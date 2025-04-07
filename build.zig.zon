@@ -1,0 +1,21 @@
+.{
+    .name = .mbjsonrpc,
+
+    .version = "0.0.0",
+
+    .fingerprint = 0x17f12cd96a322926, // Changing this has security and trust implications.
+
+    .minimum_zig_version = "0.15.0-dev.117+1408288b9",
+
+    .dependencies = .{
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        // For example...
+        //"LICENSE",
+        //"README.md",
+    },
+}
