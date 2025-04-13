@@ -1,9 +1,9 @@
 .{
-    .name = .mbjsonrpc,
+    .name = .zigjr,
 
     .version = "0.0.0",
 
-    .fingerprint = 0x17f12cd96a322926, // Changing this has security and trust implications.
+    .fingerprint = 0x5feff9626ae4bad0, // Changing this has security and trust implications.
 
     .minimum_zig_version = "0.15.0-dev.117+1408288b9",
 

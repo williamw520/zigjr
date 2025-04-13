@@ -7,7 +7,7 @@
 //
 
 const std = @import("std");
-const mbjsonrpc = @import("mbjsonrpc");
+const zigjr = @import("zigjr");
 const Allocator = std.mem.Allocator;
 const ArgIterator = std.process.ArgIterator;
 const ArrayList = std.ArrayList;
@@ -53,14 +53,6 @@ const Foo = struct {
     // id: []const u8,
 };
 
-pub fn main99() !void {
-    var gp = std.heap.GeneralPurposeAllocator(.{}){};
-    // const data1 = "{ \"id\": 1 }";
-    const data1 = "{ \"id\": \"ABC\" }";
-    const parsed = try std.json.parseFromSlice(Foo, gp.allocator(), data1, .{});
-    std.debug.print("{any}\n", .{parsed.value});
-}
-
 
 /// A command line tool that reads dependency data from file and
 /// does topological sort using the Toposort library.
@@ -81,11 +73,7 @@ pub fn main() !void {
             return;
         };
         defer g_allocator.free(data);
-
-        // const data2 = "{\"jsonrpc\": \"2.0\", \"method\": \"subtract\", \"id\": \"10\" }";
-        // const data2 = "{ \"id\": \"10\" }";
-        const req = try mbjsonrpc.Request.init(g_allocator, data);
-        // std.debug.print("req: {any}\n", .{req});
+        const req = try zigjr.Request.init(g_allocator, data);
         std.debug.print("req: {any}\n", .{req.body});
         defer req.deinit();
 

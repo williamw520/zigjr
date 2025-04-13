@@ -6,23 +6,23 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const strip_debug_symbols = b.option(bool, "strip", "strip debugging symbols") orelse false;
 
-    const mbjsonrpc_mod = b.addModule("mbjsonrpc", .{
-        .root_source_file = b.path("src/mbjsonrpc.zig"),
+    const zigjr_mod = b.addModule("zigjr", .{
+        .root_source_file = b.path("src/zigjr.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip_debug_symbols,
     });
 
     const cli_exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/mbjsonrpc-cli.zig"),
+        .root_source_file = b.path("src/zigjr-cli.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip_debug_symbols,
     });
-    cli_exe_mod.addImport("mbjsonrpc", mbjsonrpc_mod);
+    cli_exe_mod.addImport("zigjr", zigjr_mod);
 
     const exe = b.addExecutable(.{
-        .name = "mbjsonrpc-cli",
+        .name = "zigjr-cli",
         .root_module = cli_exe_mod,
     });
     b.installArtifact(exe);
@@ -39,7 +39,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const lib_unit_tests = b.addTest(.{
-        .root_module = mbjsonrpc_mod,
+        .root_module = zigjr_mod,
     });
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
