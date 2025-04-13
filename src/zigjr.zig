@@ -34,6 +34,7 @@ const ErrorCode = enum(i32) {
 };
 
 const MyErrors = error{ NotificationHasNoResponse, InvalidFunctionParameter };
+const ServerErrors = error{  };
 
 const RequestError = struct {
     code:   ErrorCode = .None,
@@ -152,12 +153,12 @@ pub const Registry = struct {
     const Self = @This();
 
     allocator:  Allocator,
-    handlers:   StringHashMap(HandlerPtr),
+    handlers:   StringHashMap(Handler),
 
     pub fn init(allocator: Allocator) Self {
         return .{
             .allocator = allocator,
-            .handlers = StringHashMap(HandlerPtr).init(allocator),
+            .handlers = StringHashMap(Handler).init(allocator),
         };
     }
 
@@ -167,44 +168,63 @@ pub const Registry = struct {
     }
 
     pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
-        const fn_ptr = handlerPtr(handler_fn);
+        const fn_ptr = toHandler(handler_fn);
         try self.handlers.put(method, fn_ptr);
     }
 
 };
 
 const Value = std.json.Value;
-const Handler0 = *const fn(Allocator) []const u8;
-const Handler1 = *const fn(Allocator, Value) []const u8;
-const Handler2 = *const fn(Allocator, Value, Value) []const u8;
-const Handler3 = *const fn(Allocator, Value, Value, Value) []const u8;
-const HandlerN = *const fn(Allocator, ArrayList(Value)) []const u8;
-const HandlerMax = 4;
+const Handler0 = *const fn(Allocator) ServerErrors![]const u8;
+const Handler1 = *const fn(Allocator, Value) ServerErrors![]const u8;
+const Handler2 = *const fn(Allocator, Value, Value) ServerErrors![]const u8;
+const Handler3 = *const fn(Allocator, Value, Value, Value) ServerErrors![]const u8;
+const Handler4 = *const fn(Allocator, Value, Value, Value, Value) ServerErrors![]const u8;
+const Handler5 = *const fn(Allocator, Value, Value, Value, Value, Value) ServerErrors![]const u8;
+const Handler6 = *const fn(Allocator, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
+const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
+const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
+const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
+const HandlerN = *const fn(Allocator, ArrayList(Value)) ServerErrors![]const u8;
 
-const HandlerPtr = union(enum) {
+const Handler = union(enum) {
     fn0: Handler0,
     fn1: Handler1,
     fn2: Handler2,
     fn3: Handler3,
+    fn4: Handler4,
+    fn5: Handler5,
+    fn6: Handler6,
+    fn7: Handler7,
+    fn8: Handler8,
+    fn9: Handler9,
     fnN: HandlerN,
 };
 
-fn handlerPtr(handler: anytype) HandlerPtr {
-    const fn_type_info = @typeInfo(@TypeOf(handler));
+fn toHandler(handler_fn: anytype) Handler {
+    const fn_type_info = @typeInfo(@TypeOf(handler_fn));
     const nparams = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params.len - 1,  // one less for the Allocator param
-        else => 9999,
+        else => 99,
     };
 
     return switch (nparams) {
-        0 => HandlerPtr { .fn0 = handler },
-        1 => HandlerPtr { .fn1 = handler },
-        else => HandlerPtr { .fnN = handler },
+        0 => Handler { .fn0 = handler_fn },
+        1 => Handler { .fn1 = handler_fn },
+        2 => Handler { .fn2 = handler_fn },
+        3 => Handler { .fn3 = handler_fn },
+        4 => Handler { .fn4 = handler_fn },
+        5 => Handler { .fn5 = handler_fn },
+        6 => Handler { .fn6 = handler_fn },
+        7 => Handler { .fn7 = handler_fn },
+        8 => Handler { .fn8 = handler_fn },
+        9 => Handler { .fn9 = handler_fn },
+        else => Handler { .fnN = handler_fn },
     };
 }
 
 
-fn foo(p1: u32) usize { return p1 + 2; }
+fn foo(p1: u32) !usize { return p1 + 2; }
 
 fn foo2(p1: ?std.json.Value, p2: ?std.json.Value) struct { id: usize, name: []const u8 } {
     _=p1;
@@ -218,7 +238,7 @@ test {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    std.debug.print("foo(3): {}\n", .{foo(3)});
+    std.debug.print("foo(3): {}\n", .{try foo(3)});
 
     // const type_foo = @TypeOf(foo);
     const info_foo = @typeInfo(@TypeOf(foo));
@@ -268,11 +288,11 @@ test {
     
 }
 
-fn fun0(_: Allocator) []const u8 {
+fn fun0(_: Allocator) ServerErrors![]const u8 {
     return "Hello";
 }
 
-fn fun1(alloc: Allocator, p1: Value) []const u8 {
+fn fun1(alloc: Allocator, p1: Value) ServerErrors![]const u8 {
     const n1 = p1.integer;
     return allocPrint(alloc, "Hello p1={}", .{n1}) catch |e| @errorName(e);
 }
@@ -288,10 +308,10 @@ test {
     var registry = Registry.init(allocator);
     defer registry.deinit();
 
-    const ptr = handlerPtr(fun0);
+    const ptr = toHandler(fun0);
     std.debug.print("ptr: {}\n", .{ptr});
 
-    const ptr2 = handlerPtr(fun0);
+    const ptr2 = toHandler(fun0);
     std.debug.print("ptr2: {}\n", .{ptr2});
 
     try registry.register("fun0", fun0);
@@ -311,11 +331,11 @@ test {
     if (registry.handlers.get("fun1")) |hptr| {
         switch (hptr) {
             .fn0 => |f| {
-                const result = f(allocator);
+                const result = try f(allocator);
                 std.debug.print("call fn0: {s}\n", .{result});
             },
             .fn1 => |f| {
-                const result = f(allocator, p1);
+                const result = try f(allocator, p1);
                 std.debug.print("call fn1: {s}\n", .{result});
             },
             // fn2: Handler2,
