@@ -101,7 +101,7 @@ pub const Request = struct {
         return if (self.body) |body| body.id else IdType { .nul = 0 };
     }
 
-    pub fn has_error(self: Self) bool {
+    pub fn hasError(self: Self) bool {
         return self.err_code != .None;
     }
 
@@ -181,26 +181,26 @@ pub const Registry = struct {
     }
 
     /// Run a handler on the request and generate a Response JSON string.
-    /// Call free_response() to free the string.
+    /// Call freeResponse() to free the string.
     pub fn run(self: *Self, req: Request) ![]const u8 {
-        if (req.has_error()) {
+        if (req.hasError()) {
             // Have a parsing error on the Request message; return an Error message.
             const code  = @intFromEnum(req.err_code);
             const msg   = req.err_msg;
-            return self.response_error(req.getId(), code, msg);
+            return self.responseError(req.getId(), code, msg);
         }
         if (self.dispatch(req)) |result| {
             return self.response(req, result);
         } else |err| {
             // Return any dispatching error as an Error message.
-            const code  = @intFromEnum(ErrorCode.ServerError);
+            const code  = errorToCode(err);
             const msg   = @errorName(err);
-            return self.response_error(req.getId(), code, msg);
+            return self.responseError(req.getId(), code, msg);
         }
     }
 
     /// Free the Response JSON string returned by run().
-    pub fn free_response(self: *Self, response_json: []const u8) void {
+    pub fn freeResponse(self: *Self, response_json: []const u8) void {
         self.alloc.free(response_json);
     }
 
@@ -247,10 +247,10 @@ pub const Registry = struct {
     /// Build a Response message, or an Error message if there was a parse error.
     /// Caller needs to call self.alloc.free() on the returned message free the memory.
     fn response(self: Self, req: Request, result_json: []const u8) ![]const u8 {
-        if (req.has_error()) {
+        if (req.hasError()) {
             const code  = @intFromEnum(req.err_code);
             const msg   = req.err_msg;
-            return self.response_error(req.getId(), code, msg);
+            return self.responseError(req.getId(), code, msg);
         }
         if (req.body) |body| {
             return switch (body.id) {
@@ -264,12 +264,12 @@ pub const Registry = struct {
         const id    = IdType { .nul = 0 };
         const code  = @intFromEnum(ErrorCode.InvalidRequest);
         const msg   = "Missing request body.";
-        return self.response_error(id, code, msg);
+        return self.responseError(id, code, msg);
     }
 
     /// Build an Error message.
     /// Caller needs to call self.alloc.free() on the returned message free the memory.
-    fn response_error(self: Self, id: IdType, code: i64, msg: []const u8) ![]const u8 {
+    fn responseError(self: Self, id: IdType, code: i64, msg: []const u8) ![]const u8 {
         return switch (id) {
             .num => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": {},
@@ -288,6 +288,16 @@ pub const Registry = struct {
                                , .{code, msg}),
         };
     }
+
+    fn errorToCode(err: anyerror) i32 {
+        return switch (err) {
+            ServerErrors.InvalidParams => @intFromEnum(ErrorCode.InvalidParams),
+            ServerErrors.InvalidRequest => @intFromEnum(ErrorCode.InvalidRequest),
+            ServerErrors.MethodNotFound => @intFromEnum(ErrorCode.MethodNotFound),
+            else => @intFromEnum(ErrorCode.ServerError),
+        };
+    }
+
 };
 
 const Value = std.json.Value;
