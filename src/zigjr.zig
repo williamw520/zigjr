@@ -204,7 +204,7 @@ pub const Registry = struct {
         self.alloc.free(response_json);
     }
 
-    fn dispatch(self: *Self, req: Request) ServerErrors![]const u8 {
+    fn dispatch(self: *Self, req: Request) anyerror![]const u8 {
         if (req.body) |body| {
             return switch (body.params) {
                 .array => |array| self.dispatchOnArray(req, body, array),
@@ -215,7 +215,7 @@ pub const Registry = struct {
         return ServerErrors.InvalidRequest;
     }
 
-    fn dispatchOnArray(self: *Self, req: Request, body: RequestBody, arr: std.json.Array) ServerErrors![]const u8 {
+    fn dispatchOnArray(self: *Self, req: Request, body: RequestBody, arr: std.json.Array) anyerror![]const u8 {
         _=req;
         if (self.handlers.get(body.method)) |handler| {
             // TODO: check handler's nparams vs arr.len
@@ -236,7 +236,7 @@ pub const Registry = struct {
         return ServerErrors.MethodNotFound;
     }
 
-    fn dispatchOnObject(self: *Self, req: Request, obj: std.json.ObjectMap) ServerErrors![]const u8 {
+    fn dispatchOnObject(self: *Self, req: Request, obj: std.json.ObjectMap) anyerror![]const u8 {
         _=self;
         _=req;
         _=obj;
@@ -291,17 +291,17 @@ pub const Registry = struct {
 };
 
 const Value = std.json.Value;
-const Handler0 = *const fn(Allocator) ServerErrors![]const u8;
-const Handler1 = *const fn(Allocator, Value) ServerErrors![]const u8;
-const Handler2 = *const fn(Allocator, Value, Value) ServerErrors![]const u8;
-const Handler3 = *const fn(Allocator, Value, Value, Value) ServerErrors![]const u8;
-const Handler4 = *const fn(Allocator, Value, Value, Value, Value) ServerErrors![]const u8;
-const Handler5 = *const fn(Allocator, Value, Value, Value, Value, Value) ServerErrors![]const u8;
-const Handler6 = *const fn(Allocator, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
-const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
-const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
-const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) ServerErrors![]const u8;
-const HandlerN = *const fn(Allocator, std.json.Array) ServerErrors![]const u8;
+const Handler0 = *const fn(Allocator) anyerror![]const u8;
+const Handler1 = *const fn(Allocator, Value) anyerror![]const u8;
+const Handler2 = *const fn(Allocator, Value, Value) anyerror![]const u8;
+const Handler3 = *const fn(Allocator, Value, Value, Value) anyerror![]const u8;
+const Handler4 = *const fn(Allocator, Value, Value, Value, Value) anyerror![]const u8;
+const Handler5 = *const fn(Allocator, Value, Value, Value, Value, Value) anyerror![]const u8;
+const Handler6 = *const fn(Allocator, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
+const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
+const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
+const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
+const HandlerN = *const fn(Allocator, std.json.Array) anyerror![]const u8;
 
 const Handler = union(enum) {
     fn0: Handler0,
@@ -404,21 +404,21 @@ test {
     
 }
 
-fn fun0(_: Allocator) ServerErrors![]const u8 {
+fn fun0(_: Allocator) anyerror![]const u8 {
     return "Hello";
 }
 
-fn fun1(alloc: Allocator, p1: Value) ServerErrors![]const u8 {
+fn fun1(alloc: Allocator, p1: Value) anyerror![]const u8 {
     const n1 = p1.integer;
     return allocPrint(alloc, "Hello p1={}", .{n1}) catch |e| @errorName(e);
 }
 
-fn fun2(alloc: Allocator, p1: Value, p2: Value) ServerErrors![]const u8 {
+fn fun2(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
     const n1 = p1.integer;
     const n2 = p2.integer;
     const str = allocPrint(alloc, "Subtract p1={}, p2={}", .{n1, n2}) catch |e| @errorName(e);
     defer alloc.free(str);
-    return std.json.stringifyAlloc(alloc, str, .{}) catch return ServerErrors.InvalidParams;
+    return std.json.stringifyAlloc(alloc, n1 - n2, .{});
 }
 
 
