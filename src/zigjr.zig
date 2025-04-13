@@ -33,8 +33,8 @@ const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
-const MyErrors = error{ NotificationHasNoResponse, InvalidFunctionParameter };
-const ServerErrors = error{ InvalidRequest, InvalidParams, MethodNotFound };
+const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
+pub const ServerErrors = error{ InvalidRequest, InvalidParams, MethodNotFound };
 
 const RequestError = struct {
     code:   ErrorCode = .None,
@@ -44,6 +44,7 @@ const RequestError = struct {
 const IdType = union(enum) {
     num:    i64,
     str:    []const u8,
+    nul:    i64,
 
     // Custom parsing when the JSON parser encounters a field of the IdType type.
     pub fn jsonParse(allocator: Allocator, source: *Scanner, options: ParseOptions) !IdType {
@@ -59,7 +60,7 @@ const IdType = union(enum) {
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
-    id:             ?IdType = null,
+    id:             IdType = IdType { .nul = 0 },   // default if JSON doesn't have it.
     params:         std.json.Value,
 };
 
@@ -89,12 +90,15 @@ pub const Request = struct {
                     return .{ .err_code = ErrorCode.ParseError, .err_msg = @errorName(err) };
                 },
         };
-        // TODO: validate method and params in parsed.
         return .{ .body = parsed.value, .parsed = parsed };
     }
 
     pub fn deinit(self: *const Self) void {
         if (self.parsed) |parsed| parsed.deinit();
+    }
+
+    pub fn getId(self: *const Self) IdType {
+        return if (self.body) |body| body.id else IdType { .nul = 0 };
     }
 
     pub fn has_error(self: Self) bool {
@@ -105,14 +109,15 @@ pub const Request = struct {
     /// Caller needs to call allocator.free() on the returned message free the memory.
     pub fn response(self: Self, alloc: Allocator, result: anytype) ![]const u8 {
         if (self.body) |body| {
-            const id = body.id orelse return MyErrors.NotificationHasNoResponse;
             const result_json = try std.json.stringifyAlloc(alloc, result, .{});
             defer alloc.free(result_json);
-            return switch (id) {
+            return switch (body.id) {
                 .num => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
-                                       , .{result_json, id.num}),
+                                       , .{result_json, body.id.num}),
                 .str => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
-                                       , .{result_json, id.str}),
+                                       , .{result_json, body.id.str}),
+                .nul => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": null }}
+                                       , .{result_json}),
             };
         }
         return self.response_error(alloc);
@@ -124,20 +129,23 @@ pub const Request = struct {
         const code  = @intFromEnum(self.err_code);
         const msg   = self.err_msg;
         if (self.body) |body| {
-            if (body.id) |id| {
-                return switch (id) {
-                    .num => allocPrint(alloc,
-                                        \\{{ "jsonrpc": "2.0", "id": {},
-                                        \\   "error": {{ code: {}, "message": {s} }}
-                                        \\}}
-                                        , .{id.num, code, msg}),
-                    .str => allocPrint(alloc,
-                                        \\{{ "jsonrpc": "2.0", "id": "{s}",
-                                        \\   "error": {{ code: {}, "message": {s} }}
-                                        \\}}
-                                        , .{id.str, code, msg}),
-                };
-            }
+            return switch (body.id) {
+                .num => allocPrint(alloc,
+                                   \\{{ "jsonrpc": "2.0", "id": {},
+                                       \\   "error": {{ code: {}, "message": {s} }}
+                                       \\}}
+                                       , .{body.id.num, code, msg}),
+                .str => allocPrint(alloc,
+                                   \\{{ "jsonrpc": "2.0", "id": "{s}",
+                                       \\   "error": {{ code: {}, "message": {s} }}
+                                       \\}}
+                                       , .{body.id.str, code, msg}),
+                .nul => allocPrint(alloc,
+                                   \\{{ "jsonrpc": "2.0", "id": null,
+                                       \\   "error": {{ code: {}, "message": {s} }}
+                                       \\}}
+                                       , .{code, msg}),
+            };
         }
         return allocPrint(alloc,
                               \\{{ "jsonrpc": "2.0", "id": null,
@@ -172,13 +180,28 @@ pub const Registry = struct {
         try self.handlers.put(method, fn_ptr);
     }
 
-    pub fn run(self: *Self, req: Request) []const u8 {
-        _=self;
-        _=req;
-        // TODO: return a Response JSON.
-        // Move response building code from Request to here.
-        // Handle existing error in req.
-        // Handle any error during dispatching.
+    /// Run a handler on the request and generate a Response JSON string.
+    /// Call free_response() to free the string.
+    pub fn run(self: *Self, req: Request) ![]const u8 {
+        if (req.has_error()) {
+            // Have a parsing error on the Request message; return an Error message.
+            const code  = @intFromEnum(req.err_code);
+            const msg   = req.err_msg;
+            return self.response_error(req.getId(), code, msg);
+        }
+        if (self.dispatch(req)) |result| {
+            return self.response(req, result);
+        } else |err| {
+            // Return any dispatching error as an Error message.
+            const code  = @intFromEnum(ErrorCode.ServerError);
+            const msg   = @errorName(err);
+            return self.response_error(req.getId(), code, msg);
+        }
+    }
+
+    /// Free the Response JSON string returned by run().
+    pub fn free_response(self: *Self, response_json: []const u8) void {
+        self.alloc.free(response_json);
     }
 
     fn dispatch(self: *Self, req: Request) ServerErrors![]const u8 {
@@ -221,6 +244,50 @@ pub const Registry = struct {
         return "";
     }
 
+    /// Build a Response message, or an Error message if there was a parse error.
+    /// Caller needs to call self.alloc.free() on the returned message free the memory.
+    fn response(self: Self, req: Request, result_json: []const u8) ![]const u8 {
+        if (req.has_error()) {
+            const code  = @intFromEnum(req.err_code);
+            const msg   = req.err_msg;
+            return self.response_error(req.getId(), code, msg);
+        }
+        if (req.body) |body| {
+            return switch (body.id) {
+                .num => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
+                                       , .{result_json, body.id.num}),
+                .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
+                                       , .{result_json, body.id.str}),
+                .nul => MyErrors.NotificationHasNoResponse,
+            };
+        }
+        const id    = IdType { .nul = 0 };
+        const code  = @intFromEnum(ErrorCode.InvalidRequest);
+        const msg   = "Missing request body.";
+        return self.response_error(id, code, msg);
+    }
+
+    /// Build an Error message.
+    /// Caller needs to call self.alloc.free() on the returned message free the memory.
+    fn response_error(self: Self, id: IdType, code: i64, msg: []const u8) ![]const u8 {
+        return switch (id) {
+            .num => allocPrint(self.alloc,
+                               \\{{ "jsonrpc": "2.0",  "id": {},
+                               \\   "error": {{ code: {}, "message": {s} }}
+                               \\}}
+                               , .{id.num, code, msg}),
+            .str => allocPrint(self.alloc,
+                               \\{{ "jsonrpc": "2.0",  "id": "{s}",
+                               \\   "error": {{ code: {}, "message": {s} }}
+                               \\}}
+                               , .{id.str, code, msg}),
+            .nul => allocPrint(self.alloc,
+                               \\{{ "jsonrpc": "2.0",  "id": null,
+                               \\   "error": {{ code: {}, "message": {s} }}
+                               \\}}
+                               , .{code, msg}),
+        };
+    }
 };
 
 const Value = std.json.Value;
@@ -349,7 +416,9 @@ fn fun1(alloc: Allocator, p1: Value) ServerErrors![]const u8 {
 fn fun2(alloc: Allocator, p1: Value, p2: Value) ServerErrors![]const u8 {
     const n1 = p1.integer;
     const n2 = p2.integer;
-    return allocPrint(alloc, "Subtract p1={}, p2={}", .{n1, n2}) catch |e| @errorName(e);
+    const str = allocPrint(alloc, "Subtract p1={}, p2={}", .{n1, n2}) catch |e| @errorName(e);
+    defer alloc.free(str);
+    return std.json.stringifyAlloc(alloc, str, .{}) catch return ServerErrors.InvalidParams;
 }
 
 
@@ -403,7 +472,7 @@ test {
         }            
     }
 
-    const res3 = try registry.dispatch(req);
+    const res3 = try registry.run(req);
     std.debug.print("res3 {s}\n", .{res3});
     
 }
