@@ -181,22 +181,22 @@ pub const Registry = struct {
         // Handle any error during dispatching.
     }
 
-    fn dispatch(self: *Self, req: Request) ServerErrors!void {
+    fn dispatch(self: *Self, req: Request) ServerErrors![]const u8 {
         if (req.body) |body| {
-            switch (body.params) {
-                .array => |array| try self.dispatchOnArray(req, body, array),
-                .object => |obj| try self.dispatchOnObject(req, body, obj),
-                else => return ServerErrors.InvalidParams,
-            }
+            return switch (body.params) {
+                .array => |array| self.dispatchOnArray(req, body, array),
+                .object => |obj| self.dispatchOnObject(req, obj),
+                else => ServerErrors.InvalidParams,
+            };
         }
         return ServerErrors.InvalidRequest;
     }
 
-    fn dispatchOnArray(self: *Self, req: Request, body: RequestBody, arr: std.json.Array) ServerErrors!void {
+    fn dispatchOnArray(self: *Self, req: Request, body: RequestBody, arr: std.json.Array) ServerErrors![]const u8 {
         _=req;
         if (self.handlers.get(body.method)) |handler| {
             // TODO: check handler's nparams vs arr.len
-            switch (handler) {
+            return switch (handler) {
                 .fn0 => |f| try f(self.alloc),
                 .fn1 => |f| try f(self.alloc, arr.items[0]),
                 .fn2 => |f| try f(self.alloc, arr.items[0], arr.items[1]),
@@ -207,17 +207,18 @@ pub const Registry = struct {
                 .fn7 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6]),
                 .fn8 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
                 .fn9 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
-                else => |f| try f(self.alloc, arr),
-            }
+                .fnN => |f| try f(self.alloc, arr),
+            };
         }
         return ServerErrors.MethodNotFound;
     }
 
-    fn dispatchOnObject(self: *Self, req: Request, obj: std.json.ObjectMap) ServerErrors!void {
+    fn dispatchOnObject(self: *Self, req: Request, obj: std.json.ObjectMap) ServerErrors![]const u8 {
         _=self;
         _=req;
         _=obj;
         // TODO: dispatch to .fn1
+        return "";
     }
 
 };
@@ -345,6 +346,12 @@ fn fun1(alloc: Allocator, p1: Value) ServerErrors![]const u8 {
     return allocPrint(alloc, "Hello p1={}", .{n1}) catch |e| @errorName(e);
 }
 
+fn fun2(alloc: Allocator, p1: Value, p2: Value) ServerErrors![]const u8 {
+    const n1 = p1.integer;
+    const n2 = p2.integer;
+    return allocPrint(alloc, "Subtract p1={}, p2={}", .{n1, n2}) catch |e| @errorName(e);
+}
+
 
 test {
     std.debug.print("\n\n\n", .{});
@@ -364,6 +371,7 @@ test {
 
     try registry.register("fun0", fun0);
     try registry.register("fun1", fun1);
+    try registry.register("subtract", fun2);
 
     const msg1 =\\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 23], "id": 1}
                 ;
@@ -394,6 +402,9 @@ test {
             },
         }            
     }
+
+    const res3 = try registry.dispatch(req);
+    std.debug.print("res3 {s}\n", .{res3});
     
 }
 
