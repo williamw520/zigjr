@@ -34,7 +34,8 @@ const ErrorCode = enum(i32) {
 };
 
 const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
-pub const ServerErrors = error{ InvalidRequest, InvalidParams, MethodNotFound };
+pub const ServerErrors = error{ InvalidRequest, InvalidParams, MethodNotFound,
+                                NoHandlerForArrayParam, NoHandlerForObjectParam, };
 
 const RequestError = struct {
     code:   ErrorCode = .None,
@@ -207,17 +208,17 @@ pub const Registry = struct {
     fn dispatch(self: *Self, req: Request) anyerror![]const u8 {
         if (req.body) |body| {
             return switch (body.params) {
-                .array => |array| self.dispatchOnArray(req, body, array),
-                .object => |obj| self.dispatchOnObject(req, obj),
+                .array => |array| self.dispatchOnArray(req, body.method, array),
+                .object => |obj| self.dispatchOnObject(req, body.method, obj),
                 else => ServerErrors.InvalidParams,
             };
         }
         return ServerErrors.InvalidRequest;
     }
 
-    fn dispatchOnArray(self: *Self, req: Request, body: RequestBody, arr: std.json.Array) anyerror![]const u8 {
+    fn dispatchOnArray(self: *Self, req: Request, method: []const u8, arr: std.json.Array) anyerror![]const u8 {
         _=req;
-        if (self.handlers.get(body.method)) |handler| {
+        if (self.handlers.get(method)) |handler| {
             // TODO: check handler's nparams vs arr.len
             return switch (handler) {
                 .fn0 => |f| try f(self.alloc),
@@ -231,17 +232,21 @@ pub const Registry = struct {
                 .fn8 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
                 .fn9 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
                 .fnN => |f| try f(self.alloc, arr),
+                else => ServerErrors.NoHandlerForArrayParam,
             };
         }
         return ServerErrors.MethodNotFound;
     }
 
-    fn dispatchOnObject(self: *Self, req: Request, obj: std.json.ObjectMap) anyerror![]const u8 {
-        _=self;
+    fn dispatchOnObject(self: *Self, req: Request, method: []const u8, obj: std.json.ObjectMap) anyerror![]const u8 {
         _=req;
-        _=obj;
-        // TODO: dispatch to .fn1
-        return "";
+        if (self.handlers.get(method)) |handler| {
+            return switch (handler) {
+                .fnObj => |f| try f(self.alloc, obj),
+                else => ServerErrors.NoHandlerForObjectParam,
+            };
+        }
+        return ServerErrors.MethodNotFound;
     }
 
     /// Build a Response message, or an Error message if there was a parse error.
@@ -312,6 +317,7 @@ const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, 
 const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const HandlerN = *const fn(Allocator, std.json.Array) anyerror![]const u8;
+const HandlerObj = *const fn(Allocator, std.json.ObjectMap) anyerror![]const u8;
 
 const Handler = union(enum) {
     fn0: Handler0,
@@ -325,6 +331,7 @@ const Handler = union(enum) {
     fn8: Handler8,
     fn9: Handler9,
     fnN: HandlerN,
+    fnObj: HandlerObj,
 };
 
 fn toHandler(handler_fn: anytype) Handler {
