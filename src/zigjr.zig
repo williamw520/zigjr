@@ -197,9 +197,9 @@ pub const Registry = struct {
             const msg   = req.err_msg;
             return self.responseError(req.getId(), code, msg);
         }
-        if (self.dispatch(req)) |result| {
-            // TODO: free result.
-            return self.response(req, result);
+        if (self.dispatch(req)) |result_json| {
+            defer self.alloc.free(result_json);
+            return self.response(req, result_json);
         } else |err| {
             // Return any dispatching error as an Error message.
             const code  = errorToCode(err);
@@ -310,6 +310,9 @@ pub const Registry = struct {
 
 };
 
+/// The returned JSON string must be allocated with the passed in allocator.
+/// The caller will free it with the allocator after using it in the Response message.
+/// Call std.json.stringifyAlloc() to build the returned JSON will take care of it.
 const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
