@@ -34,8 +34,14 @@ const ErrorCode = enum(i32) {
 };
 
 const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
-pub const ServerErrors = error{ InvalidRequest, InvalidParams, MethodNotFound,
-                                NoHandlerForArrayParam, NoHandlerForObjectParam, };
+pub const ServerErrors = error{
+    InvalidRequest, InvalidParams, MethodNotFound,
+    NoHandlerForArrayParam,
+    NoHandlerForObjectParam,
+    HandlerNotFunction,
+    HandlerInvalidParameter,
+    HandlerTooManyParams,
+};
 
 const RequestError = struct {
     code:   ErrorCode = .None,
@@ -177,7 +183,7 @@ pub const Registry = struct {
     }
 
     pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
-        const fn_ptr = toHandler(handler_fn);
+        const fn_ptr = try toHandler(handler_fn);
         try self.handlers.put(method, fn_ptr);
     }
 
@@ -231,7 +237,7 @@ pub const Registry = struct {
                 .fn7 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6]),
                 .fn8 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
                 .fn9 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
-                .fnN => |f| try f(self.alloc, arr),
+                .fnArr => |f| try f(self.alloc, arr),
                 else => ServerErrors.NoHandlerForArrayParam,
             };
         }
@@ -306,6 +312,8 @@ pub const Registry = struct {
 };
 
 const Value = std.json.Value;
+const Array = std.json.Array;
+const ObjectMap = std.json.ObjectMap;
 const Handler0 = *const fn(Allocator) anyerror![]const u8;
 const Handler1 = *const fn(Allocator, Value) anyerror![]const u8;
 const Handler2 = *const fn(Allocator, Value, Value) anyerror![]const u8;
@@ -316,8 +324,8 @@ const Handler6 = *const fn(Allocator, Value, Value, Value, Value, Value, Value) 
 const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
-const HandlerN = *const fn(Allocator, std.json.Array) anyerror![]const u8;
-const HandlerObj = *const fn(Allocator, std.json.ObjectMap) anyerror![]const u8;
+const HandlerN = *const fn(Allocator, Array) anyerror![]const u8;
+const HandlerObj = *const fn(Allocator, ObjectMap) anyerror![]const u8;
 
 const Handler = union(enum) {
     fn0: Handler0,
@@ -330,30 +338,42 @@ const Handler = union(enum) {
     fn7: Handler7,
     fn8: Handler8,
     fn9: Handler9,
-    fnN: HandlerN,
+    fnArr: HandlerN,
     fnObj: HandlerObj,
 };
 
-fn toHandler(handler_fn: anytype) Handler {
-    const fn_type_info = @typeInfo(@TypeOf(handler_fn));
+fn toHandler(handler_fn: anytype) !Handler {
+    const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
     const nparams = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params.len - 1,  // one less for the Allocator param
-        else => 99,
+        else => return ServerErrors.HandlerNotFunction,
     };
 
-    return switch (nparams) {
-        0 => Handler { .fn0 = handler_fn },
-        1 => Handler { .fn1 = handler_fn },
-        2 => Handler { .fn2 = handler_fn },
-        3 => Handler { .fn3 = handler_fn },
-        4 => Handler { .fn4 = handler_fn },
-        5 => Handler { .fn5 = handler_fn },
-        6 => Handler { .fn6 = handler_fn },
-        7 => Handler { .fn7 = handler_fn },
-        8 => Handler { .fn8 = handler_fn },
-        9 => Handler { .fn9 = handler_fn },
-        else => Handler { .fnN = handler_fn },
-    };
+    switch (nparams) {
+        0 => return Handler { .fn0 = handler_fn },
+        1 => {
+            // Single-param handler can be a Value, Array, or Object handler.
+            const param1 = fn_type_info.@"fn".params[1];
+            if (param1.type)|typ| {
+                switch (typ) {
+                    Value =>    return Handler { .fn1 = handler_fn },
+                    Array =>    return Handler { .fnArr = handler_fn },
+                    ObjectMap=> return Handler { .fnObj = handler_fn },
+                    else =>     return ServerErrors.HandlerInvalidParameter,
+                }
+            }
+            return ServerErrors.HandlerInvalidParameter;
+        },
+        2 => return Handler { .fn2 = handler_fn },
+        3 => return Handler { .fn3 = handler_fn },
+        4 => return Handler { .fn4 = handler_fn },
+        5 => return Handler { .fn5 = handler_fn },
+        6 => return Handler { .fn6 = handler_fn },
+        7 => return Handler { .fn7 = handler_fn },
+        8 => return Handler { .fn8 = handler_fn },
+        9 => return Handler { .fn9 = handler_fn },
+        else => return ServerErrors.HandlerTooManyParams,
+    }
 }
 
 
@@ -450,10 +470,13 @@ test {
     defer registry.deinit();
 
     const ptr = toHandler(fun0);
-    std.debug.print("ptr: {}\n", .{ptr});
+    std.debug.print("ptr: {any}\n", .{ptr});
 
     const ptr2 = toHandler(fun0);
-    std.debug.print("ptr2: {}\n", .{ptr2});
+    std.debug.print("ptr2: {any}\n", .{ptr2});
+
+    const ptr3 = toHandler(123);
+    std.debug.print("ptr3: {any}\n", .{ptr3});
 
     try registry.register("fun0", fun0);
     try registry.register("fun1", fun1);
@@ -482,7 +505,7 @@ test {
             },
             // fn2: Handler2,
             // fn3: Handler3,
-            // fnN: HandlerN,
+            // fnArr: HandlerArr,
             else => |_| {
                 std.debug.print("Not done yet\n", .{});
             },
