@@ -33,7 +33,6 @@ const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
-const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 pub const ServerErrors = error{
     InvalidRequest, InvalidParams, MethodNotFound,
     NoHandlerForArrayParam,
@@ -45,15 +44,12 @@ pub const ServerErrors = error{
     MismatchedParameterCounts,
 };
 
-const RequestError = struct {
-    code:   ErrorCode = .None,
-    msg:    []const u8 = "",
-};
+const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 
 const IdType = union(enum) {
     num:    i64,
     str:    []const u8,
-    nul:    i64,
+    nul:    void,
 
     // Custom parsing when the JSON parser encounters a field of the IdType type.
     pub fn jsonParse(allocator: Allocator, source: *Scanner, options: ParseOptions) !IdType {
@@ -69,7 +65,7 @@ const IdType = union(enum) {
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
-    id:             IdType = IdType { .nul = 0 },   // default if JSON doesn't have it.
+    id:             IdType = IdType { .nul = {} },  // default if JSON doesn't have it.
     params:         std.json.Value,
 };
 
@@ -311,9 +307,10 @@ const Handler6 = *const fn(Allocator, Value, Value, Value, Value, Value, Value) 
 const Handler7 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
-const HandlerN = *const fn(Allocator, Array) anyerror![]const u8;
+const HandlerArr = *const fn(Allocator, Array) anyerror![]const u8;
 const HandlerObj = *const fn(Allocator, ObjectMap) anyerror![]const u8;
 
+// Use tagged union to wrap different types of handler.
 pub const Handler = union(enum) {
     fn0: Handler0,
     fn1: Handler1,
@@ -325,7 +322,7 @@ pub const Handler = union(enum) {
     fn7: Handler7,
     fn8: Handler8,
     fn9: Handler9,
-    fnArr: HandlerN,
+    fnArr: HandlerArr,
     fnObj: HandlerObj,
 };
 
