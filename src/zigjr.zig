@@ -41,6 +41,7 @@ pub const ServerErrors = error{
     HandlerNotFunction,
     HandlerInvalidParameter,
     HandlerTooManyParams,
+    MismatchedParameterCounts,
 };
 
 const RequestError = struct {
@@ -197,6 +198,7 @@ pub const Registry = struct {
             return self.responseError(req.getId(), code, msg);
         }
         if (self.dispatch(req)) |result| {
+            // TODO: free result.
             return self.response(req, result);
         } else |err| {
             // Return any dispatching error as an Error message.
@@ -214,45 +216,42 @@ pub const Registry = struct {
     fn dispatch(self: *Self, req: Request) anyerror![]const u8 {
         if (req.body) |body| {
             return switch (body.params) {
-                .array => |array| self.dispatchOnArray(req, body.method, array),
-                .object => |obj| self.dispatchOnObject(req, body.method, obj),
+                .array  => |array|  self.dispatchOnArray(body.method, array),
+                .object => |obj|    self.dispatchOnObject(body.method, obj),
                 else => ServerErrors.InvalidParams,
             };
         }
         return ServerErrors.InvalidRequest;
     }
 
-    fn dispatchOnArray(self: *Self, req: Request, method: []const u8, arr: std.json.Array) anyerror![]const u8 {
-        _=req;
-        if (self.handlers.get(method)) |handler| {
-            // TODO: check handler's nparams vs arr.len
-            return switch (handler) {
-                .fn0 => |f| try f(self.alloc),
-                .fn1 => |f| try f(self.alloc, arr.items[0]),
-                .fn2 => |f| try f(self.alloc, arr.items[0], arr.items[1]),
-                .fn3 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2]),
-                .fn4 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3]),
-                .fn5 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4]),
-                .fn6 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5]),
-                .fn7 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6]),
-                .fn8 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
-                .fn9 => |f| try f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
-                .fnArr => |f| try f(self.alloc, arr),
-                else => ServerErrors.NoHandlerForArrayParam,
-            };
-        }
-        return ServerErrors.MethodNotFound;
+    fn dispatchOnArray(self: *Self, method: []const u8, arr: Array) anyerror![]const u8 {
+        const handler = self.handlers.get(method);
+        if (handler == null) return ServerErrors.MethodNotFound;
+        if (paramLen(handler.?) != arr.items.len) return ServerErrors.MismatchedParameterCounts;
+
+        return switch (handler.?) {
+            .fn0 => |f| f(self.alloc),
+            .fn1 => |f| f(self.alloc, arr.items[0]),
+            .fn2 => |f| f(self.alloc, arr.items[0], arr.items[1]),
+            .fn3 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2]),
+            .fn4 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3]),
+            .fn5 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4]),
+            .fn6 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5]),
+            .fn7 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6]),
+            .fn8 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
+            .fn9 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
+            .fnArr  => |f| f(self.alloc, arr),
+            else    => ServerErrors.NoHandlerForArrayParam,
+        };
     }
 
-    fn dispatchOnObject(self: *Self, req: Request, method: []const u8, obj: std.json.ObjectMap) anyerror![]const u8 {
-        _=req;
-        if (self.handlers.get(method)) |handler| {
-            return switch (handler) {
-                .fnObj => |f| try f(self.alloc, obj),
-                else => ServerErrors.NoHandlerForObjectParam,
-            };
-        }
-        return ServerErrors.MethodNotFound;
+    fn dispatchOnObject(self: *Self, method: []const u8, obj: ObjectMap) anyerror![]const u8 {
+        const handler = self.handlers.get(method);
+        if (handler == null) return ServerErrors.MethodNotFound;
+        return switch (handler.?) {
+            .fnObj  => |f| f(self.alloc, obj),
+            else    => ServerErrors.NoHandlerForObjectParam,
+        };
     }
 
     /// Build a Response message, or an Error message if there was a parse error.
@@ -374,6 +373,22 @@ fn toHandler(handler_fn: anytype) !Handler {
         9 => return Handler { .fn9 = handler_fn },
         else => return ServerErrors.HandlerTooManyParams,
     }
+}
+
+fn paramLen(handler: Handler) ?usize {
+    return switch (handler) {
+        .fn0 => 0,
+        .fn1 => 1,
+        .fn2 => 2,
+        .fn3 => 3,
+        .fn4 => 4,
+        .fn5 => 5,
+        .fn6 => 6,
+        .fn7 => 7,
+        .fn8 => 8,
+        .fn9 => 9,
+        else => null,
+    };
 }
 
 
