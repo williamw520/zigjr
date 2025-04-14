@@ -112,56 +112,6 @@ pub const Request = struct {
     pub fn hasError(self: Self) bool {
         return self.err_code != .None;
     }
-
-    /// Build a Response message, or an Error message if there was a parse error.
-    /// Caller needs to call allocator.free() on the returned message free the memory.
-    pub fn response(self: Self, alloc: Allocator, result: anytype) ![]const u8 {
-        if (self.body) |body| {
-            const result_json = try std.json.stringifyAlloc(alloc, result, .{});
-            defer alloc.free(result_json);
-            return switch (body.id) {
-                .num => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
-                                       , .{result_json, body.id.num}),
-                .str => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
-                                       , .{result_json, body.id.str}),
-                .nul => allocPrint(alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": null }}
-                                       , .{result_json}),
-            };
-        }
-        return self.response_error(alloc);
-    }
-
-    /// Build an Error message.
-    /// Caller needs to call allocator.free() on the returned message free the memory.
-    pub fn response_error(self: Self, alloc: Allocator) ![]const u8 {
-        const code  = @intFromEnum(self.err_code);
-        const msg   = self.err_msg;
-        if (self.body) |body| {
-            return switch (body.id) {
-                .num => allocPrint(alloc,
-                                   \\{{ "jsonrpc": "2.0", "id": {},
-                                       \\   "error": {{ code: {}, "message": {s} }}
-                                       \\}}
-                                       , .{body.id.num, code, msg}),
-                .str => allocPrint(alloc,
-                                   \\{{ "jsonrpc": "2.0", "id": "{s}",
-                                       \\   "error": {{ code: {}, "message": {s} }}
-                                       \\}}
-                                       , .{body.id.str, code, msg}),
-                .nul => allocPrint(alloc,
-                                   \\{{ "jsonrpc": "2.0", "id": null,
-                                       \\   "error": {{ code: {}, "message": {s} }}
-                                       \\}}
-                                       , .{code, msg}),
-            };
-        }
-        return allocPrint(alloc,
-                              \\{{ "jsonrpc": "2.0", "id": null,
-                              \\   "error": {{ code: {}, "message": {s} }}
-                              \\}}
-                              , .{code, msg});
-    }
-
 };
 
 
@@ -443,36 +393,28 @@ test {
     // const res1 = try req.response(allocator, [_]usize{ 1, 2, 3});
     // std.debug.print("res1: {s}\n", .{res1});
     
-    const res2 = try req.response(allocator, [_]usize{ 1, 2, 3});
-    std.debug.print("res2: {s}\n", .{res2});
-
     const f2 =  foo2(null, null);
     std.debug.print("foo2(): {any}\n", .{f2});
 
     const type_foo2 = @TypeOf(foo2);
     std.debug.print("type_foo2: {any}\n", .{type_foo2});
 
-    
-
-    // const fp: fn(?std.json.Value, ?std.json.Value) type = foo2;
-    // std.debug.print("fp:        {any}\n", .{fp});
-    
 }
 
-fn fun0(_: Allocator) anyerror![]const u8 {
-    return "Hello";
+fn fun0(alloc: Allocator) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, "Hello", .{});
 }
 
 fn fun1(alloc: Allocator, p1: Value) anyerror![]const u8 {
-    const n1 = p1.integer;
-    return allocPrint(alloc, "Hello p1={}", .{n1}) catch |e| @errorName(e);
+    const n1 = p1.string;
+    const str = allocPrint(alloc, "Hello p1={s}", .{n1}) catch |e| @errorName(e);
+    defer alloc.free(str);
+    return std.json.stringifyAlloc(alloc, str, .{});
 }
 
 fn fun2(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
     const n1 = p1.integer;
     const n2 = p2.integer;
-    const str = allocPrint(alloc, "Subtract p1={}, p2={}", .{n1, n2}) catch |e| @errorName(e);
-    defer alloc.free(str);
     return std.json.stringifyAlloc(alloc, n1 - n2, .{});
 }
 
@@ -500,65 +442,32 @@ test {
     try registry.register("fun1", fun1);
     try registry.register("subtract", fun2);
 
-    const msg1 =\\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 23], "id": 1}
+    const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 1}
                 ;
-    const req = try Request.init(allocator, msg1);
-    std.debug.print("req.body: {any}\n", .{req.body});
-    var p1: Value = undefined;
-    if (req.body) |body| {
-        std.debug.print("req.body.params: {any}\n", .{body.params});
-        p1 = body.params.array.items[0];
-        std.debug.print("req.body.params[0]: {any}\n", .{p1});
+    const req0 = try Request.init(allocator, msg0);
+    std.debug.print("req0.body: {any}\n", .{req0.body});
+    const res0 = try registry.run(req0);
+    std.debug.print("res0 {s}\n", .{res0});
+    
+    const msg1 =\\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": 1}
+                ;
+    const req1 = try Request.init(allocator, msg1);
+    std.debug.print("req1.body: {any}\n", .{req1.body});
+    const res1 = try registry.run(req1);
+    std.debug.print("res1 {s}\n", .{res1});
+    
+    const msg2 =\\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+                ;
+    const req2 = try Request.init(allocator, msg2);
+    std.debug.print("req2.body: {any}\n", .{req2.body});
+    if (req2.body) |body| {
+        std.debug.print("req2.body.params: {any}\n", .{body.params});
+        const p1: Value = body.params.array.items[0];
+        std.debug.print("req2.body.params[0]: {any}\n", .{p1});
     }
-
-    if (registry.handlers.get("fun1")) |hptr| {
-        switch (hptr) {
-            .fn0 => |f| {
-                const result = try f(allocator);
-                std.debug.print("call fn0: {s}\n", .{result});
-            },
-            .fn1 => |f| {
-                const result = try f(allocator, p1);
-                std.debug.print("call fn1: {s}\n", .{result});
-            },
-            // fn2: Handler2,
-            // fn3: Handler3,
-            // fnArr: HandlerArr,
-            else => |_| {
-                std.debug.print("Not done yet\n", .{});
-            },
-        }            
-    }
-
-    const res3 = try registry.run(req);
-    std.debug.print("res3 {s}\n", .{res3});
+    const res2 = try registry.run(req2);
+    std.debug.print("res2 {s}\n", .{res2});
     
 }
 
-
-const FnType = *const fn(i32) i32;
-
-fn add1(x: i32) i32 { return x + 1; }
-fn add2(x: i32) i32 { return x + 2; }
-
-test {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
-    var map = std.StringHashMap(FnType).init(allocator);
-    defer map.deinit();    
-
-    try map.put("inc1", add1);
-    try map.put("inc2", add2);
-
-    if (map.get("inc1")) |f| {
-        const result = f(5);
-        std.debug.print("inc1(5): {}\n", .{result});
-    }    
-    if (map.get("inc2")) |f| {
-        const result = f(5);
-        std.debug.print("inc2(5): {}\n", .{result});
-    }    
-
-}
 
