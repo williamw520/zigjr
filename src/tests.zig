@@ -22,15 +22,19 @@ test "check out type info detail" {
     const params = info_fn_foo.params;
     const param_count = params.len;
 
-    _=return_type;
-    _=param_count;
-
     // std.debug.print("TypeOf: {any}\n", .{type_foo});
     // std.debug.print("typeInfo: {any}\n", .{info_foo});
     // std.debug.print("info_fn: {any}\n", .{info_fn_foo});
     // std.debug.print("return_type: {any}\n", .{return_type});
     // std.debug.print("param_count: {any}\n", .{param_count});
     // std.debug.print("params[0]: {any}\n", .{params[0]});
+
+    if (return_type) |typ| {
+        _=typ;
+        // std.debug.print(" return_typ: {any}\n", .{typ});
+    }
+    try testing.expect(param_count == 1);
+    try testing.expect(params[0].type == u32);
 }
 
 
@@ -129,7 +133,7 @@ test "Register handlers" {
     // try registry.register("fun_wrong_param_type2", fun_wrong_param_type2);
 }
 
-test "Message request" {
+test "Message request parsing" {
     const allocator = gpa.allocator();
 
     var registry = zigjr.Registry.init(allocator);
@@ -301,7 +305,7 @@ test "Message request" {
 
 }
 
-test "Request handling" {
+test "Request dispatching" {
     // std.debug.print("\n\n\n", .{});
     // std.debug.print("test handler calls...\n", .{});
 
