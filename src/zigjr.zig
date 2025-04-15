@@ -52,6 +52,24 @@ pub const ServerErrors = error{
 
 const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 
+// TODO: Have matching types against the types in the JSON-RPC spec for parsing a stream of messages.
+//       Each type has its own jsonParse() to parse its fields.
+// RpcSession - stream of RpcMessage's.
+// RpcMessage - either one RpcRequest, an array of RpcRequest, or EOS.
+// RpcRequest - the request body
+// RpcId - IdType
+// RpcParams - params field
+//
+// RpcSession.init
+//      jreader = json.Reader.init(.. reader)
+// Let caller drive the loop.
+// while running_flag
+//      rpcMsg = RpcSession.next()
+//          jreader.peekNextTokenType() != .end_of_document
+//          rpcMsg = json.parseFromTokenSource(RpcMessage, jreader ..)
+//      dispatch on rpcMsg or EOS
+// 
+
 pub const IdType = union(enum) {
     num:    i64,
     str:    []const u8,
