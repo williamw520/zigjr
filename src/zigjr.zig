@@ -21,6 +21,9 @@ const ParseOptions = std.json.ParseOptions;
 const innerParse = std.json.innerParse;
 const ParseFromValueError = std.json.ParseFromValueError;
 const ParseError = std.json.ParseError;
+const Value = std.json.Value;
+const Array = std.json.Array;
+const ObjectMap = std.json.ObjectMap;
 
 
 pub const ErrorCode = enum(i32) {
@@ -68,8 +71,8 @@ pub const IdType = union(enum) {
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
-    id:             IdType = IdType { .nul = {} },  // default if JSON doesn't have it.
-    params:         std.json.Value,
+    id:             IdType = IdType { .nul = {} },  // default for optional field.
+    params:         Value = Value { .null = {} },   // default for optional field.
 };
 
 /// Handle an incoming JSON-RPC 2.0 request message.
@@ -128,7 +131,9 @@ pub const Request = struct {
             self.err_msg = try allocPrint(self.alloc, "Invalid JSON-RPC version", .{});
             return;
         }
-        if (self.body.?.params != .array and self.body.?.params != .object) {
+        if (self.body.?.params != .null and
+            self.body.?.params != .array and
+            self.body.?.params != .object) {
             self.err_code = ErrorCode.InvalidParams;
             self.err_msg = try allocPrint(self.alloc, "'Params' is not an array or an object.", .{});
             return;
@@ -212,12 +217,24 @@ pub const Registry = struct {
     fn dispatch(self: *Self, req: Request) anyerror![]const u8 {
         if (req.body) |body| {
             return switch (body.params) {
+                .null   => self.dispatchOnNone(body.method),
                 .array  => |array|  self.dispatchOnArray(body.method, array),
                 .object => |obj|    self.dispatchOnObject(body.method, obj),
                 else => ServerErrors.InvalidParams,
             };
         }
         return ServerErrors.InvalidRequest;
+    }
+
+    fn dispatchOnNone(self: *Self, method: []const u8) anyerror![]const u8 {
+        const handler = self.handlers.get(method);
+        if (handler == null) return ServerErrors.MethodNotFound;
+        if (paramLen(handler.?) > 0) return ServerErrors.MismatchedParameterCounts;
+
+        return switch (handler.?) {
+            .fn0 => |f| f(self.alloc),
+            else    => ServerErrors.NoHandlerForNoParam,
+        };
     }
 
     fn dispatchOnArray(self: *Self, method: []const u8, arr: Array) anyerror![]const u8 {
@@ -321,9 +338,6 @@ pub const Registry = struct {
 /// The returned JSON string must be allocated with the passed in allocator.
 /// The caller will free it with the allocator after using it in the Response message.
 /// Call std.json.stringifyAlloc() to build the returned JSON will take care of it.
-const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 const Handler0 = *const fn(Allocator) anyerror![]const u8;
 const Handler1 = *const fn(Allocator, Value) anyerror![]const u8;
 const Handler2 = *const fn(Allocator, Value, Value) anyerror![]const u8;
