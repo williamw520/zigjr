@@ -23,7 +23,7 @@ const ParseFromValueError = std.json.ParseFromValueError;
 const ParseError = std.json.ParseError;
 
 
-const ErrorCode = enum(i32) {
+pub const ErrorCode = enum(i32) {
     None = 0,
     ParseError = -32700,        // Invalid JSON was received by the server.
     InvalidRequest = -32600,    // The JSON sent is not a valid Request object.
@@ -34,7 +34,10 @@ const ErrorCode = enum(i32) {
 };
 
 pub const ServerErrors = error{
-    InvalidRequest, InvalidParams, MethodNotFound,
+    InvalidRequest,
+    InvalidParams,
+    MethodNotFound,
+    InvalidMethodName,
     NoHandlerForArrayParam,
     NoHandlerForObjectParam,
     HandlerNotFunction,
@@ -46,7 +49,7 @@ pub const ServerErrors = error{
 
 const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 
-const IdType = union(enum) {
+pub const IdType = union(enum) {
     num:    i64,
     str:    []const u8,
     nul:    void,
@@ -80,41 +83,61 @@ pub const Request = struct {
     parsed:         ?std.json.Parsed(RequestBody) = null,
 
     pub fn init(alloc: Allocator, message: []const u8) !Self {
-        // std.debug.print("msg: {s}\n", .{msg});
         // TODO: May be to use parseFromSlice(Value, ..) and then manually decode the obj tree in Value,
         // to get better info on errors.  Also can handle batching requests in an array.
-        const parsed = std.json.parseFromSlice(RequestBody, alloc, message, .{}) catch |err|
-            switch (err) {
-                ParseError(Scanner).MissingField,
-                ParseError(Scanner).UnknownField,
-                ParseError(Scanner).DuplicateField => {
-                    return .{
-                        .alloc = alloc,
-                        .err_code = ErrorCode.InvalidRequest,
-                        .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                    };
-                },
-                error.OutOfMemory,
-                error.BufferUnderrun => {
-                    return .{
-                        .alloc = alloc,
-                        .err_code = ErrorCode.InternalError,
-                        .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                    };
-                },
-                else => {
-                    return .{
-                        .alloc = alloc,
-                        .err_code = ErrorCode.ParseError,
-                        .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                    };
-                },
-        };
-        return .{
-            .alloc = alloc,
-            .body = parsed.value,
-            .parsed = parsed,
-        };
+        const parsed = std.json.parseFromSlice(RequestBody, alloc, message, .{})
+                        catch |err| return initWithError(alloc, err);
+        var req = Self { .alloc = alloc, .body = parsed.value, .parsed = parsed };
+        try req.validate();
+        return req;
+    }
+
+    fn initWithError(alloc: Allocator, err: ParseError(Scanner)) !Self {
+        switch (err) {
+            ParseError(Scanner).MissingField,
+            ParseError(Scanner).UnknownField,
+            ParseError(Scanner).DuplicateField => {
+                return .{
+                    .alloc = alloc,
+                    .err_code = ErrorCode.InvalidRequest,
+                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
+                };
+            },
+            error.OutOfMemory,
+            error.BufferUnderrun => {
+                return .{
+                    .alloc = alloc,
+                    .err_code = ErrorCode.InternalError,
+                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
+                };
+            },
+            else => {
+                return .{
+                    .alloc = alloc,
+                    .err_code = ErrorCode.ParseError,
+                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
+                };
+            },
+        }
+    }
+
+    fn validate(self: *Self) !void {
+        // At this point, all the required fields are there. Check the fields.
+        if (!std.mem.eql(u8, &self.body.?.jsonrpc, "2.0")) {
+            self.err_code = ErrorCode.InvalidRequest;
+            self.err_msg = try allocPrint(self.alloc, "Invalid JSON-RPC version", .{});
+            return;
+        }
+        if (self.body.?.params != .array and self.body.?.params != .object) {
+            self.err_code = ErrorCode.InvalidParams;
+            self.err_msg = try allocPrint(self.alloc, "'Params' is not an array or an object.", .{});
+            return;
+        }
+        if (self.body.?.method.len == 0) {
+            self.err_code = ErrorCode.InvalidRequest;
+            self.err_msg = try allocPrint(self.alloc, "Method is empty.", .{});
+            return;
+        }
     }
 
     pub fn deinit(self: *const Self) void {
@@ -123,12 +146,13 @@ pub const Request = struct {
     }
 
     pub fn getId(self: *const Self) IdType {
-        return if (self.body) |body| body.id else IdType { .nul = 0 };
+        return if (self.body) |body| body.id else IdType { .nul = {} };
     }
 
     pub fn hasError(self: Self) bool {
         return self.err_code != .None;
     }
+
 };
 
 
@@ -150,6 +174,9 @@ pub const Registry = struct {
     }
 
     pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
+        if (std.mem.startsWith(u8, method, "rpc.")) {
+            return ServerErrors.InvalidMethodName;      // By spec, "rpc." is reserved.
+        }
         const fn_ptr = try toHandler(handler_fn);
         try self.handlers.put(method, fn_ptr);
     }
@@ -240,7 +267,7 @@ pub const Registry = struct {
                 .nul => MyErrors.NotificationHasNoResponse,
             };
         }
-        const id    = IdType { .nul = 0 };
+        const id    = IdType { .nul = {} };
         const code  = @intFromEnum(ErrorCode.InvalidRequest);
         const msg   = "Missing request body.";
         return self.responseError(id, code, msg);
