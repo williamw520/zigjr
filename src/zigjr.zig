@@ -82,7 +82,7 @@ pub const Request = struct {
     alloc:          Allocator,
     err_code:       ErrorCode = .None,
     err_msg:        []const u8 = "",
-    body:           ?RequestBody = null,
+    body:           ?RequestBody = null,            // no body in the case of parse error.
     parsed:         ?std.json.Parsed(RequestBody) = null,
 
     pub fn init(alloc: Allocator, message: []const u8) !Self {
@@ -125,22 +125,24 @@ pub const Request = struct {
     }
 
     fn validate(self: *Self) !void {
-        // At this point, all the required fields are there. Check the fields.
-        if (!std.mem.eql(u8, &self.body.?.jsonrpc, "2.0")) {
+        // At this point, the request has passed parsing.  Check the parsed fields.
+        const body = self.body.?;
+        if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
             self.err_code = ErrorCode.InvalidRequest;
-            self.err_msg = try allocPrint(self.alloc, "Invalid JSON-RPC version", .{});
+            self.err_msg = try allocPrint(self.alloc, "Invalid JSON-RPC version.  Must be 2.0.", .{});
             return;
         }
-        if (self.body.?.params != .null and
-            self.body.?.params != .array and
-            self.body.?.params != .object) {
+        if (body.params != .array and               // body.params is a std.json.Value.
+            body.params != .object and
+            body.params != .null) {
             self.err_code = ErrorCode.InvalidParams;
-            self.err_msg = try allocPrint(self.alloc, "'Params' is not an array or an object.", .{});
+            self.err_msg = try allocPrint(self.alloc,
+                            "'Params' must be an array, an object, or not defined.", .{});
             return;
         }
-        if (self.body.?.method.len == 0) {
+        if (body.method.len == 0) {
             self.err_code = ErrorCode.InvalidRequest;
-            self.err_msg = try allocPrint(self.alloc, "Method is empty.", .{});
+            self.err_msg = try allocPrint(self.alloc, "'Method' is empty.", .{});
             return;
         }
     }
