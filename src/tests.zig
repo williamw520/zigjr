@@ -360,9 +360,53 @@ test "Request streaming" {
     var json_stream2 = std.io.fixedBufferStream(
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
-    const in_reader2 = json_stream2.reader();
-    var rs2 = zigjr.rpcStream(alloc, in_reader2);
+    var rs2 = zigjr.rpcStream(alloc, json_stream2.reader());
     defer rs2.deinit();
+
+    var json_stream3 = std.io.fixedBufferStream(
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    );
+    var rs3 = zigjr.rpcStream(alloc, json_stream3.reader());
+    defer rs3.deinit();
+
+    const rm3 = try rs3.next();
+    std.debug.print("rm3 {any}\n", .{rm3});
+    std.debug.print("rm3 {s}\n", .{rm3.request.method});
+    std.debug.print("rm3 {any}\n", .{rm3.request.params});
+
+
+    var json_stream4 = std.io.fixedBufferStream(
+        \\[ {"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1},
+        \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2} ]
+    );
+    var rs4 = zigjr.rpcStream(alloc, json_stream4.reader());
+    defer rs4.deinit();
+
+    const rm4 = try rs4.next();
+    std.debug.print("rm4 {any}\n", .{rm4});
+    std.debug.print("rm4 {s}\n", .{rm4.requests[0].method});
+    std.debug.print("rm4 {any}\n", .{rm4.requests[0].params});
+    std.debug.print("rm4 {s}\n", .{rm4.requests[1].method});
+    std.debug.print("rm4 {any}\n", .{rm4.requests[1].params});
+
+
+    var json_stream5 = std.io.fixedBufferStream(
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+        \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2}
+    );
+    var rs5 = zigjr.rpcStream(alloc, json_stream5.reader());
+    defer rs5.deinit();
+
+    // NOTE: Stream parsing of JSON's is impossible.
+    // The next statement causes an assert in std.json.parseFromTokenSourceLeaky(),
+    //  assert(.end_of_document == try scanner_or_reader.next())
+    // It's expecting the end of input after parsed one JSON.
+    const rm5 = try rs5.next();
+    std.debug.print("rm5 {any}\n", .{rm5});
+    // std.debug.print("rm5 {s}\n", .{rm5.requests[0].method});
+    // std.debug.print("rm5 {any}\n", .{rm5.requests[0].params});
+    // std.debug.print("rm5 {s}\n", .{rm5.requests[1].method});
+    // std.debug.print("rm5 {any}\n", .{rm5.requests[1].params});
     
 }
 

@@ -36,7 +36,7 @@ pub const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
-pub const ServerErrors = error{
+pub const ServerErrors = error {
     InvalidRequest,
     InvalidParams,
     MethodNotFound,
@@ -97,29 +97,76 @@ pub fn RpcStream(comptime IncomingReaderType: type) type {
             self.json_reader.deinit();
         }
 
-        pub fn next(self: *Self) void {
-            if (self.json_reader.peekNextTokenType() == .end_of_document) {
-                return; // TODO: return RpcMessage.EOS
+        pub fn next(self: *Self) !RpcMessage {
+            const token_type = self.json_reader.peekNextTokenType() catch |err| {
+                // return ServerErrors.
+                return err;
+            };
+            if (token_type == .end_of_document) {
+                return RpcMessage { .eos = {} };
             }
-            // const parsed = std.json.parseFromTokenSource(RpcMessage, self.alloc, self.json_reader, .{});
-            // _=parsed;
+
+            const parsed = try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.json_reader, .{});
+            return parsed.value;
         }
         
     };
 }
+
+pub const RpcMessage = union(enum) {
+    request:    RpcRequest,
+    requests:   []const RpcRequest,
+    eos:        void,
+
+    // Custom parsing when the JSON parser encounters a field of this type.
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
+        // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
+        return switch (try source.peekNextTokenType()) {
+            .object_begin   => .{ .request = try innerParse(RpcRequest, alloc, source, options) },
+            .array_begin    => .{ .requests  = try innerParse([]const RpcRequest, alloc, source, options) },
+            // else => ServerErrors.InvalidRequest,
+            else => error.UnexpectedToken,
+        };
+    }
+};
+
+pub const RpcRequest = struct {
+    jsonrpc:    [3]u8,
+    method:     []u8,
+    params:     RpcParams = RpcParams { .nul = {} },    // default for optional field.
+    id:         RpcId = RpcId { .nul = {} },            // default for optional field.
+};
+
+pub const RpcParams = union(enum) {
+    nul:        void,
+    object:     Value,
+    array:      []const Value,
+
+    // Custom parsing when the JSON parser encounters a field of this type.
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParams {
+        // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
+        return switch (try source.peekNextTokenType()) {
+            .object_begin   => .{ .object = try innerParse(Value, alloc, source, options) },
+            .array_begin    => .{ .array  = try innerParse([]const Value, alloc, source, options) },
+            // else => ServerErrors.InvalidParams,
+            else => error.UnexpectedToken,
+        };
+    }
+};
 
 pub const RpcId = union(enum) {
     num:    i64,
     str:    []const u8,
     nul:    void,
 
-    // Custom parsing when the JSON parser encounters a field of the RpcId type.
-    pub fn jsonParse(allocator: Allocator, source: *Scanner, options: ParseOptions) !RpcId {
+    // Custom parsing when the JSON parser encounters a field of this type.
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
         // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
         return switch (try source.peekNextTokenType()) {
-            .number => .{ .num = try innerParse(i64, allocator, source, options) },
-            .string => .{ .str = try innerParse([]const u8, allocator, source, options) },
-            else => error.InvalidCharacter,
+            .number => .{ .num = try innerParse(i64, alloc, source, options) },
+            .string => .{ .str = try innerParse([]const u8, alloc, source, options) },
+            // else => error.InvalidCharacter,
+            else => error.UnexpectedToken,
         };
     }
 };
