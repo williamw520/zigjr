@@ -59,27 +59,13 @@ pub const MyErrors = error {
     MissingRequestBody,
 };
 
-// TODO: Have matching types against the types in the JSON-RPC spec for parsing a stream of messages.
-//       Each type has its own jsonParse() to parse its fields.
-// RpcParser - stream of RpcMessage's.
-// RpcMessage - either one RpcRequest, an array of RpcRequest
-// RpcRequest - the request body
-// RpcId - IdType
-// RpcParams - params field
-//
-// RpcParser.init
-//      jreader = json.Reader.init(.. reader)
-// Let caller drive the loop.
-// while running_flag
-//      rpcMsg = RpcParser.next()
-//          jreader.peekNextTokenType() != .end_of_document
-//          rpcMsg = json.parseFromTokenSource(RpcMessage, jreader ..)
-//      dispatch on rpcMsg
-//
 
+pub fn parseStr(alloc: Allocator, str: []const u8) RpcParser(std.io.FixedBufferStream.Reader) {
+    const reader = std.io.fixedBufferStream(str).reader();
+    return RpcParser(@TypeOf(reader)).init(alloc, reader);
+}
 
-
-pub fn parseRpcJson(alloc: Allocator, incoming_reader: anytype) RpcParser(@TypeOf(incoming_reader)) {
+pub fn parseReader(alloc: Allocator, incoming_reader: anytype) RpcParser(@TypeOf(incoming_reader)) {
     return RpcParser(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
 }
 
@@ -239,7 +225,7 @@ fn RpcRequest(comptime JsonReader: type) type {
     };
 }
 
-pub const RpcParams = union(enum) {
+const RpcParams = union(enum) {
     nul:        void,
     object:     Value,
     array:      []const Value,
@@ -267,6 +253,7 @@ pub const RpcId = union(enum) {
         };
     }
 };
+
 
 const RequestBody = struct {
     jsonrpc:        [3]u8,
