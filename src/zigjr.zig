@@ -36,10 +36,16 @@ pub const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
-pub const ServerErrors = error {
+pub const MyErrors = error {
+    None,
+
+    ParseError,
     InvalidRequest,
-    InvalidParams,
     MethodNotFound,
+    InvalidMethod,
+    InvalidParams,
+    InternalError,
+
     InvalidMethodName,
     NoHandlerForArrayParam,
     NoHandlerForObjectParam,
@@ -48,9 +54,10 @@ pub const ServerErrors = error {
     HandlerInvalidParameterType,
     HandlerTooManyParams,
     MismatchedParameterCounts,
-};
 
-const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
+    NotificationHasNoResponse,
+    MissingRequestBody,
+};
 
 // TODO: Have matching types against the types in the JSON-RPC spec for parsing a stream of messages.
 //       Each type has its own jsonParse() to parse its fields.
@@ -70,9 +77,7 @@ const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 //      dispatch on rpcMsg
 //
 
-// pub fn reader(allocator: Allocator, io_reader: anytype) Reader(default_buffer_size, @TypeOf(io_reader)) {
-//     return Reader(default_buffer_size, @TypeOf(io_reader)).init(allocator, io_reader);
-// }
+
 
 pub fn parseRpcJson(alloc: Allocator, incoming_reader: anytype) RpcParser(@TypeOf(incoming_reader)) {
     return RpcParser(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
@@ -97,50 +102,154 @@ pub fn RpcParser(comptime IncomingReaderType: type) type {
             self.json_reader.deinit();
         }
 
-        pub fn next(self: *Self) !RpcMessage {
-            const parsed = try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.json_reader, .{});
+        pub fn next(self: *Self) !RpcMessage(JsonReader) {
+            const parsed = try std.json.parseFromTokenSource(RpcMessage(JsonReader),
+                                                             self.alloc, &self.json_reader, .{});
             return parsed.value;
         }
         
     };
 }
 
-pub const RpcMessage = union(enum) {
-    request:    RpcRequest,
-    requests:   []const RpcRequest,
+fn RpcMessage(comptime JsonReader: type) type {
+    return union(enum) {
+        request:    RpcRequest(JsonReader),
+        batch:      []const RpcRequest(JsonReader),
 
-    // Custom parsing when the JSON parser encounters a field of this type.
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
-        // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
-        return switch (try source.peekNextTokenType()) {
-            .object_begin   => .{ .request = try innerParse(RpcRequest, alloc, source, options) },
-            .array_begin    => .{ .requests  = try innerParse([]const RpcRequest, alloc, source, options) },
-            // else => ServerErrors.InvalidRequest,
-            else => error.UnexpectedToken,
-        };
-    }
-};
+        // Custom parsing when the JSON parser encounters a field of this type.
+        pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage(JsonReader) {
+            // There're only two cases: object or array.
+            return switch (try source.peekNextTokenType()) {
+                .object_begin=> .{
+                    .request = try innerParse(RpcRequest(JsonReader), alloc, source, options)
+                },
+                .array_begin => .{
+                    .batch   = try innerParse([]const RpcRequest(JsonReader), alloc, source, options)
+                },
+                else => error.UnexpectedToken,
+            };
+        }
+    };
+}
 
-pub const RpcRequest = struct {
-    jsonrpc:    [3]u8,
-    method:     []u8,
+const RpcRequestBody = struct {
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' },
+    method:     []u8 = "",
     params:     RpcParams = RpcParams { .nul = {} },    // default for optional field.
     id:         RpcId = RpcId { .nul = {} },            // default for optional field.
 };
+
+fn RpcError(comptime JsonReader: type) type {
+    return struct {
+        const Self = @This();
+
+        alloc:      Allocator,
+        err:        MyErrors = MyErrors.None,
+        code:       ErrorCode,
+        msg:        []const u8,
+        req_id:     RpcId = RpcId { .nul = {} },        // request id related to the error.
+
+        pub fn deinit(self: Self) void {
+            self.allocator.free(self.msg);
+        }
+
+        fn ofParseError(alloc: Allocator, parseErr: ParseError(JsonReader)) !Self {
+            switch (parseErr) {
+                ParseError(JsonReader).MissingField,
+                ParseError(JsonReader).UnknownField,
+                ParseError(JsonReader).DuplicateField => {
+                    return .{
+                        .alloc = alloc,
+                        .err  = MyErrors.InvalidRequest,
+                        .code = ErrorCode.InvalidRequest,
+                        .msg = try allocPrint(alloc, "{s}", .{@errorName(parseErr)}),
+                    };
+                },
+                error.Overflow,
+                error.OutOfMemory => {
+                    return .{
+                        .alloc = alloc,
+                        .err  = MyErrors.InternalError,
+                        .code = ErrorCode.InternalError,
+                        .msg = try allocPrint(alloc, "{s}", .{@errorName(parseErr)}),
+                    };
+                },
+                else => {
+                    return .{
+                        .alloc = alloc,
+                        .err  = MyErrors.ParseError,
+                        .code = ErrorCode.ParseError,
+                        .msg = try allocPrint(alloc, "{s}", .{@errorName(parseErr)}),
+                    };
+                },
+
+            }
+        }
+
+        fn validateBody(alloc: Allocator, body: RpcRequestBody) !?Self {
+            if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
+                return .{
+                    .alloc = alloc,
+                    .err = MyErrors.InvalidRequest,
+                    .code = ErrorCode.InvalidRequest,
+                    .msg = try allocPrint(alloc, "Invalid JSON-RPC version.  Must be 2.0.", .{}),
+                    .req_id = body.id,
+                };
+            }
+            if (body.params == .err) {
+                return .{
+                    .alloc = alloc,
+                    .err = body.params.err,
+                    .code = ErrorCode.InvalidParams,
+                    .msg = try allocPrint(alloc, "'Params' must be an array, an object, or not defined.", .{}),
+                };
+            }
+            if (body.method.len == 0) {
+                return .{
+                    .alloc = alloc,
+                    .err = MyErrors.InvalidMethod,
+                    .code = ErrorCode.InvalidRequest,
+                    .msg = try allocPrint(alloc, "'Method' is empty.", .{}),
+                };
+            }
+
+            return null;
+        }
+    };
+}
+
+fn RpcRequest(comptime JsonReader: type) type {
+    return union(enum) {
+        const Self = @This();
+
+        err:        RpcError(JsonReader),
+        body:       RpcRequestBody,         // no body in the case of parse error.
+
+        pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
+            const body = innerParse(RpcRequestBody, alloc, source, options) catch |parse_err| {
+                return .{ .err = try RpcError(JsonReader).ofParseError(alloc, parse_err) };
+            };
+            // At this point, the request body has passed parsing.  Check the body content.
+            if (try RpcError(JsonReader).validateBody(alloc, body)) |err| {
+                return .{ .err = err };
+            }
+            return .{ .body = body, };
+        }
+
+    };
+}
 
 pub const RpcParams = union(enum) {
     nul:        void,
     object:     Value,
     array:      []const Value,
+    err:        MyErrors,
 
-    // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParams {
-        // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
         return switch (try source.peekNextTokenType()) {
             .object_begin   => .{ .object = try innerParse(Value, alloc, source, options) },
             .array_begin    => .{ .array  = try innerParse([]const Value, alloc, source, options) },
-            // else => ServerErrors.InvalidParams,
-            else => error.UnexpectedToken,
+            else            => .{ .err = MyErrors.InvalidParams },
         };
     }
 };
@@ -150,13 +259,10 @@ pub const RpcId = union(enum) {
     str:    []const u8,
     nul:    void,
 
-    // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
-        // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
         return switch (try source.peekNextTokenType()) {
             .number => .{ .num = try innerParse(i64, alloc, source, options) },
             .string => .{ .str = try innerParse([]const u8, alloc, source, options) },
-            // else => error.InvalidCharacter,
             else => error.UnexpectedToken,
         };
     }
@@ -276,7 +382,7 @@ pub const Registry = struct {
 
     pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
         if (std.mem.startsWith(u8, method, "rpc.")) {
-            return ServerErrors.InvalidMethodName;      // By spec, "rpc." is reserved.
+            return MyErrors.InvalidMethodName;      // By spec, "rpc." is reserved.
         }
         const fn_ptr = try toHandler(handler_fn);
         try self.handlers.put(method, fn_ptr);
@@ -316,27 +422,27 @@ pub const Registry = struct {
                 .null   => self.dispatchOnNone(body.method),
                 .array  => |array|  self.dispatchOnArray(body.method, array),
                 .object => |obj|    self.dispatchOnObject(body.method, obj),
-                else => ServerErrors.InvalidParams,
+                else => MyErrors.InvalidParams,
             };
         }
-        return ServerErrors.InvalidRequest;
+        return MyErrors.InvalidRequest;
     }
 
     fn dispatchOnNone(self: *Self, method: []const u8) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return ServerErrors.MethodNotFound;
-        if (paramLen(handler.?) > 0) return ServerErrors.MismatchedParameterCounts;
+        if (handler == null) return MyErrors.MethodNotFound;
+        if (paramLen(handler.?) > 0) return MyErrors.MismatchedParameterCounts;
 
         return switch (handler.?) {
             .fn0 => |f| f(self.alloc),
-            else    => ServerErrors.NoHandlerForNoParam,
+            else    => MyErrors.NoHandlerForNoParam,
         };
     }
 
     fn dispatchOnArray(self: *Self, method: []const u8, arr: Array) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return ServerErrors.MethodNotFound;
-        if (paramLen(handler.?) != arr.items.len) return ServerErrors.MismatchedParameterCounts;
+        if (handler == null) return MyErrors.MethodNotFound;
+        if (paramLen(handler.?) != arr.items.len) return MyErrors.MismatchedParameterCounts;
 
         return switch (handler.?) {
             .fn0 => |f| f(self.alloc),
@@ -350,16 +456,16 @@ pub const Registry = struct {
             .fn8 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
             .fn9 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
             .fnArr  => |f| f(self.alloc, arr),
-            else    => ServerErrors.NoHandlerForArrayParam,
+            else    => MyErrors.NoHandlerForArrayParam,
         };
     }
 
     fn dispatchOnObject(self: *Self, method: []const u8, obj: ObjectMap) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return ServerErrors.MethodNotFound;
+        if (handler == null) return MyErrors.MethodNotFound;
         return switch (handler.?) {
             .fnObj  => |f| f(self.alloc, obj),
-            else    => ServerErrors.NoHandlerForObjectParam,
+            else    => MyErrors.NoHandlerForObjectParam,
         };
     }
 
@@ -410,15 +516,15 @@ pub const Registry = struct {
 
     fn errorToCodeMsg(err: anyerror) struct {i32, []const u8} {
         return switch (err) {
-            ServerErrors.InvalidParams => .{
+            MyErrors.InvalidParams => .{
                 @intFromEnum(ErrorCode.InvalidParams),
                 "Invalid Params",
             },
-            ServerErrors.InvalidRequest => .{
+            MyErrors.InvalidRequest => .{
                 @intFromEnum(ErrorCode.InvalidRequest),
                 "Invalid Request",
             },
-            ServerErrors.MethodNotFound => .{
+            MyErrors.MethodNotFound => .{
                 @intFromEnum(ErrorCode.MethodNotFound),
                 "Method Not Found",
             },
@@ -467,7 +573,7 @@ fn toHandler(handler_fn: anytype) !Handler {
     const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
     const nparams = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params.len - 1,  // one less for the Allocator param
-        else => return ServerErrors.HandlerNotFunction,
+        else => return MyErrors.HandlerNotFunction,
     };
 
     switch (nparams) {
@@ -480,10 +586,10 @@ fn toHandler(handler_fn: anytype) !Handler {
                     Value =>    return Handler { .fn1 = handler_fn },
                     Array =>    return Handler { .fnArr = handler_fn },
                     ObjectMap=> return Handler { .fnObj = handler_fn },
-                    else =>     return ServerErrors.HandlerInvalidParameterType,
+                    else =>     return MyErrors.HandlerInvalidParameterType,
                 }
             }
-            return ServerErrors.HandlerInvalidParameter;
+            return MyErrors.HandlerInvalidParameter;
         },
         2 => return Handler { .fn2 = handler_fn },
         3 => return Handler { .fn3 = handler_fn },
@@ -493,7 +599,7 @@ fn toHandler(handler_fn: anytype) !Handler {
         7 => return Handler { .fn7 = handler_fn },
         8 => return Handler { .fn8 = handler_fn },
         9 => return Handler { .fn9 = handler_fn },
-        else => return ServerErrors.HandlerTooManyParams,
+        else => return MyErrors.HandlerTooManyParams,
     }
 }
 

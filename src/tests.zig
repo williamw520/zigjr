@@ -118,13 +118,13 @@ test "Register handlers" {
     try testing.expect(registry.get("fun2").?.fn2 == fun2a);
 
     // Test validation.
-    try testing.expectError(zigjr.ServerErrors.HandlerTooManyParams,
+    try testing.expectError(zigjr.MyErrors.HandlerTooManyParams,
                             registry.register("fun_too_many_params", fun_too_many_params));
 
-    try testing.expectError(zigjr.ServerErrors.HandlerInvalidParameterType,
+    try testing.expectError(zigjr.MyErrors.HandlerInvalidParameterType,
                             registry.register("fun_wrong_param_type", fun_wrong_param_type));
 
-    try testing.expectError(zigjr.ServerErrors.InvalidMethodName,
+    try testing.expectError(zigjr.MyErrors.InvalidMethodName,
                             registry.register("rpc.abc", fun0));
 
     // These would cause compile errors, correctly as expected.
@@ -371,8 +371,8 @@ test "Request streaming" {
 
     const rm3 = try rs3.next();
     std.debug.print("rm3 {any}\n", .{rm3});
-    std.debug.print("rm3 {s}\n", .{rm3.request.method});
-    std.debug.print("rm3 {any}\n", .{rm3.request.params});
+    std.debug.print("rm3 {s}\n", .{rm3.request.body.method});
+    std.debug.print("rm3 {any}\n", .{rm3.request.body.params});
 
 
     var json_stream4 = std.io.fixedBufferStream(
@@ -384,10 +384,10 @@ test "Request streaming" {
 
     const rm4 = try rs4.next();
     std.debug.print("rm4 {any}\n", .{rm4});
-    std.debug.print("rm4 {s}\n", .{rm4.requests[0].method});
-    std.debug.print("rm4 {any}\n", .{rm4.requests[0].params});
-    std.debug.print("rm4 {s}\n", .{rm4.requests[1].method});
-    std.debug.print("rm4 {any}\n", .{rm4.requests[1].params});
+    std.debug.print("rm4 {s}\n", .{rm4.batch[0].body.method});
+    std.debug.print("rm4 {any}\n", .{rm4.batch[0].body.params});
+    std.debug.print("rm4 {s}\n", .{rm4.batch[1].body.method});
+    std.debug.print("rm4 {any}\n", .{rm4.batch[1].body.params});
 
 
     var json_stream5 = std.io.fixedBufferStream(
@@ -401,12 +401,16 @@ test "Request streaming" {
     // The next statement causes an assert in std.json.parseFromTokenSourceLeaky(),
     //  assert(.end_of_document == try scanner_or_reader.next())
     // It's expecting the end of input after parsed one JSON.
-    const rm5 = try rs5.next();
-    std.debug.print("rm5 {any}\n", .{rm5});
-    // std.debug.print("rm5 {s}\n", .{rm5.requests[0].method});
-    // std.debug.print("rm5 {any}\n", .{rm5.requests[0].params});
-    // std.debug.print("rm5 {s}\n", .{rm5.requests[1].method});
-    // std.debug.print("rm5 {any}\n", .{rm5.requests[1].params});
+    std.debug.print("--------\n", .{});
+    // const rm5 = rs5.next() catch |err| {
+    //     std.debug.print("rm5 err: {any}\n", .{err});
+    // };
+    // std.debug.print("rm5 {any}\n", .{rm5});
+    
+    // std.debug.print("rm5 {s}\n", .{rm5.batch[0].method});
+    // std.debug.print("rm5 {any}\n", .{rm5.batch[0].params});
+    // std.debug.print("rm5 {s}\n", .{rm5.batch[1].method});
+    // std.debug.print("rm5 {any}\n", .{rm5.batch[1].params});
     
 }
 
