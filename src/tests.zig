@@ -97,9 +97,9 @@ fn fun_wrong_param_type(_: Allocator, _: u8) anyerror![]const u8 {}
 fn fun_wrong_param_type2(_: Allocator, _: Value, _: u8) anyerror![]const u8 {}
 
 test "Register handlers" {
-    const allocator = gpa.allocator();
+    const alloc = gpa.allocator();
 
-    var registry = zigjr.Registry.init(allocator);
+    var registry = zigjr.Registry.init(alloc);
     defer registry.deinit();
 
     try registry.register("fun0", fun0);
@@ -134,171 +134,165 @@ test "Register handlers" {
 }
 
 test "Message request parsing" {
-    const allocator = gpa.allocator();
+    const alloc = gpa.allocator();
 
-    var registry = zigjr.Registry.init(allocator);
-    defer registry.deinit();
-
-    try registry.register("fun0", fun0);
-    try registry.register("fun1", fun1);
-    try registry.register("subtract", fun2);
-
-    const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 0}
-                ;
-    const req0 = try zigjr.Request.init(allocator, msg0);
+    const req0 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 0}
+    );
     try testing.expect(req0.hasError() == false);
     try testing.expect(req0.getId().num == 0);
     
-    const msg1 =\\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
-                ;
-    const req1 = try zigjr.Request.init(allocator, msg1);
+    const req1 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
+    );
     try testing.expect(req1.hasError() == false);
     try testing.expect(std.mem.eql(u8, req1.getId().str, "1"));
 
-    const msg2 =\\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 2}
-                ;
-    const req2 = try zigjr.Request.init(allocator, msg2);
+    const req2 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 2}
+    );
     try testing.expect(req2.hasError() == false);
     try testing.expect(req2.getId().num == 2);
 
-    const msg3 =\\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
-                ;
-    const req3 = try zigjr.Request.init(allocator, msg3);
+    const req3 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
+    );
     try testing.expect(req3.hasError() == false);
     try testing.expect(req3.getId().num == 3);
 
-    const msg4 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
-                ;
-    const req4 = try zigjr.Request.init(allocator, msg4);
+    const req4 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
+    );
     try testing.expect(req4.hasError() == false);
-    try testing.expect(req4.getId() == zigjr.IdType.nul);
+    try testing.expect(req4.getId() == zigjr.RpcId.nul);
 
-    const msg5 =\\{"jsonrpc": "2.0", "method": "fun0" }
-                ;
-    const req5 = try zigjr.Request.init(allocator, msg5);
+    const req5 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun0" }
+    );
     try testing.expect(req5.hasError() == false);
-    try testing.expect(req5.getId() == zigjr.IdType.nul);
+    try testing.expect(req5.getId() == zigjr.RpcId.nul);
 
-    const msg5a =\\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
-                ;
-    const req5a = try zigjr.Request.init(allocator, msg5a);
+    const req5a = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
+    );
     try testing.expect(req5a.hasError() == false);
     try testing.expect(std.mem.eql(u8, req5a.getId().str, "5a"));
 
-    const msg5b =\\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": "5b" }
-                ;
-    const req5b = try zigjr.Request.init(allocator, msg5b);
+    const req5b = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": "5b" }
+    );
     try testing.expect(req5b.hasError() == false);
     try testing.expect(std.mem.eql(u8, req5b.getId().str, "5b"));
 
 
-    const e_msg1 =\\{}
-                ;
-    const e_req1 = try zigjr.Request.init(allocator, e_msg1);
+    const e_req1 = try zigjr.Request.init(alloc, 
+        \\{}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1.err_code, e_req1.err_msg});
     try testing.expect(e_req1.hasError() == true);
     try testing.expect(e_req1.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg1a =\\{
-                ;
-    const e_req1a = try zigjr.Request.init(allocator, e_msg1a);
+    const e_req1a = try zigjr.Request.init(alloc,
+        \\{
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1a.err_code, e_req1a.err_msg});
     try testing.expect(e_req1a.hasError() == true);
     try testing.expect(e_req1a.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_msg1b =\\}
-                ;
-    const e_req1b = try zigjr.Request.init(allocator, e_msg1b);
+    const e_req1b = try zigjr.Request.init(alloc,
+        \\}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1b.err_code, e_req1b.err_msg});
     try testing.expect(e_req1b.hasError() == true);
     try testing.expect(e_req1b.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_msg1c ="";
-    const e_req1c = try zigjr.Request.init(allocator, e_msg1c);
+    const e_req1c = try zigjr.Request.init(alloc,
+        ""
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1c.err_code, e_req1c.err_msg});
     try testing.expect(e_req1c.hasError() == true);
     try testing.expect(e_req1c.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_msg2 =\\{"foo": }
-                ;
-    const e_req2 = try zigjr.Request.init(allocator, e_msg2);
+    const e_req2 = try zigjr.Request.init(alloc,
+        \\{"foo": }
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2.err_code, e_req2.err_msg});
     try testing.expect(e_req2.hasError() == true);
     try testing.expect(e_req2.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg2a =\\ foo abc 123
-                ;
-    const e_req2a = try zigjr.Request.init(allocator, e_msg2a);
+    const e_req2a = try zigjr.Request.init(alloc,
+        \\ foo abc 123
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2a.err_code, e_req2a.err_msg});
     try testing.expect(e_req2a.hasError() == true);
     try testing.expect(e_req2a.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_msg2b =\\{"foo":
-                ;
-    const e_req2b = try zigjr.Request.init(allocator, e_msg2b);
+    const e_req2b = try zigjr.Request.init(alloc,
+        \\{"foo":
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2b.err_code, e_req2b.err_msg});
     try testing.expect(e_req2b.hasError() == true);
     try testing.expect(e_req2b.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg3 =\\{"jsonrpc": }
-                ;
-    const e_req3 = try zigjr.Request.init(allocator, e_msg3);
+    const e_req3 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": }
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3.err_code, e_req3.err_msg});
     try testing.expect(e_req3.hasError() == true);
     try testing.expect(e_req3.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_msg3a =\\{"jsonrpc": "2.0"}
-                ;
-    const e_req3a = try zigjr.Request.init(allocator, e_msg3a);
+    const e_req3a = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3a.err_code, e_req3a.err_msg});
     try testing.expect(e_req3a.hasError() == true);
     try testing.expect(e_req3a.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg4 =\\{"jsonrpc": "2.0", "method": "foobar", "params": [], "params": [], "id": "4"}
-                ;
-    const e_req4 = try zigjr.Request.init(allocator, e_msg4);
+    const e_req4 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "foobar", "params": [], "params": [], "id": "4"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req4.err_code, e_req4.err_msg});
     try testing.expect(e_req4.hasError() == true);
     try testing.expect(e_req4.err_code == zigjr.ErrorCode.InvalidRequest);
     
-    const e_msg5 =\\{"jsonrpc": "0.0", "method": "", "params": [], "id": "5"}
-                ;
-    const e_req5 = try zigjr.Request.init(allocator, e_msg5);
+    const e_req5 = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "0.0", "method": "", "params": [], "id": "5"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5.err_code, e_req5.err_msg});
     try testing.expect(e_req5.hasError() == true);
     try testing.expect(e_req5.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg5a =\\{"jsonrpc": "1.0", "method": "", "params": [], "id": "5a"}
-                ;
-    const e_req5a = try zigjr.Request.init(allocator, e_msg5a);
+    const e_req5a = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "1.0", "method": "", "params": [], "id": "5a"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5a.err_code, e_req5a.err_msg});
     try testing.expect(e_req5a.hasError() == true);
     try testing.expect(e_req5a.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg5b =\\{"jsonrpc": "3.0", "method": "", "params": [], "id": "5b"}
-                ;
-    const e_req5b = try zigjr.Request.init(allocator, e_msg5b);
+    const e_req5b = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "3.0", "method": "", "params": [], "id": "5b"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5b.err_code, e_req5b.err_msg});
     try testing.expect(e_req5b.hasError() == true);
     try testing.expect(e_req5b.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg5c =\\{"jsonrpc": "2.0", "method": "", "params": [], "id": "5c"}
-                ;
-    const e_req5c = try zigjr.Request.init(allocator, e_msg5c);
+    const e_req5c = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "", "params": [], "id": "5c"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5c.err_code, e_req5c.err_msg});
     try testing.expect(e_req5c.hasError() == true);
     try testing.expect(e_req5c.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_msg5d =\\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
-                ;
-    const e_req5d = try zigjr.Request.init(allocator, e_msg5d);
+    const e_req5d = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5d.err_code, e_req5d.err_msg});
     try testing.expect(e_req5d.hasError() == true);
     try testing.expect(e_req5d.err_code == zigjr.ErrorCode.InvalidParams);
 
-    const e_msg5e =\\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5e"}
-                ;
-    const e_req5e = try zigjr.Request.init(allocator, e_msg5e);
+    const e_req5e = try zigjr.Request.init(alloc,
+        \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5e"}
+    );
     std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5e.err_code, e_req5e.err_msg});
     try testing.expect(e_req5e.hasError() == true);
     try testing.expect(e_req5e.err_code == zigjr.ErrorCode.InvalidParams);

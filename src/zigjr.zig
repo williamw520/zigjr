@@ -68,15 +68,15 @@ const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 //          jreader.peekNextTokenType() != .end_of_document
 //          rpcMsg = json.parseFromTokenSource(RpcMessage, jreader ..)
 //      dispatch on rpcMsg or EOS
-// 
+//
 
-pub const IdType = union(enum) {
+pub const RpcId = union(enum) {
     num:    i64,
     str:    []const u8,
     nul:    void,
 
-    // Custom parsing when the JSON parser encounters a field of the IdType type.
-    pub fn jsonParse(allocator: Allocator, source: *Scanner, options: ParseOptions) !IdType {
+    // Custom parsing when the JSON parser encounters a field of the RpcId type.
+    pub fn jsonParse(allocator: Allocator, source: *Scanner, options: ParseOptions) !RpcId {
         // std.debug.print("jsonParse: {any}\n", .{source.peekNextTokenType()});
         return switch (try source.peekNextTokenType()) {
             .number => .{ .num = try innerParse(i64, allocator, source, options) },
@@ -89,7 +89,7 @@ pub const IdType = union(enum) {
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
-    id:             IdType = IdType { .nul = {} },  // default for optional field.
+    id:             RpcId = RpcId { .nul = {} },  // default for optional field.
     params:         Value = Value { .null = {} },   // default for optional field.
 };
 
@@ -170,8 +170,8 @@ pub const Request = struct {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
-    pub fn getId(self: *const Self) IdType {
-        return if (self.body) |body| body.id else IdType { .nul = {} };
+    pub fn getId(self: *const Self) RpcId {
+        return if (self.body) |body| body.id else RpcId { .nul = {} };
     }
 
     pub fn hasError(self: Self) bool {
@@ -304,7 +304,7 @@ pub const Registry = struct {
                 .nul => MyErrors.NotificationHasNoResponse,
             };
         }
-        const id    = IdType { .nul = {} };
+        const id    = RpcId { .nul = {} };
         const code  = @intFromEnum(ErrorCode.InvalidRequest);
         const msg   = "Missing request body.";
         return self.responseError(id, code, msg);
@@ -312,7 +312,7 @@ pub const Registry = struct {
 
     /// Build an Error message.
     /// Caller needs to call self.alloc.free() on the returned message free the memory.
-    fn responseError(self: Self, id: IdType, code: i64, msg: []const u8) ![]const u8 {
+    fn responseError(self: Self, id: RpcId, code: i64, msg: []const u8) ![]const u8 {
         return switch (id) {
             .num => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": {},
