@@ -54,31 +54,31 @@ const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 
 // TODO: Have matching types against the types in the JSON-RPC spec for parsing a stream of messages.
 //       Each type has its own jsonParse() to parse its fields.
-// RpcStream - stream of RpcMessage's.
-// RpcMessage - either one RpcRequest, an array of RpcRequest, or EOS.
+// RpcParser - stream of RpcMessage's.
+// RpcMessage - either one RpcRequest, an array of RpcRequest
 // RpcRequest - the request body
 // RpcId - IdType
 // RpcParams - params field
 //
-// RpcStream.init
+// RpcParser.init
 //      jreader = json.Reader.init(.. reader)
 // Let caller drive the loop.
 // while running_flag
-//      rpcMsg = RpcStream.next()
+//      rpcMsg = RpcParser.next()
 //          jreader.peekNextTokenType() != .end_of_document
 //          rpcMsg = json.parseFromTokenSource(RpcMessage, jreader ..)
-//      dispatch on rpcMsg or EOS
+//      dispatch on rpcMsg
 //
 
 // pub fn reader(allocator: Allocator, io_reader: anytype) Reader(default_buffer_size, @TypeOf(io_reader)) {
 //     return Reader(default_buffer_size, @TypeOf(io_reader)).init(allocator, io_reader);
 // }
 
-pub fn rpcStream(alloc: Allocator, incoming_reader: anytype) RpcStream(@TypeOf(incoming_reader)) {
-    return RpcStream(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
+pub fn parseRpcJson(alloc: Allocator, incoming_reader: anytype) RpcParser(@TypeOf(incoming_reader)) {
+    return RpcParser(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
 }
 
-pub fn RpcStream(comptime IncomingReaderType: type) type {
+pub fn RpcParser(comptime IncomingReaderType: type) type {
     return struct {
         const Self = @This();
         const JsonReader = std.json.Reader(std.json.default_buffer_size, IncomingReaderType);
@@ -98,14 +98,6 @@ pub fn RpcStream(comptime IncomingReaderType: type) type {
         }
 
         pub fn next(self: *Self) !RpcMessage {
-            const token_type = self.json_reader.peekNextTokenType() catch |err| {
-                // return ServerErrors.
-                return err;
-            };
-            if (token_type == .end_of_document) {
-                return RpcMessage { .eos = {} };
-            }
-
             const parsed = try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.json_reader, .{});
             return parsed.value;
         }
@@ -116,7 +108,6 @@ pub fn RpcStream(comptime IncomingReaderType: type) type {
 pub const RpcMessage = union(enum) {
     request:    RpcRequest,
     requests:   []const RpcRequest,
-    eos:        void,
 
     // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {

@@ -354,19 +354,19 @@ test "Request streaming" {
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     const in_reader1 = json_stream1.reader();
-    var rs1 = zigjr.RpcStream(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    var rs1 = zigjr.RpcParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
     defer rs1.deinit();
 
     var json_stream2 = std.io.fixedBufferStream(
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
-    var rs2 = zigjr.rpcStream(alloc, json_stream2.reader());
+    var rs2 = zigjr.parseRpcJson(alloc, json_stream2.reader());
     defer rs2.deinit();
 
     var json_stream3 = std.io.fixedBufferStream(
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
-    var rs3 = zigjr.rpcStream(alloc, json_stream3.reader());
+    var rs3 = zigjr.parseRpcJson(alloc, json_stream3.reader());
     defer rs3.deinit();
 
     const rm3 = try rs3.next();
@@ -379,7 +379,7 @@ test "Request streaming" {
         \\[ {"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1},
         \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2} ]
     );
-    var rs4 = zigjr.rpcStream(alloc, json_stream4.reader());
+    var rs4 = zigjr.parseRpcJson(alloc, json_stream4.reader());
     defer rs4.deinit();
 
     const rm4 = try rs4.next();
@@ -394,7 +394,7 @@ test "Request streaming" {
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
         \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2}
     );
-    var rs5 = zigjr.rpcStream(alloc, json_stream5.reader());
+    var rs5 = zigjr.parseRpcJson(alloc, json_stream5.reader());
     defer rs5.deinit();
 
     // NOTE: Stream parsing of JSON's is impossible.
