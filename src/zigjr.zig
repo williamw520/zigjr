@@ -54,21 +54,59 @@ const MyErrors = error{ NotificationHasNoResponse, MissingRequestBody };
 
 // TODO: Have matching types against the types in the JSON-RPC spec for parsing a stream of messages.
 //       Each type has its own jsonParse() to parse its fields.
-// RpcSession - stream of RpcMessage's.
+// RpcStream - stream of RpcMessage's.
 // RpcMessage - either one RpcRequest, an array of RpcRequest, or EOS.
 // RpcRequest - the request body
 // RpcId - IdType
 // RpcParams - params field
 //
-// RpcSession.init
+// RpcStream.init
 //      jreader = json.Reader.init(.. reader)
 // Let caller drive the loop.
 // while running_flag
-//      rpcMsg = RpcSession.next()
+//      rpcMsg = RpcStream.next()
 //          jreader.peekNextTokenType() != .end_of_document
 //          rpcMsg = json.parseFromTokenSource(RpcMessage, jreader ..)
 //      dispatch on rpcMsg or EOS
 //
+
+// pub fn reader(allocator: Allocator, io_reader: anytype) Reader(default_buffer_size, @TypeOf(io_reader)) {
+//     return Reader(default_buffer_size, @TypeOf(io_reader)).init(allocator, io_reader);
+// }
+
+pub fn rpcStream(alloc: Allocator, incoming_reader: anytype) RpcStream(@TypeOf(incoming_reader)) {
+    return RpcStream(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
+}
+
+pub fn RpcStream(comptime IncomingReaderType: type) type {
+    return struct {
+        const Self = @This();
+        const JsonReader = std.json.Reader(std.json.default_buffer_size, IncomingReaderType);
+
+        alloc:          Allocator,
+        json_reader:    JsonReader,
+
+        pub fn init(alloc: Allocator, incoming_reader: IncomingReaderType) Self {
+            return .{
+                .alloc = alloc,
+                .json_reader = JsonReader.init(alloc, incoming_reader),
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.json_reader.deinit();
+        }
+
+        pub fn next(self: *Self) void {
+            if (self.json_reader.peekNextTokenType() == .end_of_document) {
+                return; // TODO: return RpcMessage.EOS
+            }
+            // const parsed = std.json.parseFromTokenSource(RpcMessage, self.alloc, self.json_reader, .{});
+            // _=parsed;
+        }
+        
+    };
+}
 
 pub const RpcId = union(enum) {
     num:    i64,

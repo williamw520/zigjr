@@ -347,3 +347,24 @@ test "Request dispatching" {
     
 }
 
+test "Request streaming" {
+    const alloc = gpa.allocator();
+
+    var json_stream1 = std.io.fixedBufferStream(
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    );
+    const in_reader1 = json_stream1.reader();
+    var rs1 = zigjr.RpcStream(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    defer rs1.deinit();
+
+    var json_stream2 = std.io.fixedBufferStream(
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    );
+    const in_reader2 = json_stream2.reader();
+    var rs2 = zigjr.rpcStream(alloc, in_reader2);
+    defer rs2.deinit();
+    
+}
+
+
+
