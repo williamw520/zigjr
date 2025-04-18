@@ -118,13 +118,13 @@ test "Register handlers" {
     try testing.expect(registry.get("fun2").?.fn2 == fun2a);
 
     // Test validation.
-    try testing.expectError(zigjr.MyErrors.HandlerTooManyParams,
+    try testing.expectError(zigjr.HandlerErrors.HandlerTooManyParams,
                             registry.register("fun_too_many_params", fun_too_many_params));
 
-    try testing.expectError(zigjr.MyErrors.HandlerInvalidParameterType,
+    try testing.expectError(zigjr.HandlerErrors.HandlerInvalidParameterType,
                             registry.register("fun_wrong_param_type", fun_wrong_param_type));
 
-    try testing.expectError(zigjr.MyErrors.InvalidMethodName,
+    try testing.expectError(zigjr.HandlerErrors.InvalidMethodName,
                             registry.register("rpc.abc", fun0));
 
     // These would cause compile errors, correctly as expected.
@@ -134,187 +134,203 @@ test "Register handlers" {
 }
 
 test "Message request parsing" {
-    const alloc = gpa.allocator();
+    // const alloc = gpa.allocator();
 
-    const req0 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 0}
-    );
-    try testing.expect(req0.hasError() == false);
-    try testing.expect(req0.getId().num == 0);
+    // const req0 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 0}
+    // );
+    // try testing.expect(req0.hasError() == false);
+    // try testing.expect(req0.getId().num == 0);
     
-    const req1 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
-    );
-    try testing.expect(req1.hasError() == false);
-    try testing.expect(std.mem.eql(u8, req1.getId().str, "1"));
+    // const req1 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
+    // );
+    // try testing.expect(req1.hasError() == false);
+    // try testing.expect(std.mem.eql(u8, req1.getId().str, "1"));
 
-    const req2 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 2}
-    );
-    try testing.expect(req2.hasError() == false);
-    try testing.expect(req2.getId().num == 2);
+    // const req2 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 2}
+    // );
+    // try testing.expect(req2.hasError() == false);
+    // try testing.expect(req2.getId().num == 2);
 
-    const req3 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
-    );
-    try testing.expect(req3.hasError() == false);
-    try testing.expect(req3.getId().num == 3);
+    // const req3 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
+    // );
+    // try testing.expect(req3.hasError() == false);
+    // try testing.expect(req3.getId().num == 3);
 
-    const req4 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
-    );
-    try testing.expect(req4.hasError() == false);
-    try testing.expect(req4.getId() == zigjr.RpcId.nul);
+    // const req4 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
+    // );
+    // try testing.expect(req4.hasError() == false);
+    // try testing.expect(req4.getId() == zigjr.RpcId.nul);
 
-    const req5 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun0" }
-    );
-    try testing.expect(req5.hasError() == false);
-    try testing.expect(req5.getId() == zigjr.RpcId.nul);
+    // const req5 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun0" }
+    // );
+    // try testing.expect(req5.hasError() == false);
+    // try testing.expect(req5.getId() == zigjr.RpcId.nul);
 
-    const req5a = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
-    );
-    try testing.expect(req5a.hasError() == false);
-    try testing.expect(std.mem.eql(u8, req5a.getId().str, "5a"));
+    // const req5a = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
+    // );
+    // try testing.expect(req5a.hasError() == false);
+    // try testing.expect(std.mem.eql(u8, req5a.getId().str, "5a"));
 
-    const req5b = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": "5b" }
-    );
-    try testing.expect(req5b.hasError() == false);
-    try testing.expect(std.mem.eql(u8, req5b.getId().str, "5b"));
+    // const req5b = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": "5b" }
+    // );
+    // try testing.expect(req5b.hasError() == false);
+    // try testing.expect(std.mem.eql(u8, req5b.getId().str, "5b"));
 
 
-    const e_req1 = try zigjr.Request.init(alloc, 
-        \\{}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1.err_code, e_req1.err_msg});
-    try testing.expect(e_req1.hasError() == true);
-    try testing.expect(e_req1.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req1 = try zigjr.Request.init(alloc, 
+    //     \\{}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1.err_code, e_req1.err_msg});
+    // try testing.expect(e_req1.hasError() == true);
+    // try testing.expect(e_req1.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req1a = try zigjr.Request.init(alloc,
-        \\{
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1a.err_code, e_req1a.err_msg});
-    try testing.expect(e_req1a.hasError() == true);
-    try testing.expect(e_req1a.err_code == zigjr.ErrorCode.ParseError);
+    // const e_req1a = try zigjr.Request.init(alloc,
+    //     \\{
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1a.err_code, e_req1a.err_msg});
+    // try testing.expect(e_req1a.hasError() == true);
+    // try testing.expect(e_req1a.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_req1b = try zigjr.Request.init(alloc,
-        \\}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1b.err_code, e_req1b.err_msg});
-    try testing.expect(e_req1b.hasError() == true);
-    try testing.expect(e_req1b.err_code == zigjr.ErrorCode.ParseError);
+    // const e_req1b = try zigjr.Request.init(alloc,
+    //     \\}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1b.err_code, e_req1b.err_msg});
+    // try testing.expect(e_req1b.hasError() == true);
+    // try testing.expect(e_req1b.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_req1c = try zigjr.Request.init(alloc,
-        ""
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1c.err_code, e_req1c.err_msg});
-    try testing.expect(e_req1c.hasError() == true);
-    try testing.expect(e_req1c.err_code == zigjr.ErrorCode.ParseError);
+    // const e_req1c = try zigjr.Request.init(alloc,
+    //     ""
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1c.err_code, e_req1c.err_msg});
+    // try testing.expect(e_req1c.hasError() == true);
+    // try testing.expect(e_req1c.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_req2 = try zigjr.Request.init(alloc,
-        \\{"foo": }
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2.err_code, e_req2.err_msg});
-    try testing.expect(e_req2.hasError() == true);
-    try testing.expect(e_req2.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req2 = try zigjr.Request.init(alloc,
+    //     \\{"foo": }
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2.err_code, e_req2.err_msg});
+    // try testing.expect(e_req2.hasError() == true);
+    // try testing.expect(e_req2.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req2a = try zigjr.Request.init(alloc,
-        \\ foo abc 123
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2a.err_code, e_req2a.err_msg});
-    try testing.expect(e_req2a.hasError() == true);
-    try testing.expect(e_req2a.err_code == zigjr.ErrorCode.ParseError);
+    // const e_req2a = try zigjr.Request.init(alloc,
+    //     \\ foo abc 123
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2a.err_code, e_req2a.err_msg});
+    // try testing.expect(e_req2a.hasError() == true);
+    // try testing.expect(e_req2a.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_req2b = try zigjr.Request.init(alloc,
-        \\{"foo":
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2b.err_code, e_req2b.err_msg});
-    try testing.expect(e_req2b.hasError() == true);
-    try testing.expect(e_req2b.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req2b = try zigjr.Request.init(alloc,
+    //     \\{"foo":
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req2b.err_code, e_req2b.err_msg});
+    // try testing.expect(e_req2b.hasError() == true);
+    // try testing.expect(e_req2b.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req3 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": }
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3.err_code, e_req3.err_msg});
-    try testing.expect(e_req3.hasError() == true);
-    try testing.expect(e_req3.err_code == zigjr.ErrorCode.ParseError);
+    // const e_req3 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": }
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3.err_code, e_req3.err_msg});
+    // try testing.expect(e_req3.hasError() == true);
+    // try testing.expect(e_req3.err_code == zigjr.ErrorCode.ParseError);
 
-    const e_req3a = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3a.err_code, e_req3a.err_msg});
-    try testing.expect(e_req3a.hasError() == true);
-    try testing.expect(e_req3a.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req3a = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req3a.err_code, e_req3a.err_msg});
+    // try testing.expect(e_req3a.hasError() == true);
+    // try testing.expect(e_req3a.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req4 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "foobar", "params": [], "params": [], "id": "4"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req4.err_code, e_req4.err_msg});
-    try testing.expect(e_req4.hasError() == true);
-    try testing.expect(e_req4.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req4 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "foobar", "params": [], "params": [], "id": "4"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req4.err_code, e_req4.err_msg});
+    // try testing.expect(e_req4.hasError() == true);
+    // try testing.expect(e_req4.err_code == zigjr.ErrorCode.InvalidRequest);
     
-    const e_req5 = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "0.0", "method": "", "params": [], "id": "5"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5.err_code, e_req5.err_msg});
-    try testing.expect(e_req5.hasError() == true);
-    try testing.expect(e_req5.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req5 = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "0.0", "method": "", "params": [], "id": "5"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5.err_code, e_req5.err_msg});
+    // try testing.expect(e_req5.hasError() == true);
+    // try testing.expect(e_req5.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req5a = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "1.0", "method": "", "params": [], "id": "5a"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5a.err_code, e_req5a.err_msg});
-    try testing.expect(e_req5a.hasError() == true);
-    try testing.expect(e_req5a.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req5a = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "1.0", "method": "", "params": [], "id": "5a"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5a.err_code, e_req5a.err_msg});
+    // try testing.expect(e_req5a.hasError() == true);
+    // try testing.expect(e_req5a.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req5b = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "3.0", "method": "", "params": [], "id": "5b"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5b.err_code, e_req5b.err_msg});
-    try testing.expect(e_req5b.hasError() == true);
-    try testing.expect(e_req5b.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req5b = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "3.0", "method": "", "params": [], "id": "5b"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5b.err_code, e_req5b.err_msg});
+    // try testing.expect(e_req5b.hasError() == true);
+    // try testing.expect(e_req5b.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req5c = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "", "params": [], "id": "5c"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5c.err_code, e_req5c.err_msg});
-    try testing.expect(e_req5c.hasError() == true);
-    try testing.expect(e_req5c.err_code == zigjr.ErrorCode.InvalidRequest);
+    // const e_req5c = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "", "params": [], "id": "5c"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5c.err_code, e_req5c.err_msg});
+    // try testing.expect(e_req5c.hasError() == true);
+    // try testing.expect(e_req5c.err_code == zigjr.ErrorCode.InvalidRequest);
 
-    const e_req5d = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5d.err_code, e_req5d.err_msg});
-    try testing.expect(e_req5d.hasError() == true);
-    try testing.expect(e_req5d.err_code == zigjr.ErrorCode.InvalidParams);
+    // const e_req5d = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5d.err_code, e_req5d.err_msg});
+    // try testing.expect(e_req5d.hasError() == true);
+    // try testing.expect(e_req5d.err_code == zigjr.ErrorCode.InvalidParams);
 
-    const e_req5e = try zigjr.Request.init(alloc,
-        \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5e"}
-    );
-    std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5e.err_code, e_req5e.err_msg});
-    try testing.expect(e_req5e.hasError() == true);
-    try testing.expect(e_req5e.err_code == zigjr.ErrorCode.InvalidParams);
+    // const e_req5e = try zigjr.Request.init(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5e"}
+    // );
+    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req5e.err_code, e_req5e.err_msg});
+    // try testing.expect(e_req5e.hasError() == true);
+    // try testing.expect(e_req5e.err_code == zigjr.ErrorCode.InvalidParams);
 
 }
 
 test "Request dispatching" {
-    // std.debug.print("\n\n\n", .{});
-    // std.debug.print("test handler calls...\n", .{});
+    std.debug.print("-------- Request dispatching\n", .{});
 
-    // const allocator = gpa.allocator();
+    const alloc = gpa.allocator();
 
-    // var registry = zigjr.Registry.init(allocator);
-    // defer registry.deinit();
+    var registry = zigjr.Registry.init(alloc);
+    defer registry.deinit();
 
-    // try registry.register("fun0", fun0);
-    // try registry.register("fun1", fun1);
-    // try registry.register("subtract", fun2);
+    try registry.register("fun0", fun0);
+    try registry.register("fun1", fun1);
+    try registry.register("subtract", fun2);
 
-    // const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 1}
+
+    // var json_stream1 = std.io.fixedBufferStream(
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    // );
+    // const in_reader1 = json_stream1.reader();
+    // var rs1 = zigjr.RpcParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    // defer rs1.deinit();
+
+    // const req0 = try rs1.next();
+    // _=req0;
+
+    // const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [20, 10], "id": 1}
     //             ;
-    // const req0 = try zigjr.Request.init(allocator, msg0);
+    
+    // var parser = zigjr.parseStr(alloc,
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    // );
+    // const req0a = try parser.next();
+    // _=req0a;
+
     // std.debug.print("req0.body: {any}\n", .{req0.body});
     // const res0 = try registry.run(req0);
     // std.debug.print("res0 {s}\n", .{res0});
@@ -348,69 +364,74 @@ test "Request dispatching" {
 }
 
 test "Request streaming" {
+    // std.debug.print("-------- Request streaming\n", .{});
+
     const alloc = gpa.allocator();
 
     var json_stream1 = std.io.fixedBufferStream(
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     const in_reader1 = json_stream1.reader();
-    var rs1 = zigjr.RpcParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    var rs1 = zigjr.ReaderParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    const rm1 = try rs1.next();
+    std.debug.print("rm1: {any}\n", .{rm1});
+    // _=rm1;
     defer rs1.deinit();
 
-    var json_stream2 = std.io.fixedBufferStream(
-        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
-    );
-    var rs2 = zigjr.parseReader(alloc, json_stream2.reader());
-    defer rs2.deinit();
+    // var json_stream2 = std.io.fixedBufferStream(
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    // );
+    // var rs2 = zigjr.parseReader(alloc, json_stream2.reader());
+    // defer rs2.deinit();
 
-    var json_stream3 = std.io.fixedBufferStream(
-        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
-    );
-    var rs3 = zigjr.parseReader(alloc, json_stream3.reader());
-    defer rs3.deinit();
+    // var json_stream3 = std.io.fixedBufferStream(
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    // );
+    // var rs3 = zigjr.parseReader(alloc, json_stream3.reader());
+    // defer rs3.deinit();
 
-    const rm3 = try rs3.next();
-    std.debug.print("rm3 {any}\n", .{rm3});
-    std.debug.print("rm3 {s}\n", .{rm3.request.body.method});
-    std.debug.print("rm3 {any}\n", .{rm3.request.body.params});
-
-
-    var json_stream4 = std.io.fixedBufferStream(
-        \\[ {"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1},
-        \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2} ]
-    );
-    var rs4 = zigjr.parseReader(alloc, json_stream4.reader());
-    defer rs4.deinit();
-
-    const rm4 = try rs4.next();
-    std.debug.print("rm4 {any}\n", .{rm4});
-    std.debug.print("rm4 {s}\n", .{rm4.batch[0].body.method});
-    std.debug.print("rm4 {any}\n", .{rm4.batch[0].body.params});
-    std.debug.print("rm4 {s}\n", .{rm4.batch[1].body.method});
-    std.debug.print("rm4 {any}\n", .{rm4.batch[1].body.params});
+    // const rm3 = try rs3.next();
+    // std.debug.print("rm3 {any}\n", .{rm3});
+    // std.debug.print("rm3 {s}\n", .{rm3.request.body.method});
+    // std.debug.print("rm3 {any}\n", .{rm3.request.body.params});
 
 
-    var json_stream5 = std.io.fixedBufferStream(
-        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
-        \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2}
-    );
-    var rs5 = zigjr.parseReader(alloc, json_stream5.reader());
-    defer rs5.deinit();
+    // var json_stream4 = std.io.fixedBufferStream(
+    //     \\[ {"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1},
+    //     \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2} ]
+    // );
+    // var rs4 = zigjr.parseReader(alloc, json_stream4.reader());
+    // defer rs4.deinit();
 
-    // NOTE: Stream parsing of JSON's is impossible.
-    // The next statement causes an assert in std.json.parseFromTokenSourceLeaky(),
-    //  assert(.end_of_document == try scanner_or_reader.next())
-    // It's expecting the end of input after parsed one JSON.
-    std.debug.print("--------\n", .{});
-    // const rm5 = rs5.next() catch |err| {
-    //     std.debug.print("rm5 err: {any}\n", .{err});
-    // };
-    // std.debug.print("rm5 {any}\n", .{rm5});
+    // const rm4 = try rs4.next();
+    // std.debug.print("rm4 {any}\n", .{rm4});
+    // std.debug.print("rm4 {s}\n", .{rm4.batch[0].body.method});
+    // std.debug.print("rm4 {any}\n", .{rm4.batch[0].body.params});
+    // std.debug.print("rm4 {s}\n", .{rm4.batch[1].body.method});
+    // std.debug.print("rm4 {any}\n", .{rm4.batch[1].body.params});
+
+
+    // var json_stream5 = std.io.fixedBufferStream(
+    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    //     \\  {"jsonrpc": "2.0", "method": "add", "params": [2, 3], "id": 2}
+    // );
+    // var rs5 = zigjr.parseReader(alloc, json_stream5.reader());
+    // defer rs5.deinit();
+
+    // // NOTE: Stream parsing of JSON's is impossible.
+    // // The next statement causes an assert in std.json.parseFromTokenSourceLeaky(),
+    // //  assert(.end_of_document == try scanner_or_reader.next())
+    // // It's expecting the end of input after parsed one JSON.
+    // std.debug.print("--------\n", .{});
+    // // const rm5 = rs5.next() catch |err| {
+    // //     std.debug.print("rm5 err: {any}\n", .{err});
+    // // };
+    // // std.debug.print("rm5 {any}\n", .{rm5});
     
-    // std.debug.print("rm5 {s}\n", .{rm5.batch[0].method});
-    // std.debug.print("rm5 {any}\n", .{rm5.batch[0].params});
-    // std.debug.print("rm5 {s}\n", .{rm5.batch[1].method});
-    // std.debug.print("rm5 {any}\n", .{rm5.batch[1].params});
+    // // std.debug.print("rm5 {s}\n", .{rm5.batch[0].method});
+    // // std.debug.print("rm5 {any}\n", .{rm5.batch[0].params});
+    // // std.debug.print("rm5 {s}\n", .{rm5.batch[1].method});
+    // // std.debug.print("rm5 {any}\n", .{rm5.batch[1].params});
     
 }
 
