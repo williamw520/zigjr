@@ -136,31 +136,29 @@ const RpcRequestBody = struct {
 const RpcError = struct {
     const Self = @This();
 
-    alloc:      Allocator,
     code:       ErrorCode,
     msg:        []const u8,
     req_id:     RpcId = .{ .nul = {} },         // request id related to the error.
 
-    fn deinit(self: Self) void {
-        self.allocator.free(self.msg);
-    }
-
+    // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
+    // The memory is freed all together in Parsed(T).deinit().
     fn initParseError(alloc: Allocator, parse_err: ParseError(Scanner)) !Self {
         const msg = try allocPrint(alloc, "{s}", .{@errorName(parse_err)});
         return switch (parse_err) {
             error.MissingField, error.UnknownField, error.DuplicateField, error.LengthMismatch =>
-                .{ .alloc = alloc, .code = ErrorCode.InvalidRequest, .msg = msg },
+                .{ .code = ErrorCode.InvalidRequest, .msg = msg },
             error.Overflow, error.OutOfMemory => 
-                .{ .alloc = alloc, .code = ErrorCode.InternalError, .msg = msg },
+                .{ .code = ErrorCode.InternalError, .msg = msg },
             else =>
-                .{ .alloc = alloc, .code = ErrorCode.ParseError, .msg = msg },
+                .{ .code = ErrorCode.ParseError, .msg = msg },
         };
     }
 
+    // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
+    // The memory is freed all together in Parsed(T).deinit().
     fn validateBody(alloc: Allocator, body: RpcRequestBody) !?Self {
         if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
             return .{
-                .alloc = alloc,
                 .code = ErrorCode.InvalidRequest,
                 .msg = try allocPrint(alloc, "Invalid JSON-RPC version. Must be 2.0.", .{}),
                 .req_id = body.id,
@@ -168,7 +166,6 @@ const RpcError = struct {
         }
         if (body.params == .invalid) {
             return .{
-                .alloc = alloc,
                 .code = ErrorCode.InvalidParams,
                 .msg = try allocPrint(alloc, "'Params' must be an array, an object, or not defined.", .{}),
                 .req_id = body.id,
@@ -176,7 +173,6 @@ const RpcError = struct {
         }
         if (body.method.len == 0) {
             return .{
-                .alloc = alloc,
                 .code = ErrorCode.InvalidRequest,
                 .msg = try allocPrint(alloc, "'Method' is empty.", .{}),
                 .req_id = body.id,
