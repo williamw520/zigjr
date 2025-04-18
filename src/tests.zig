@@ -325,11 +325,10 @@ test "Request dispatching" {
     // const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [20, 10], "id": 1}
     //             ;
     
-    // var parser = zigjr.parseStr(alloc,
-    //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
-    // );
-    // const req0a = try parser.next();
-    // _=req0a;
+    const rm0 = zigjr.parseStr(alloc,
+        \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+    );
+    std.debug.print("rm0: {any}\n", .{rm0});
 
     // std.debug.print("req0.body: {any}\n", .{req0.body});
     // const res0 = try registry.run(req0);
@@ -364,7 +363,7 @@ test "Request dispatching" {
 }
 
 test "Request streaming" {
-    // std.debug.print("-------- Request streaming\n", .{});
+    std.debug.print("-------- Request streaming\n", .{});
 
     const alloc = gpa.allocator();
 
@@ -372,11 +371,12 @@ test "Request streaming" {
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     const in_reader1 = json_stream1.reader();
-    var rs1 = zigjr.ReaderParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
-    const rm1 = try rs1.next();
+    const rm1 = zigjr.parseReader(alloc, in_reader1);
+    // var rs1 = zigjr.ReaderParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
+    // const rm1 = try rs1.next();
     std.debug.print("rm1: {any}\n", .{rm1});
     // _=rm1;
-    defer rs1.deinit();
+    // defer rs1.deinit();
 
     // var json_stream2 = std.io.fixedBufferStream(
     //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}

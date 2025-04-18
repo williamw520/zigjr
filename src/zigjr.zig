@@ -52,131 +52,89 @@ pub const HandlerErrors = error {
 };
 
 
-const Buffer = []const u8;
-const BufferReader = std.io.FixedBufferStream(Buffer).Reader;
-
-// pub fn parseStr(alloc: Allocator, str: []const u8) StrParser(BufferReader) {
-//     std.debug.print("**** parseStr: {s}\n", .{str});
-
-//     const parsed = try std.json.parseFromTokenSource(RpcMessage(JsonReader),
-//                                                      self.alloc, &self.jreader, .{});
-    
-//     const parsed = std.json.parseFromSlice(RpcMessage(JsonReader), alloc, message, .{})
-//         catch |err| return initWithError(alloc, err);
-//     var req = Self { .alloc = alloc, .body = parsed.value, .parsed = parsed };
-//     try req.validate();
-//     return req;
-// }
-
-//pub fn parseStr(alloc: Allocator, str: []const u8) RpcParser(std.io.FixedBufferStream([]const u8).Reader) {
-pub fn parseStr99(alloc: Allocator, str: []const u8) ReaderParser(BufferReader) {
-    std.debug.print("**** parseStr: {s}\n", .{str});
-    var stream = std.io.fixedBufferStream(str);
-    const reader = stream.reader();
-    
-    // const contents = try reader.readAllAlloc(alloc, 1024);
-    // defer alloc.free(contents);
-    // std.debug.print("reader:        {s}\n", .{contents});
-
-    var p = ReaderParser(@TypeOf(reader)).init(alloc, reader);
-    const rm1 = p.next() catch  {
-        return ReaderParser(@TypeOf(reader)).init(alloc, reader);
-    };
-    std.debug.print("rm1: {any}\n", .{rm1});
-
-    return ReaderParser(@TypeOf(reader)).init(alloc, reader);
+pub fn parseStr(alloc: Allocator, json_str: []const u8) !RpcMessage {
+    const parsed = try std.json.parseFromSlice(RpcMessage, alloc, json_str, .{});
+    return parsed.value;
 }
 
-fn StrParser(comptime IncomingReaderType: type) type {
+pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcMessage {
+    var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
+    defer rp.deinit();
+    // NOTE: Stream parsing of JSON's is impossible.
+    // The assert() in std.json.parseFromTokenSourceLeaky() expects the end of input
+    // after parsing just one JSON.
+    //      assert(.end_of_document == try scanner_or_reader.next())
+    return rp.next();
+}
+
+fn ReaderParser(comptime JsonReaderType: type) type {
     return struct {
         const Self = @This();
-        const JsonReader = std.json.Reader(std.json.default_buffer_size, IncomingReaderType);
+        const ScannerReader = std.json.Reader(std.json.default_buffer_size, JsonReaderType);
 
-        str_stream: std.io.FixedBufferStream(Buffer),
-        buf_reader: std.io.FixedBufferStream(Buffer).Reader,
         alloc:      Allocator,
-        jreader:    JsonReader,
+        jreader:    ScannerReader,
 
-        pub fn init(alloc: Allocator, str: []const u8) Self {
-            var stream = std.io.fixedBufferStream(str);
-            const reader = stream.reader();
-            return .{
-                .str_stream = stream,
-                .buf_reader = reader,
-                .alloc = alloc,
-                .jreader = JsonReader.init(alloc, reader)
-            };
+        pub fn init(alloc: Allocator, json_reader: JsonReaderType) Self {
+            // ScannerReader bridging the incoming_reader and a Scanner.
+            return .{ .alloc = alloc,  .jreader = ScannerReader.init(alloc, json_reader) };
         }
 
         pub fn deinit(self: *Self) void {
             self.jreader.deinit();
         }
 
-        pub fn next(self: *Self) !RpcMessage(JsonReader) {
-            const parsed = try std.json.parseFromTokenSource(RpcMessage(JsonReader),
+        pub fn next(self: *Self) !RpcMessage {
+            const parsed = try std.json.parseFromTokenSource(RpcMessage,
                                                              self.alloc, &self.jreader, .{});
             return parsed.value;
         }
-
     };
 }
 
-pub fn parseReader(alloc: Allocator, incoming_reader: anytype) ReaderParser(@TypeOf(incoming_reader)) {
-    return ReaderParser(@TypeOf(incoming_reader)).init(alloc, incoming_reader);
-}
 
-pub fn ReaderParser(comptime IncomingReaderType: type) type {
-    return struct {
-        const Self = @This();
-        const JsonReader = std.json.Reader(std.json.default_buffer_size, IncomingReaderType);
+const RpcMessage = union(enum) {
+    request:    RpcRequest,                 // JSON-RPC's single request
+    batch:      []const RpcRequest,         // JSON-RPC's batch of requests
 
-        alloc:      Allocator,
-        jreader:    JsonReader,
+    // Custom parsing when the JSON parser encounters a field of this type.
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
+        return switch (try source.peekNextTokenType()) {
+            .object_begin=> .{
+                .request = try innerParse(RpcRequest, alloc, source, options)
+            },
+            .array_begin => .{
+                .batch   = try innerParse([]const RpcRequest, alloc, source, options)
+            },
+            else => error.UnexpectedToken,  // there're only two cases; any other is an error.
+        };
+    }
+};
 
-        pub fn init(alloc: Allocator, incoming_reader: IncomingReaderType) Self {
-            return .{ .alloc = alloc,  .jreader = JsonReader.init(alloc, incoming_reader) };
+const RpcRequest = union(enum) {
+    const Self = @This();
+
+    body:       RpcRequestBody,
+    err:        RpcError,           // capture the parsing error or the validation error.
+
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
+        const body = innerParse(RpcRequestBody, alloc, source, options) catch |parse_err| {
+            return .{ .err = try RpcError.initParseError(alloc, parse_err) };
+        };
+        // At this point, the request body has passed parsing.  Validate its content.
+        if (try RpcError.validateBody(alloc, body)) |validation_err| {
+            return .{ .err = validation_err };
+        } else {
+            return .{ .body = body, };
         }
-
-        pub fn deinit(self: *Self) void {
-            self.jreader.deinit();
-        }
-
-        pub fn next(self: *Self) !RpcMessage(JsonReader) {
-            const parsed = try std.json.parseFromTokenSource(RpcMessage(JsonReader),
-                                                             self.alloc, &self.jreader, .{});
-            return parsed.value;
-        }
-        
-    };
-}
-
-fn RpcMessage(comptime SourceType: type) type {
-    return union(enum) {
-        request:    RpcRequest,
-        batch:      []const RpcRequest,
-
-        // Custom parsing when the JSON parser encounters a field of this type.
-        pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage(SourceType) {
-            // There're only two cases: object or array.
-            std.debug.print("*** RpcMessage.jsonParse token: {any}\n", .{try source.peekNextTokenType()});
-            return switch (try source.peekNextTokenType()) {
-                .object_begin=> .{
-                    .request = try innerParse(RpcRequest, alloc, source, options)
-                },
-                .array_begin => .{
-                    .batch   = try innerParse([]const RpcRequest, alloc, source, options)
-                },
-                else => error.UnexpectedToken,
-            };
-        }
-    };
-}
+    }
+};
 
 const RpcRequestBody = struct {
-    jsonrpc:    [3]u8 = .{ '0', '.', '0' },
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' },     // default to fail validation.
     method:     []u8 = "",
-    params:     RpcParams = RpcParams { .nul = {} },    // default for optional field.
-    id:         RpcId = RpcId { .nul = {} },            // default for optional field.
+    params:     RpcParams = .{ .nul = {} },     // default for optional field.
+    id:         RpcId = .{ .nul = {} },         // default for optional field.
 };
 
 const RpcError = struct {
@@ -185,17 +143,25 @@ const RpcError = struct {
     alloc:      Allocator,
     code:       ErrorCode,
     msg:        []const u8,
-    req_id:     RpcId = RpcId { .nul = {} },        // request id related to the error.
+    req_id:     RpcId = .{ .nul = {} },         // request id related to the error.
 
-    pub fn init(alloc: Allocator, code: ErrorCode, msg: []const u8) Self {
-        return .{ .alloc = alloc, .code = code, .msg = msg };
-    }
-
-    pub fn deinit(self: Self) void {
+    fn deinit(self: Self) void {
         self.allocator.free(self.msg);
     }
 
-    fn ofBodyValidation(alloc: Allocator, body: RpcRequestBody) !?Self {
+    fn initParseError(alloc: Allocator, parse_err: ParseError(Scanner)) !Self {
+        const msg = try allocPrint(alloc, "{s}", .{@errorName(parse_err)});
+        return switch (parse_err) {
+            error.MissingField, error.UnknownField, error.DuplicateField, error.LengthMismatch =>
+                .{ .alloc = alloc, .code = ErrorCode.InvalidRequest, .msg = msg },
+            error.Overflow, error.OutOfMemory => 
+                .{ .alloc = alloc, .code = ErrorCode.InternalError, .msg = msg },
+            else =>
+                .{ .alloc = alloc, .code = ErrorCode.ParseError, .msg = msg },
+        };
+    }
+
+    fn validateBody(alloc: Allocator, body: RpcRequestBody) !?Self {
         if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
             return .{
                 .alloc = alloc,
@@ -224,36 +190,6 @@ const RpcError = struct {
     }
 };
 
-const RpcRequest = union(enum) {
-    const Self = @This();
-
-    err:        RpcError,           // capture the parsing error or the validation error.
-    body:       RpcRequestBody,     // no body in the case of parsing error.
-
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
-        const body = innerParse(RpcRequestBody, alloc, source, options) catch |parse_err| {
-            // msg must be freed with alloc in RpcError.deinit().
-            const msg = try allocPrint(alloc, "{s}", .{@errorName(parse_err)});
-            return switch (parse_err) {
-                error.MissingField, error.UnknownField, error.DuplicateField, error.LengthMismatch => .{
-                    .err = RpcError.init(alloc, ErrorCode.InvalidRequest, msg)
-                },
-                error.Overflow, error.OutOfMemory => .{
-                    .err = RpcError.init(alloc, ErrorCode.InternalError, msg)
-                },
-                else => .{
-                    .err = RpcError.init(alloc, ErrorCode.ParseError, msg)
-                },
-            };
-        };
-        // At this point, the request body has passed parsing.  Check the body content.
-        if (try RpcError.ofBodyValidation(alloc, body)) |validation_err| {
-            return .{ .err = validation_err };
-        }
-        return .{ .body = body, };
-    }
-};
-
 const RpcParams = union(enum) {
     nul:        void,
     object:     Value,
@@ -269,10 +205,10 @@ const RpcParams = union(enum) {
     }
 };
 
-pub const RpcId = union(enum) {
-    num:    i64,
-    str:    []const u8,
-    nul:    void,
+const RpcId = union(enum) {
+    nul:        void,
+    num:        i64,
+    str:        []const u8,
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
         return switch (try source.peekNextTokenType()) {
@@ -284,6 +220,7 @@ pub const RpcId = union(enum) {
 };
 
 
+// TODO: deprecated.
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
@@ -292,6 +229,7 @@ const RequestBody = struct {
 };
 
 /// Handle an incoming JSON-RPC 2.0 request message.
+// TODO: deprecated.
 pub const Request = struct {
     const Self = @This();
 
