@@ -91,7 +91,7 @@ fn ReaderParser(comptime JsonReaderType: type) type {
 }
 
 
-const RpcMessage = union(enum) {
+pub const RpcMessage = union(enum) {
     request:    RpcRequest,                 // JSON-RPC's single request
     batch:      []const RpcRequest,         // JSON-RPC's batch of requests
 
@@ -109,30 +109,40 @@ const RpcMessage = union(enum) {
     }
 };
 
-const RpcRequest = union(enum) {
+pub const RpcRequest = struct {
     const Self = @This();
 
-    body:       RpcRequestBody,
-    err:        RpcError,           // capture the parsing error or the validation error.
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
+    method:     []u8 = "",
+    params:     RpcParams = .{ .nul = {} }, // default for optional field.
+    id:         RpcId = .{ .nul = {} },     // default for optional field.
+    err:        ?RpcError = null,           // capture the parsing error or the validation error.
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
         const body = innerParse(RpcRequestBody, alloc, source, options) catch |parse_err| {
             return .{ .err = try RpcError.initParseError(alloc, parse_err) };
         };
         // At this point, the request body has passed parsing.  Validate its content.
-        if (try RpcError.validateBody(alloc, body)) |validation_err| {
-            return .{ .err = validation_err };
-        } else {
-            return .{ .body = body, };
-        }
+        return .{
+            .jsonrpc    = body.jsonrpc,
+            .method     = body.method,
+            .params     = body.params,
+            .id         = body.id,
+            .err        = try RpcError.validateBody(alloc, body),
+        };
     }
+
+    pub fn hasError(self: Self) bool {
+        return self.err != null;
+    }
+
 };
 
 const RpcRequestBody = struct {
-    jsonrpc:    [3]u8 = .{ '0', '.', '0' },     // default to fail validation.
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     method:     []u8 = "",
-    params:     RpcParams = .{ .nul = {} },     // default for optional field.
-    id:         RpcId = .{ .nul = {} },         // default for optional field.
+    params:     RpcParams = .{ .nul = {} }, // default for optional field.
+    id:         RpcId = .{ .nul = {} },     // default for optional field.
 };
 
 const RpcError = struct {
