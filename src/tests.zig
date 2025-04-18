@@ -325,10 +325,11 @@ test "Request dispatching" {
     // const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [20, 10], "id": 1}
     //             ;
     
-    const rm0 = zigjr.parseStr(alloc,
+    const result0 = try zigjr.parseJson(alloc,
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
-    std.debug.print("rm0: {any}\n", .{rm0});
+    defer result0.deinit();
+    std.debug.print("result0: {any}\n", .{result0.value});
 
     // std.debug.print("req0.body: {any}\n", .{req0.body});
     // const res0 = try registry.run(req0);
@@ -371,12 +372,9 @@ test "Request streaming" {
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     const in_reader1 = json_stream1.reader();
-    const rm1 = zigjr.parseReader(alloc, in_reader1);
-    // var rs1 = zigjr.ReaderParser(@TypeOf(in_reader1)).init(alloc, in_reader1);
-    // const rm1 = try rs1.next();
-    std.debug.print("rm1: {any}\n", .{rm1});
-    // _=rm1;
-    // defer rs1.deinit();
+    const result1 = try zigjr.parseReader(alloc, in_reader1);
+    defer result1.deinit();
+    std.debug.print("result1: {any}\n", .{result1.value});
 
     // var json_stream2 = std.io.fixedBufferStream(
     //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}

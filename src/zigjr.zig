@@ -9,25 +9,21 @@
 const std = @import("std");
 const Type = std.builtin.Type;
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
-const indexOfScalar = std.mem.indexOfScalar;
 const StringHashMap = std.hash_map.StringHashMap;
 const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
-const parseInt = std.fmt.parseInt;
-const tokenizeScalar = std.mem.tokenizeScalar;
+const Parsed = std.json.Parsed;
 const Scanner = std.json.Scanner;
 const ParseOptions = std.json.ParseOptions;
 const innerParse = std.json.innerParse;
-const ParseFromValueError = std.json.ParseFromValueError;
 const ParseError = std.json.ParseError;
 const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
 
+// JSON-RPC 2.0 error codes.
 pub const ErrorCode = enum(i32) {
-    None = 0,
     ParseError = -32700,        // Invalid JSON was received by the server.
     InvalidRequest = -32600,    // The JSON sent is not a valid Request object.
     MethodNotFound = -32601,    // The method does not exist / is not available.
@@ -36,8 +32,8 @@ pub const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
+// Handler registration errors or dispatching errors.
 pub const HandlerErrors = error {
-    // Handler registration errors or dispatch errors.
     InvalidMethodName,
     NoHandlerForArrayParam,
     NoHandlerForObjectParam,
@@ -52,12 +48,14 @@ pub const HandlerErrors = error {
 };
 
 
-pub fn parseStr(alloc: Allocator, json_str: []const u8) !RpcMessage {
+pub const RpcResult = std.json.Parsed(RpcMessage);
+
+pub fn parseJson(alloc: Allocator, json_str: []const u8) !RpcResult {
     const parsed = try std.json.parseFromSlice(RpcMessage, alloc, json_str, .{});
-    return parsed.value;
+    return parsed;
 }
 
-pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcMessage {
+pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcResult {
     var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
     defer rp.deinit();
     // NOTE: Stream parsing of JSON's is impossible.
@@ -84,10 +82,8 @@ fn ReaderParser(comptime JsonReaderType: type) type {
             self.jreader.deinit();
         }
 
-        pub fn next(self: *Self) !RpcMessage {
-            const parsed = try std.json.parseFromTokenSource(RpcMessage,
-                                                             self.alloc, &self.jreader, .{});
-            return parsed.value;
+        pub fn next(self: *Self) !RpcResult {
+            return try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.jreader, .{});
         }
     };
 }
@@ -106,7 +102,7 @@ const RpcMessage = union(enum) {
             .array_begin => .{
                 .batch   = try innerParse([]const RpcRequest, alloc, source, options)
             },
-            else => error.UnexpectedToken,  // there're only two cases; any other is an error.
+            else => error.UnexpectedToken,  // there're only two cases; any others are error.
         };
     }
 };
