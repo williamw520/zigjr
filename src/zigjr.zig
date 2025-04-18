@@ -58,10 +58,12 @@ pub fn parseJson(alloc: Allocator, json_str: []const u8) !RpcResult {
 pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcResult {
     var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
     defer rp.deinit();
-    // NOTE: Stream parsing of JSON's is impossible.
+    // NOTE: Stream parsing of JSON's via Reader is impossible.
     // The assert() in std.json.parseFromTokenSourceLeaky() expects the end of input
     // after parsing just one JSON.
     //      assert(.end_of_document == try scanner_or_reader.next())
+    // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
+    // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
     return rp.next();
 }
 
