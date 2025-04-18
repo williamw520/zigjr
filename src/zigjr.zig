@@ -48,11 +48,40 @@ pub const HandlerErrors = error {
 };
 
 
-pub const RpcResult = std.json.Parsed(RpcMessage);
+pub const RpcResult = struct {
+    const Self = @This();
+    parsed:     std.json.Parsed(RpcMessage),
+    rpc_msg:    RpcMessage,
+
+    pub fn deinit(self: *Self) void {
+        self.parsed.deinit();
+    }
+
+    pub fn isRequest(self: *Self) bool {
+        return self.rpc_msg == .request;
+    }
+
+    pub fn isBatch(self: *Self) bool {
+        return self.rpc_msg == .batch;
+    }
+
+    /// Shortcut to access the inner request.
+    pub fn request(self: *Self) RpcRequest {
+        return self.rpc_msg.request;
+    }
+
+    /// Shortcut to access the inner batch.
+    pub fn batch(self: *Self) []const RpcRequest {
+        return self.rpc_msg.batch;
+    }
+};
 
 pub fn parseJson(alloc: Allocator, json_str: []const u8) !RpcResult {
     const parsed = try std.json.parseFromSlice(RpcMessage, alloc, json_str, .{});
-    return parsed;
+    return .{
+        .parsed = parsed,
+        .rpc_msg = parsed.value,
+    };
 }
 
 pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcResult {
@@ -64,7 +93,11 @@ pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcResult {
     //      assert(.end_of_document == try scanner_or_reader.next())
     // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
     // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
-    return rp.next();
+    const parsed = try rp.next();
+    return .{
+        .parsed = parsed,
+        .rpc_msg = parsed.value,
+    };
 }
 
 fn ReaderParser(comptime JsonReaderType: type) type {
@@ -84,7 +117,7 @@ fn ReaderParser(comptime JsonReaderType: type) type {
             self.jreader.deinit();
         }
 
-        pub fn next(self: *Self) !RpcResult {
+        pub fn next(self: *Self) !Parsed(RpcMessage) {
             return try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.jreader, .{});
         }
     };
@@ -114,7 +147,7 @@ pub const RpcRequest = struct {
 
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     method:     []u8 = "",
-    params:     RpcParams = .{ .nul = {} }, // default for optional field.
+    params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .nul = {} },     // default for optional field.
     err:        ?RpcError = null,           // capture the parsing error or the validation error.
 
@@ -123,12 +156,14 @@ pub const RpcRequest = struct {
             return .{ .err = try RpcError.initParseError(alloc, parse_err) };
         };
         // At this point, the request body has passed parsing.  Validate its content.
+        if (try RpcError.validateBody(alloc, body)) |validation_err| {
+            return .{ .err = validation_err };
+        }
         return .{
-            .jsonrpc    = body.jsonrpc,
-            .method     = body.method,
-            .params     = body.params,
-            .id         = body.id,
-            .err        = try RpcError.validateBody(alloc, body),
+            .jsonrpc = body.jsonrpc,
+            .method  = body.method,
+            .params  = if (body.params == .value) body.params.value else Value { .null = {} },
+            .id      = body.id,
         };
     }
 
@@ -196,15 +231,14 @@ const RpcError = struct {
 
 const RpcParams = union(enum) {
     nul:        void,
-    object:     Value,
-    array:      []const Value,
+    value:      Value,
     invalid:    void,
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParams {
         return switch (try source.peekNextTokenType()) {
-            .object_begin   => .{ .object = try innerParse(Value, alloc, source, options) },
-            .array_begin    => .{ .array  = try innerParse([]const Value, alloc, source, options) },
-            else            => .{ .invalid = {} },
+            .object_begin   => .{ .value    = try innerParse(Value, alloc, source, options) },
+            .array_begin    => .{ .value    = try innerParse(Value, alloc, source, options) },
+            else            => .{ .invalid  = {} },
         };
     }
 };

@@ -139,19 +139,21 @@ test "Register handlers" {
 test "Parsing valid request, single integer param, integer id" {
     const alloc = gpa.allocator();
     {
-        const result = try zigjr.parseJson(alloc,
+        var result = try zigjr.parseJson(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "params": [42], "id": 1}
         );
         defer result.deinit();
-        try testing.expect(@TypeOf(result.value) == RpcMessage);
-        try testing.expect(result.value == .request);
-        try testing.expect(result.value.request.hasError() == false);
-        try testing.expect(std.mem.eql(u8, &result.value.request.jsonrpc, "2.0"));
-        try testing.expect(std.mem.eql(u8, result.value.request.method, "fun0"));
-        try testing.expect(result.value.request.params == .array);
-        try testing.expect(result.value.request.params.array.len == 1);
-        try testing.expect(result.value.request.params.array[0].integer == 42);
-        try testing.expect(result.value.request.id.num == 1);
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        try testing.expect(result.isRequest());
+        try testing.expect(!result.isBatch());
+        try testing.expect(result.request().hasError() == false);
+        try testing.expect(std.mem.eql(u8, &result.request().jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, result.request().method, "fun0"));
+        try testing.expect(result.request().params == .array);
+        try testing.expect(result.request().params.array.items.len == 1);
+        try testing.expect(result.request().params.array.items[0].integer == 42);
+        try testing.expect(result.request().id.num == 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
@@ -159,40 +161,60 @@ test "Parsing valid request, single integer param, integer id" {
 test "Parsing valid request, single string param, string id" {
     const alloc = gpa.allocator();
     {
-        const result = try zigjr.parseJson(alloc,
+        var result = try zigjr.parseJson(alloc,
             \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
         );
         defer result.deinit();
-        try testing.expect(@TypeOf(result.value) == RpcMessage);
-        try testing.expect(result.value == .request);
-        try testing.expect(result.value.request.hasError() == false);
-        try testing.expect(std.mem.eql(u8, &result.value.request.jsonrpc, "2.0"));
-        try testing.expect(std.mem.eql(u8, result.value.request.method, "fun1"));
-        try testing.expect(result.value.request.params == .array);
-        try testing.expect(result.value.request.params.array.len == 1);
-        try testing.expect(std.mem.eql(u8, result.value.request.params.array[0].string, "FUN1"));
-        try testing.expect(std.mem.eql(u8, result.value.request.id.str, "1"));
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        try testing.expect(result.request().hasError() == false);
+        try testing.expect(std.mem.eql(u8, &result.request().jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, result.request().method, "fun1"));
+        try testing.expect(result.request().params == .array);
+        try testing.expect(result.request().params.array.items.len == 1);
+        try testing.expect(std.mem.eql(u8, result.request().params.array.items[0].string, "FUN1"));
+        try testing.expect(std.mem.eql(u8, result.request().id.str, "1"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
-test "Parsing valid request, tww integer params, integer id" {
+test "Parsing valid request, tw0 integer params, integer id" {
     const alloc = gpa.allocator();
     {
-        const result = try zigjr.parseJson(alloc,
+        var result = try zigjr.parseJson(alloc,
             \\{"jsonrpc": "2.0", "method": "fun1", "params": [42, 22], "id": 2}
         );
         defer result.deinit();
-        try testing.expect(@TypeOf(result.value) == RpcMessage);
-        try testing.expect(result.value == .request);
-        try testing.expect(result.value.request.hasError() == false);
-        try testing.expect(std.mem.eql(u8, &result.value.request.jsonrpc, "2.0"));
-        try testing.expect(std.mem.eql(u8, result.value.request.method, "fun1"));
-        try testing.expect(result.value.request.params == .array);
-        try testing.expect(result.value.request.params.array.len == 2);
-        try testing.expect(result.value.request.params.array[0].integer == 42);
-        try testing.expect(result.value.request.params.array[1].integer == 22);
-        try testing.expect(result.value.request.id.num == 2);
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        try testing.expect(result.request().hasError() == false);
+        try testing.expect(std.mem.eql(u8, &result.request().jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, result.request().method, "fun1"));
+        try testing.expect(result.request().params == .array);
+        try testing.expect(result.request().params.array.items.len == 2);
+        try testing.expect(result.request().params.array.items[0].integer == 42);
+        try testing.expect(result.request().params.array.items[1].integer == 22);
+        try testing.expect(result.request().id.num == 2);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Parsing valid request, object params, integer id" {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
+        );
+        defer result.deinit();
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        try testing.expect(result.request().hasError() == false);
+        try testing.expect(std.mem.eql(u8, &result.request().jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, result.request().method, "fun_obj"));
+        try testing.expect(result.request().params == .object);
+        try testing.expect(std.mem.eql(u8, result.request().params.object.get("name").?.string, "foobar"));
+        try testing.expect(result.request().params.object.get("weight").?.integer == 150);
+        try testing.expect(result.request().id.num == 3);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
@@ -372,11 +394,11 @@ test "Request dispatching" {
     // const msg0 =\\{"jsonrpc": "2.0", "method": "fun0", "params": [20, 10], "id": 1}
     //             ;
     
-    const result0 = try zigjr.parseJson(alloc,
+    var result0 = try zigjr.parseJson(alloc,
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     defer result0.deinit();
-    std.debug.print("result0: {any}\n", .{result0.value});
+    std.debug.print("result0: {any}\n", .{result0.rpc_msg});
 
     // std.debug.print("req0.body: {any}\n", .{req0.body});
     // const res0 = try registry.run(req0);
@@ -419,9 +441,9 @@ test "Request streaming" {
         \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
     );
     const in_reader1 = json_stream1.reader();
-    const result1 = try zigjr.parseReader(alloc, in_reader1);
+    var result1 = try zigjr.parseReader(alloc, in_reader1);
     defer result1.deinit();
-    std.debug.print("result1: {any}\n", .{result1.value});
+    std.debug.print("result1: {any}\n", .{result1.rpc_msg});
 
     // var json_stream2 = std.io.fixedBufferStream(
     //     \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
