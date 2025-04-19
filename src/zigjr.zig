@@ -24,6 +24,7 @@ const ObjectMap = std.json.ObjectMap;
 
 // JSON-RPC 2.0 error codes.
 pub const ErrorCode = enum(i32) {
+    None = 0,
     ParseError = -32700,        // Invalid JSON was received by the server.
     InvalidRequest = -32600,    // The JSON sent is not a valid Request object.
     MethodNotFound = -32601,    // The method does not exist / is not available.
@@ -57,11 +58,12 @@ pub const HandlerErrors = error {
 
 pub const RpcResult = struct {
     const Self = @This();
-    parsed:     std.json.Parsed(RpcMessage),
+    alloc:      Allocator,
+    parsed:     ?std.json.Parsed(RpcMessage) = null,
     rpc_msg:    RpcMessage,
 
     pub fn deinit(self: *Self) void {
-        self.parsed.deinit();
+        if (self.parsed) |parsed| parsed.deinit();
     }
 
     pub fn isRequest(self: *Self) bool {
@@ -85,8 +87,18 @@ pub const RpcResult = struct {
 };
 
 pub fn parseJson(alloc: Allocator, json_str: []const u8) !RpcResult {
-    const parsed = try std.json.parseFromSlice(RpcMessage, alloc, json_str, .{});
+    // TODO: the alloc passed in is different from the one from parsed.arena
+    // Causing free() to crash.
+    const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
+        const req = RpcRequest.initErr(try RpcError.initParseError(parse_err));
+        return .{
+            .alloc = alloc,
+            .parsed = null,
+            .rpc_msg = RpcMessage { .request = req },
+        };
+    };
     return .{
+        .alloc = alloc,
         .parsed = parsed,
         .rpc_msg = parsed.value,
     };
@@ -103,6 +115,7 @@ pub fn parseReader(alloc: Allocator, json_reader: anytype) !RpcResult {
     // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
     const parsed = try rp.next();
     return .{
+        .alloc = alloc,
         .parsed = parsed,
         .rpc_msg = parsed.value,
     };
@@ -134,7 +147,7 @@ fn ReaderParser(comptime JsonReaderType: type) type {
 
 pub const RpcMessage = union(enum) {
     request:    RpcRequest,                 // JSON-RPC's single request
-    batch:      []const RpcRequest,         // JSON-RPC's batch of requests
+    batch:      []RpcRequest,               // JSON-RPC's batch of requests
 
     // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
@@ -143,7 +156,7 @@ pub const RpcMessage = union(enum) {
                 .request = try innerParse(RpcRequest, alloc, source, options)
             },
             .array_begin => .{
-                .batch   = try innerParse([]const RpcRequest, alloc, source, options)
+                .batch   = try innerParse([]RpcRequest, alloc, source, options)
             },
             else => error.UnexpectedToken,  // there're only two cases; any others are error.
         };
@@ -157,14 +170,19 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .null = {} },    // default for optional field.
-    err:        ?RpcError = null,           // capture the parsing error or the validation error.
+    err:        RpcError = .{},             // capture the parsing error or the validation error.
+
+    fn initErr(err: RpcError) Self {
+        return .{ .err = err };
+    }
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
         const body = innerParse(RpcRequestBody, alloc, source, options) catch |parse_err| {
-            return .{ .err = try RpcError.initParseError(alloc, parse_err) };
+            std.debug.print("****** RpcRequest.jsonParse parse_err\n", .{});
+            return .{ .err = try RpcError.initParseError(parse_err) };
         };
         // At this point, the request body has passed parsing.  Validate its content.
-        if (try RpcError.validateBody(alloc, body)) |validation_err| {
+        if (try RpcError.validateBody(body)) |validation_err| {
             return .{ .err = validation_err };
         }
         return .{
@@ -200,11 +218,11 @@ pub const RpcRequest = struct {
     }
 
     pub fn hasError(self: Self) bool {
-        return self.err != null;
+        return self.err.code != ErrorCode.None;
     }
 
     pub fn isErrorCode(self: Self, code: ErrorCode) bool {
-        return if (self.err)|e| e.code == code else false;
+        return self.err.code == code;
     }
     
 };
@@ -219,45 +237,45 @@ const RpcRequestBody = struct {
 const RpcError = struct {
     const Self = @This();
 
-    code:       ErrorCode,
-    msg:        []const u8,
+    code:       ErrorCode = ErrorCode.None,
+    err_msg:    []const u8 = "",                // only constant string, no allocation.
     req_id:     RpcId = .{ .null = {} },        // request id related to the error.
 
     // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
     // The memory is freed all together in Parsed(T).deinit().
-    fn initParseError(alloc: Allocator, parse_err: ParseError(Scanner)) !Self {
-        const msg = try allocPrint(alloc, "{s}", .{@errorName(parse_err)});
+    fn initParseError(parse_err: ParseError(Scanner)) !Self {
         return switch (parse_err) {
-            error.MissingField, error.UnknownField, error.DuplicateField, error.LengthMismatch =>
-                .{ .code = ErrorCode.InvalidRequest, .msg = msg },
+            error.MissingField, error.UnknownField, error.DuplicateField,
+            error.LengthMismatch, error.UnexpectedEndOfInput =>
+                .{ .code = ErrorCode.InvalidRequest, .err_msg = @errorName(parse_err) },
             error.Overflow, error.OutOfMemory => 
-                .{ .code = ErrorCode.InternalError, .msg = msg },
+                .{ .code = ErrorCode.InternalError, .err_msg = @errorName(parse_err) },
             else =>
-                .{ .code = ErrorCode.ParseError, .msg = msg },
+                .{ .code = ErrorCode.ParseError, .err_msg = @errorName(parse_err) },
         };
     }
 
     // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
     // The memory is freed all together in Parsed(T).deinit().
-    fn validateBody(alloc: Allocator, body: RpcRequestBody) !?Self {
+    fn validateBody(body: RpcRequestBody) !?Self {
         if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
             return .{
                 .code = ErrorCode.InvalidRequest,
-                .msg = try allocPrint(alloc, "Invalid JSON-RPC version. Must be 2.0.", .{}),
+                .err_msg = "Invalid JSON-RPC version. Must be 2.0.",
                 .req_id = body.id,
             };
         }
         if (body.params == .invalid) {
             return .{
                 .code = ErrorCode.InvalidParams,
-                .msg = try allocPrint(alloc, "'Params' must be an array, an object, or not defined.", .{}),
+                .err_msg = "'Params' must be an array, an object, or not defined.",
                 .req_id = body.id,
             };
         }
         if (body.method.len == 0) {
             return .{
                 .code = ErrorCode.InvalidRequest,
-                .msg = try allocPrint(alloc, "'Method' is empty.", .{}),
+                .err_msg = "'Method' is empty.",
                 .req_id = body.id,
             };
         }

@@ -363,7 +363,7 @@ test "Parse valid request, with no params, with string id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "Parse empty request, expect InvalidRequest error." {
+test "Parse empty object request {}, expect InvalidRequest error." {
     const alloc = gpa.allocator();
     {
         var result = try zigjr.parseJson(alloc,
@@ -372,7 +372,23 @@ test "Parse empty request, expect InvalidRequest error." {
         defer result.deinit();
         const req = try result.request();
         try testing.expect(req.hasError());
-        try testing.expect(req.err.?.code == zigjr.ErrorCode.InvalidRequest);
+        try testing.expect(req.err.code == zigjr.ErrorCode.InvalidRequest);
+        try testing.expect(req.isErrorCode(zigjr.ErrorCode.InvalidRequest));
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse incomplete request, expect InvalidRequest error." {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{
+        );
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(req.hasError());
+        try testing.expect(req.err.code == zigjr.ErrorCode.InvalidRequest);
         try testing.expect(req.isErrorCode(zigjr.ErrorCode.InvalidRequest));
 
     }
