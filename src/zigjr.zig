@@ -32,6 +32,13 @@ pub const ErrorCode = enum(i32) {
     ServerError = -32000,       // -32000 to -32099 reserved for implementation defined errors.
 };
 
+pub const JrErrors = error {
+    NotSingleRpcRequest,
+    NotBatchRpcRequest,
+    NotArray,
+    NotObject,
+};
+
 // Handler registration errors or dispatching errors.
 pub const HandlerErrors = error {
     InvalidMethodName,
@@ -65,14 +72,15 @@ pub const RpcResult = struct {
         return self.rpc_msg == .batch;
     }
 
-    /// Shortcut to access the inner request.
-    pub fn request(self: *Self) RpcRequest {
-        return self.rpc_msg.request;
+    /// Shortcut to access the inner tagged union invariant request.
+    /// Can also access via switch(rpc_msg) .request => 
+    pub fn request(self: *Self) !RpcRequest {
+        return if (self.isRequest()) self.rpc_msg.request else JrErrors.NotSingleRpcRequest;
     }
 
-    /// Shortcut to access the inner batch.
-    pub fn batch(self: *Self) []const RpcRequest {
-        return self.rpc_msg.batch;
+    /// Shortcut to access the inner tagged union invariant batch.
+    pub fn batch(self: *Self) ![]const RpcRequest {
+        return if (self.isBatch()) self.rpc_msg.batch else JrErrors.NotBatchRpcRequest;
     }
 };
 
@@ -109,7 +117,7 @@ fn ReaderParser(comptime JsonReaderType: type) type {
         jreader:    ScannerReader,
 
         pub fn init(alloc: Allocator, json_reader: JsonReaderType) Self {
-            // ScannerReader bridging the incoming_reader and a Scanner.
+            // ScannerReader bridging the json_reader and a Scanner.
             return .{ .alloc = alloc,  .jreader = ScannerReader.init(alloc, json_reader) };
         }
 
@@ -148,7 +156,7 @@ pub const RpcRequest = struct {
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
-    id:         RpcId = .{ .nul = {} },     // default for optional field.
+    id:         RpcId = .{ .null = {} },    // default for optional field.
     err:        ?RpcError = null,           // capture the parsing error or the validation error.
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
@@ -167,17 +175,40 @@ pub const RpcRequest = struct {
         };
     }
 
+    pub fn hasParams(self: Self) bool {
+        return self.params != .null;
+    }
+
+    pub fn hasArrayParams(self: Self) bool {
+        return self.params == .array;
+    }
+
+    pub fn hasObjectParams(self: Self) bool {
+        return self.params == .object;
+    }
+
+    pub fn arrayParams(self: Self) !std.json.Array {
+        return if (self.params == .array) self.params.array else JrErrors.NotArray;
+    }
+
+    pub fn objectParams(self: Self) !std.json.ObjectMap {
+        return if (self.params == .object) self.params.object else JrErrors.NotObject;
+    }
+
+    pub fn hasId(self: Self) bool {
+        return self.id != .null;
+    }
+
     pub fn hasError(self: Self) bool {
         return self.err != null;
     }
-
 };
 
 const RpcRequestBody = struct {
-    jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' },     // default to fail validation.
     method:     []u8 = "",
-    params:     RpcParams = .{ .nul = {} }, // default for optional field.
-    id:         RpcId = .{ .nul = {} },     // default for optional field.
+    params:     RpcParamsBody = .{ .nul = {} }, // default for optional field.
+    id:         RpcId = .{ .null = {} },        // default for optional field.
 };
 
 const RpcError = struct {
@@ -185,7 +216,7 @@ const RpcError = struct {
 
     code:       ErrorCode,
     msg:        []const u8,
-    req_id:     RpcId = .{ .nul = {} },         // request id related to the error.
+    req_id:     RpcId = .{ .null = {} },        // request id related to the error.
 
     // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
     // The memory is freed all together in Parsed(T).deinit().
@@ -229,12 +260,12 @@ const RpcError = struct {
     }
 };
 
-const RpcParams = union(enum) {
+const RpcParamsBody = union(enum) {
     nul:        void,
     value:      Value,
     invalid:    void,
 
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParams {
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParamsBody {
         return switch (try source.peekNextTokenType()) {
             .object_begin   => .{ .value    = try innerParse(Value, alloc, source, options) },
             .array_begin    => .{ .value    = try innerParse(Value, alloc, source, options) },
@@ -244,7 +275,7 @@ const RpcParams = union(enum) {
 };
 
 const RpcId = union(enum) {
-    nul:        void,
+    null:       void,
     num:        i64,
     str:        []const u8,
 
@@ -262,7 +293,7 @@ const RpcId = union(enum) {
 const RequestBody = struct {
     jsonrpc:        [3]u8,
     method:         []u8,
-    id:             RpcId = RpcId { .nul = {} },  // default for optional field.
+    id:             RpcId = RpcId { .null = {} },   // default for optional field.
     params:         Value = Value { .null = {} },   // default for optional field.
 };
 
@@ -345,7 +376,7 @@ pub const Request = struct {
     }
 
     pub fn getId(self: *const Self) RpcId {
-        return if (self.body) |body| body.id else RpcId { .nul = {} };
+        return if (self.body) |body| body.id else RpcId { .null = {} };
     }
 
     pub fn hasError(self: Self) bool {
@@ -475,10 +506,10 @@ pub const Registry = struct {
                                        , .{result_json, body.id.num}),
                 .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
                                        , .{result_json, body.id.str}),
-                .nul => HandlerErrors.NotificationHasNoResponse,
+                .null => HandlerErrors.NotificationHasNoResponse,
             };
         }
-        const id    = RpcId { .nul = {} };
+        const id    = RpcId { .null = {} };
         const code  = @intFromEnum(ErrorCode.InvalidRequest);
         const msg   = "Missing request body.";
         return self.responseError(id, code, msg);
@@ -498,7 +529,7 @@ pub const Registry = struct {
                                \\   "error": {{ code: {}, "message": "{s}" }}
                                \\}}
                                , .{id.str, code, msg}),
-            .nul => allocPrint(self.alloc,
+            .null => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": null,
                                \\   "error": {{ code: {}, "message": "{s}" }}
                                \\}}
