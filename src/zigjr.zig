@@ -202,6 +202,11 @@ pub const RpcRequest = struct {
     pub fn hasError(self: Self) bool {
         return self.err != null;
     }
+
+    pub fn isErrorCode(self: Self, code: ErrorCode) bool {
+        return if (self.err)|e| e.code == code else false;
+    }
+    
 };
 
 const RpcRequestBody = struct {
@@ -274,7 +279,7 @@ const RpcParamsBody = union(enum) {
     }
 };
 
-const RpcId = union(enum) {
+pub const RpcId = union(enum) {
     null:       void,
     num:        i64,
     str:        []const u8,

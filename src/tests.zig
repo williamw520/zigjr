@@ -156,6 +156,7 @@ test "Parsing valid request, single integer param, integer id" {
         try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
         try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
         try testing.expect(std.mem.eql(u8, req.method, "fun0"));
+        try testing.expect(req.hasParams());
         try testing.expect(req.params == .array);
         try testing.expect(req.params.array.items.len == 1);
         try testing.expect(req.params.array.items[0].integer == 42);
@@ -191,6 +192,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
         try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
         try testing.expect(std.mem.eql(u8, req.method, "fun1"));
+        try testing.expect(req.hasParams());
         try testing.expect(req.params == .array);
         try testing.expect(req.params.array.items.len == 1);
         try testing.expect(std.mem.eql(u8, req.params.array.items[0].string, "FUN1"));
@@ -226,6 +228,7 @@ test "Parsing valid request, tw0 integer params, integer id" {
         try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
         try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
         try testing.expect(std.mem.eql(u8, req.method, "fun1"));
+        try testing.expect(req.hasParams());
         try testing.expect(req.params == .array);
         try testing.expect(req.params.array.items.len == 2);
         try testing.expect(req.params.array.items[0].integer == 42);
@@ -253,9 +256,6 @@ test "Parsing valid request, object params, integer id" {
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        
-        try testing.expect(req.id.num == 3);
-
         try testing.expect(result.rpc_msg == .request);
         switch (result.rpc_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -266,6 +266,7 @@ test "Parsing valid request, object params, integer id" {
         try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
         try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
         try testing.expect(std.mem.eql(u8, req.method, "fun_obj"));
+        try testing.expect(req.hasParams());
         try testing.expect(req.params == .object);
         try testing.expect(std.mem.eql(u8, req.params.object.get("name").?.string, "foobar"));
         try testing.expect(req.params.object.get("weight").?.integer == 150);
@@ -282,41 +283,104 @@ test "Parsing valid request, object params, integer id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
+test "Parse valid request, with 0 params, with no id" {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
+        );
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        switch (result.rpc_msg) {
+            .request    => |r| { _=r; try testing.expect(true);  },
+            .batch      => |b| { _=b; try testing.expect(false); },
+        }
+        try testing.expect(result.isRequest());
+        try testing.expect(!result.isBatch());
+        try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
+        try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, req.method, "fun0"));
+        try testing.expect(req.hasParams());
+        try testing.expect(req.params == .array);
+        try testing.expect(req.params.array.items.len == 0);
+        try testing.expect(req.hasArrayParams());
+        try testing.expect(!req.hasObjectParams());
+        try testing.expect(req.arrayParams()  != JrErrors.NotArray);
+        try testing.expect(req.objectParams() == JrErrors.NotObject);
+        try testing.expect((try req.arrayParams()).items.len == 0);
+        try testing.expect(!req.hasId());
+        try testing.expect(req.id == zigjr.RpcId.null);
+        try testing.expect(req.hasError() == false);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse valid request, with no params, with no id" {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0" }
+        );
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        switch (result.rpc_msg) {
+            .request    => |r| { _=r; try testing.expect(true);  },
+            .batch      => |b| { _=b; try testing.expect(false); },
+        }
+        try testing.expect(result.isRequest());
+        try testing.expect(!result.isBatch());
+        try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
+        try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, req.method, "fun0"));
+        try testing.expect(!req.hasParams());
+        try testing.expect(req.params == .null);
+        try testing.expect(!req.hasArrayParams());
+        try testing.expect(!req.hasObjectParams());
+        try testing.expect(req.arrayParams()  == JrErrors.NotArray);
+        try testing.expect(req.objectParams() == JrErrors.NotObject);
+        try testing.expect(!req.hasId());
+        try testing.expect(req.id == zigjr.RpcId.null);
+        try testing.expect(req.hasError() == false);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse valid request, with no params, with string id" {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
+        );
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(req.hasId());
+        try testing.expect(std.mem.eql(u8, req.id.str, "5a"));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse empty request, expect InvalidRequest error." {
+    const alloc = gpa.allocator();
+    {
+        var result = try zigjr.parseJson(alloc,
+            \\{}
+        );
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(req.hasError());
+        try testing.expect(req.err.?.code == zigjr.ErrorCode.InvalidRequest);
+        try testing.expect(req.isErrorCode(zigjr.ErrorCode.InvalidRequest));
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
 test "Message request parsing" {
     // const alloc = gpa.allocator();
-
-
-    // const req4 = try zigjr.Request.init(alloc,
-    //     \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
-    // );
-    // try testing.expect(req4.hasError() == false);
-    // try testing.expect(req4.getId() == zigjr.RpcId.nul);
-
-    // const req5 = try zigjr.Request.init(alloc,
-    //     \\{"jsonrpc": "2.0", "method": "fun0" }
-    // );
-    // try testing.expect(req5.hasError() == false);
-    // try testing.expect(req5.getId() == zigjr.RpcId.nul);
-
-    // const req5a = try zigjr.Request.init(alloc,
-    //     \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
-    // );
-    // try testing.expect(req5a.hasError() == false);
-    // try testing.expect(std.mem.eql(u8, req5a.getId().str, "5a"));
-
-    // const req5b = try zigjr.Request.init(alloc,
-    //     \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": "5b" }
-    // );
-    // try testing.expect(req5b.hasError() == false);
-    // try testing.expect(std.mem.eql(u8, req5b.getId().str, "5b"));
-
-
-    // const e_req1 = try zigjr.Request.init(alloc, 
-    //     \\{}
-    // );
-    // std.debug.print("err_code: {}, err_msg: {s}\n", .{e_req1.err_code, e_req1.err_msg});
-    // try testing.expect(e_req1.hasError() == true);
-    // try testing.expect(e_req1.err_code == zigjr.ErrorCode.InvalidRequest);
 
     // const e_req1a = try zigjr.Request.init(alloc,
     //     \\{
