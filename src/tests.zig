@@ -565,6 +565,113 @@ test "Parse non-object nor non-array params 'abcd', expect error." {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+// Test parseReader
+
+test "Parsing valid request with parseReader, single integer param, integer id" {
+    const alloc = gpa.allocator();
+    {
+        var json_stream = std.io.fixedBufferStream(
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [42], "id": 1}
+        );
+        const json_reader = json_stream.reader();
+        var result = zigjr.parseReader(alloc, json_reader);
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        switch (result.rpc_msg) {
+            .request    => |r| { _=r; try testing.expect(true);  },
+            .batch      => |b| { _=b; try testing.expect(false); },
+        }
+        try testing.expect(result.isRequest());
+        try testing.expect(!result.isBatch());
+        try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
+        try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, req.method, "fun0"));
+        try testing.expect(req.hasParams());
+        try testing.expect(req.params == .array);
+        try testing.expect(req.params.array.items.len == 1);
+        try testing.expect(req.params.array.items[0].integer == 42);
+        try testing.expect(req.hasArrayParams());
+        try testing.expect(!req.hasObjectParams());
+        try testing.expect(req.arrayParams()  != JrErrors.NotArray);
+        try testing.expect(req.objectParams() == JrErrors.NotObject);
+        try testing.expect((try req.arrayParams()).items.len == 1);
+        try testing.expect((try req.arrayParams()).items[0].integer == 42);
+        try testing.expect(req.hasId());
+        try testing.expect(req.id.num == 1);
+        try testing.expect(req.hasError() == false);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Parsing valid request with parseReader, single string param, string id" {
+    const alloc = gpa.allocator();
+    {
+        var json_stream = std.io.fixedBufferStream(
+            \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
+        );
+        const json_reader = json_stream.reader();
+        var result = zigjr.parseReader(alloc, json_reader);
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
+        try testing.expect(result.rpc_msg == .request);
+        switch (result.rpc_msg) {
+            .request    => |r| { _=r; try testing.expect(true);  },
+            .batch      => |b| { _=b; try testing.expect(false); },
+        }
+        try testing.expect(result.isRequest());
+        try testing.expect(!result.isBatch());
+        try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
+        try testing.expect(std.mem.eql(u8, &req.jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, req.method, "fun1"));
+        try testing.expect(req.hasParams());
+        try testing.expect(req.params == .array);
+        try testing.expect(req.params.array.items.len == 1);
+        try testing.expect(std.mem.eql(u8, req.params.array.items[0].string, "FUN1"));
+        try testing.expect(req.hasArrayParams());
+        try testing.expect(!req.hasObjectParams());
+        try testing.expect(req.arrayParams()  != JrErrors.NotArray);
+        try testing.expect(req.objectParams() == JrErrors.NotObject);
+        try testing.expect((try req.arrayParams()).items.len == 1);
+        try testing.expect(std.mem.eql(u8, (try req.arrayParams()).items[0].string, "FUN1"));
+        try testing.expect(req.hasId());
+        try testing.expect(std.mem.eql(u8, req.id.str, "1"));
+        try testing.expect(req.hasError() == false);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Parse missing value request with parseReader, expect error." {
+    const alloc = gpa.allocator();
+    {
+        var json_stream = std.io.fixedBufferStream(
+            \\{"foo": }
+        );
+        const json_reader = json_stream.reader();
+        var result = zigjr.parseReader(alloc, json_reader);
+        defer result.deinit();
+        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse empty method with parseJson, expect error." {
+    const alloc = gpa.allocator();
+    {
+        var json_stream = std.io.fixedBufferStream(
+            \\{"jsonrpc": "2.0", "method": ""}
+        );
+        const json_reader = json_stream.reader();
+        var result = zigjr.parseReader(alloc, json_reader);
+        defer result.deinit();
+        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
 
 test "Request dispatching" {
     std.debug.print("-------- Request dispatching\n", .{});
