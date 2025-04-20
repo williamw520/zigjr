@@ -9,11 +9,67 @@
 const std = @import("std");
 const zigjr = @import("zigjr");
 const Allocator = std.mem.Allocator;
+const ParseOptions = std.json.ParseOptions;
+const innerParse = std.json.innerParse;
+
 const ArgIterator = std.process.ArgIterator;
 const ArrayList = std.ArrayList;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const g_allocator = gpa.allocator();
+
+
+const U1 = union(enum) {
+    s2:     S2,
+    arr:    []S2,
+
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !U1 {
+        return switch (try source.peekNextTokenType()) {
+            .object_begin => .{ .s2  = try innerParse(S2, alloc, source, options) },
+            .array_begin =>  .{ .arr = try innerParse([]S2, alloc, source, options) },
+            else => error.UnexpectedToken,
+        };
+    }    
+};
+
+// This is the struct returned with the error if any.
+const S2 = struct {
+    id:  u32 = 0,
+    err: []const u8 = "",
+
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: ParseOptions) !S2 {
+        const s2a = std.json.innerParse(S2a, alloc, source, options) catch |err| {
+            return .{ .err = @errorName(err) };
+        };
+        return .{ .id = s2a.id };
+    }    
+};
+
+// This is the struct for parsing into.
+const S2a = struct {
+    id:  u32,
+};
+
+
+test "test1" {
+    const str1 = \\{ "id": 123 }
+    ;
+    var res1 = std.json.parseFromSlice(U1, std.testing.allocator, str1, .{}) catch |err| {
+        std.debug.print("Parse error: {}\n", .{err});
+        return;
+    };
+    res1.deinit();
+
+    // This triggers an assert in std.json.parseFromTokenSourceLeaky() at line 151.
+    // const str2 = \\{ "idx": "123" }
+    // ;
+    // var res2 = std.json.parseFromSlice(U1, std.testing.allocator, str2, .{}) catch |err| {
+    //     std.debug.print("parseFromSlice error: {}\n", .{err});
+    //     return;
+    // };
+    // res2.deinit();
+
+}
 
 const IdType = union(enum) {
     num: i64,
