@@ -46,6 +46,7 @@ pub const HandlerErrors = error {
     NoHandlerForArrayParam,
     NoHandlerForObjectParam,
     HandlerNotFunction,
+    MissingAllocator,
     HandlerInvalidParameter,
     HandlerInvalidParameterType,
     HandlerTooManyParams,
@@ -442,7 +443,7 @@ pub const Registry = struct {
 
     /// Run a handler on the request and generate a Response JSON string.
     /// Call freeResponse() to free the string.
-    pub fn run(self: *Self, req: Request) ![]const u8 {
+    pub fn run(self: *Self, req: RpcRequest) ![]const u8 {
         if (req.hasError()) {
             // Have a parsing error on the Request message; return an Error message.
             const code  = @intFromEnum(req.err_code);
@@ -619,17 +620,20 @@ pub const Handler = union(enum) {
 
 fn toHandler(handler_fn: anytype) !Handler {
     const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
-    const nparams = switch (fn_type_info) {
-        .@"fn" =>|info_fn| info_fn.params.len - 1,  // one less for the Allocator param
+    const params = switch (fn_type_info) {
+        .@"fn" =>|info_fn| info_fn.params,
         else => return HandlerErrors.HandlerNotFunction,
     };
+    if (params.len == 0) {
+        return HandlerErrors.MissingAllocator;
+    }
+    const nparams = params.len - 1;  // one less for the Allocator param
 
     switch (nparams) {
         0 => return Handler { .fn0 = handler_fn },
         1 => {
             // Single-param handler can be a Value, Array, or Object handler.
-            const param1 = fn_type_info.@"fn".params[1];
-            if (param1.type)|typ| {
+            if (params[1].type)|typ| {
                 switch (typ) {
                     Value =>    return Handler { .fn1 = handler_fn },
                     Array =>    return Handler { .fnArr = handler_fn },
