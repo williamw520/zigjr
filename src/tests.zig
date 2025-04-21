@@ -669,7 +669,7 @@ test "Test validation on registering handler with too many params, expect error"
     {
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
-        try testing.expectError(zigjr.HandlerErrors.HandlerTooManyParams,
+        try testing.expectError(zigjr.RegistrationErrors.HandlerTooManyParams,
                                 registry.register("fun_too_many_params", fun_too_many_params));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -680,7 +680,7 @@ test "Test validation on registering handler with the wrong param type, expect e
     {
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
-        try testing.expectError(zigjr.HandlerErrors.HandlerInvalidParameterType,
+        try testing.expectError(zigjr.RegistrationErrors.HandlerInvalidParameterType,
                                 registry.register("fun_wrong_param_type", fun_wrong_param_type));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -691,7 +691,7 @@ test "Test validation on registering a reserved name prefix 'rpc.', expect error
     {
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
-        try testing.expectError(zigjr.HandlerErrors.InvalidMethodName,
+        try testing.expectError(zigjr.RegistrationErrors.InvalidMethodName,
                                 registry.register("rpc.abc", fun0));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -702,7 +702,7 @@ test "Test validation on registering a handler with missing allocator, expect er
     {
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
-        try testing.expectError(zigjr.HandlerErrors.MissingAllocator,
+        try testing.expectError(zigjr.RegistrationErrors.MissingAllocator,
                                 registry.register("fun_missing_allocator", fun_missing_allocator));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -720,10 +720,34 @@ test "Uncomment to test catching registration errors on compile, expect compile 
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-
-
+// Test request dispatching
 
 test "Request dispatching" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fun0", fun0);
+        try registry.register("fun1", fun1);
+        try registry.register("subtract", fun2);
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+        );
+        defer result.deinit();
+        const req = try result.request();
+        const res = try registry.run(req);
+        defer alloc.free(res);
+        std.debug.print("response: {s}\n", .{res});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+
+
+test "Request dispatching more" {
     const alloc = gpa.allocator();
 
     var registry = zigjr.Registry.init(alloc);

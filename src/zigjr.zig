@@ -38,22 +38,24 @@ pub const JrErrors = error {
     NotBatchRpcRequest,
     NotArray,
     NotObject,
+    NotificationHasNoResponse,
 };
 
 // Handler registration errors or dispatching errors.
-pub const HandlerErrors = error {
+pub const RegistrationErrors = error {
     InvalidMethodName,
-    NoHandlerForArrayParam,
-    NoHandlerForObjectParam,
     HandlerNotFunction,
     MissingAllocator,
     HandlerInvalidParameter,
     HandlerInvalidParameterType,
     HandlerTooManyParams,
+};
+pub const DispatchErrors = error {
+    NoHandlerForArrayParam,
+    NoHandlerForObjectParam,
     MismatchedParameterCounts,
-
-    NotificationHasNoResponse,
-    MissingRequestBody,
+    MethodNotFound,
+    InvalidParams,
 };
 
 
@@ -315,103 +317,6 @@ pub const RpcId = union(enum) {
 };
 
 
-// TODO: deprecated.
-const RequestBody = struct {
-    jsonrpc:        [3]u8,
-    method:         []u8,
-    id:             RpcId = RpcId { .null = {} },   // default for optional field.
-    params:         Value = Value { .null = {} },   // default for optional field.
-};
-
-/// Handle an incoming JSON-RPC 2.0 request message.
-// TODO: deprecated.
-pub const Request = struct {
-    const Self = @This();
-
-    alloc:          Allocator,
-    err_code:       ErrorCode = .None,
-    err_msg:        []const u8 = "",
-    body:           ?RequestBody = null,            // no body in the case of parse error.
-    parsed:         ?std.json.Parsed(RequestBody) = null,
-
-    pub fn init(alloc: Allocator, message: []const u8) !Self {
-        // TODO: May be to use parseFromSlice(Value, ..) and then manually decode the obj tree in Value,
-        // to get better info on errors.  Also can handle batching requests in an array.
-        const parsed = std.json.parseFromSlice(RequestBody, alloc, message, .{})
-                        catch |err| return initWithError(alloc, err);
-        var req = Self { .alloc = alloc, .body = parsed.value, .parsed = parsed };
-        try req.validate();
-        return req;
-    }
-
-    fn initWithError(alloc: Allocator, err: ParseError(Scanner)) !Self {
-        switch (err) {
-            ParseError(Scanner).MissingField,
-            ParseError(Scanner).UnknownField,
-            ParseError(Scanner).DuplicateField => {
-                return .{
-                    .alloc = alloc,
-                    .err_code = ErrorCode.InvalidRequest,
-                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                };
-            },
-            error.OutOfMemory,
-            error.BufferUnderrun => {
-                return .{
-                    .alloc = alloc,
-                    .err_code = ErrorCode.InternalError,
-                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                };
-            },
-            else => {
-                return .{
-                    .alloc = alloc,
-                    .err_code = ErrorCode.ParseError,
-                    .err_msg = try allocPrint(alloc, "{s}", .{@errorName(err)}),
-                };
-            },
-        }
-    }
-
-    fn validate(self: *Self) !void {
-        // At this point, the request has passed parsing.  Check the parsed fields.
-        const body = self.body.?;
-        if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
-            self.err_code = ErrorCode.InvalidRequest;
-            self.err_msg = try allocPrint(self.alloc, "Invalid JSON-RPC version.  Must be 2.0.", .{});
-            return;
-        }
-        if (body.params != .array and               // body.params is a std.json.Value.
-            body.params != .object and
-            body.params != .null) {
-            self.err_code = ErrorCode.InvalidParams;
-            self.err_msg = try allocPrint(self.alloc,
-                            "'Params' must be an array, an object, or not defined.", .{});
-            return;
-        }
-        if (body.method.len == 0) {
-            self.err_code = ErrorCode.InvalidRequest;
-            self.err_msg = try allocPrint(self.alloc, "'Method' is empty.", .{});
-            return;
-        }
-    }
-
-    pub fn deinit(self: *const Self) void {
-        if (self.hasError()) self.alloc.free(self.err_msg);
-        if (self.parsed) |parsed| parsed.deinit();
-    }
-
-    pub fn getId(self: *const Self) RpcId {
-        return if (self.body) |body| body.id else RpcId { .null = {} };
-    }
-
-    pub fn hasError(self: Self) bool {
-        return self.err_code != .None;
-    }
-
-};
-
-
 pub const Registry = struct {
     const Self = @This();
 
@@ -431,7 +336,7 @@ pub const Registry = struct {
 
     pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
         if (std.mem.startsWith(u8, method, "rpc.")) {
-            return HandlerErrors.InvalidMethodName;      // By spec, "rpc." is reserved.
+            return RegistrationErrors.InvalidMethodName;    // By spec, "rpc." is reserved.
         }
         const fn_ptr = try toHandler(handler_fn);
         try self.handlers.put(method, fn_ptr);
@@ -445,18 +350,16 @@ pub const Registry = struct {
     /// Call freeResponse() to free the string.
     pub fn run(self: *Self, req: RpcRequest) ![]const u8 {
         if (req.hasError()) {
-            // Have a parsing error on the Request message; return an Error message.
-            const code  = @intFromEnum(req.err_code);
-            const msg   = req.err_msg;
-            return self.responseError(req.getId(), code, msg);
+            // For parsing or validation error on the request, return an error response.
+            return self.responseError(req.id, @intFromEnum(req.err.code), req.err.err_msg);
         }
         if (self.dispatch(req)) |result_json| {
             defer self.alloc.free(result_json);
             return self.response(req, result_json);
-        } else |err| {
-            // Return any dispatching error as an Error message.
-            const code, const msg = errorToCodeMsg(err);
-            return self.responseError(req.getId(), code, msg);
+        } else |dispatch_err| {
+            // Return any dispatching error as an error response.
+            const code, const msg = errorToCodeMsg(dispatch_err);
+            return self.responseError(req.id, code, msg);
         }
     }
 
@@ -465,33 +368,33 @@ pub const Registry = struct {
         self.alloc.free(response_json);
     }
 
-    fn dispatch(self: *Self, req: Request) anyerror![]const u8 {
-        if (req.body) |body| {
-            return switch (body.params) {
-                .null   => self.dispatchOnNone(body.method),
-                .array  => |array|  self.dispatchOnArray(body.method, array),
-                .object => |obj|    self.dispatchOnObject(body.method, obj),
-                else => HandlerErrors.InvalidParams,
-            };
-        }
-        return HandlerErrors.InvalidRequest;
+    fn dispatch(self: *Self, req: RpcRequest) anyerror![]const u8 {
+        return switch (req.params) {
+            .null   =>      self.dispatchOnNone(req.method),
+            .array  => |a|  self.dispatchOnArray(req.method, a),
+            .object => |o|  self.dispatchOnObject(req.method, o),
+            else    => DispatchErrors.InvalidParams,
+        };
     }
 
     fn dispatchOnNone(self: *Self, method: []const u8) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return HandlerErrors.MethodNotFound;
-        if (paramLen(handler.?) > 0) return HandlerErrors.MismatchedParameterCounts;
-
+        if (handler == null) return DispatchErrors.MethodNotFound;
+        if (paramLen(handler.?)) |nparams| {
+            if (nparams > 0) return DispatchErrors.MismatchedParameterCounts;
+        } else {
+            return DispatchErrors.MismatchedParameterCounts;
+        }
         return switch (handler.?) {
             .fn0 => |f| f(self.alloc),
-            else    => HandlerErrors.NoHandlerForNoParam,
+            else => DispatchErrors.MismatchedParameterCounts,
         };
     }
 
     fn dispatchOnArray(self: *Self, method: []const u8, arr: Array) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return HandlerErrors.MethodNotFound;
-        if (paramLen(handler.?) != arr.items.len) return HandlerErrors.MismatchedParameterCounts;
+        if (handler == null) return DispatchErrors.MethodNotFound;
+        if (paramLen(handler.?) != arr.items.len) return DispatchErrors.MismatchedParameterCounts;
 
         return switch (handler.?) {
             .fn0 => |f| f(self.alloc),
@@ -505,40 +408,32 @@ pub const Registry = struct {
             .fn8 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
             .fn9 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
             .fnArr  => |f| f(self.alloc, arr),
-            else    => HandlerErrors.NoHandlerForArrayParam,
+            else    => DispatchErrors.NoHandlerForArrayParam,
         };
     }
 
     fn dispatchOnObject(self: *Self, method: []const u8, obj: ObjectMap) anyerror![]const u8 {
         const handler = self.handlers.get(method);
-        if (handler == null) return HandlerErrors.MethodNotFound;
+        if (handler == null) return DispatchErrors.MethodNotFound;
         return switch (handler.?) {
             .fnObj  => |f| f(self.alloc, obj),
-            else    => HandlerErrors.NoHandlerForObjectParam,
+            else    => DispatchErrors.NoHandlerForObjectParam,
         };
     }
 
     /// Build a Response message, or an Error message if there was a parse error.
     /// Caller needs to call self.alloc.free() on the returned message free the memory.
-    fn response(self: Self, req: Request, result_json: []const u8) ![]const u8 {
+    fn response(self: Self, req: RpcRequest, result_json: []const u8) ![]const u8 {
         if (req.hasError()) {
-            const code  = @intFromEnum(req.err_code);
-            const msg   = req.err_msg;
-            return self.responseError(req.getId(), code, msg);
+            return self.responseError(req.id, @intFromEnum(req.err.code), req.err.err_msg);
         }
-        if (req.body) |body| {
-            return switch (body.id) {
-                .num => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
-                                       , .{result_json, body.id.num}),
-                .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
-                                       , .{result_json, body.id.str}),
-                .null => HandlerErrors.NotificationHasNoResponse,
-            };
-        }
-        const id    = RpcId { .null = {} };
-        const code  = @intFromEnum(ErrorCode.InvalidRequest);
-        const msg   = "Missing request body.";
-        return self.responseError(id, code, msg);
+        return switch (req.id) {
+            .num => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
+                                   , .{result_json, req.id.num}),
+            .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
+                                   , .{result_json, req.id.str}),
+            .null => JrErrors.NotificationHasNoResponse,
+        };
     }
 
     /// Build an Error message.
@@ -565,21 +460,29 @@ pub const Registry = struct {
 
     fn errorToCodeMsg(err: anyerror) struct {i32, []const u8} {
         return switch (err) {
-            HandlerErrors.InvalidParams => .{
-                @intFromEnum(ErrorCode.InvalidParams),
-                "Invalid Params",
-            },
-            HandlerErrors.InvalidRequest => .{
-                @intFromEnum(ErrorCode.InvalidRequest),
-                "Invalid Request",
-            },
-            HandlerErrors.MethodNotFound => .{
+            DispatchErrors.MethodNotFound => .{
                 @intFromEnum(ErrorCode.MethodNotFound),
-                "Method Not Found",
+                "Method not found.",
+            },
+            DispatchErrors.InvalidParams => .{
+                @intFromEnum(ErrorCode.InvalidParams),
+                "Invalid parameters.",
+            },
+            DispatchErrors.NoHandlerForArrayParam => .{
+                @intFromEnum(ErrorCode.InvalidParams),
+                "Handler expecting array parameters but got non-array parameters.",
+            },
+            DispatchErrors.NoHandlerForObjectParam => .{
+                @intFromEnum(ErrorCode.InvalidParams),
+                "Handler expecting an object parameter but got non-object parameters.",
+            },
+            DispatchErrors.MismatchedParameterCounts => .{
+                @intFromEnum(ErrorCode.InvalidParams),
+                "The number of parameters of the request does not match the parameter count of the handler.",
             },
             else => .{
                 @intFromEnum(ErrorCode.ServerError),
-                "Server Error",
+                @errorName(err),    // return the dispatching error as text msg.
             },
         };
     }
@@ -622,10 +525,10 @@ fn toHandler(handler_fn: anytype) !Handler {
     const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
     const params = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params,
-        else => return HandlerErrors.HandlerNotFunction,
+        else => return RegistrationErrors.HandlerNotFunction,
     };
     if (params.len == 0) {
-        return HandlerErrors.MissingAllocator;
+        return RegistrationErrors.MissingAllocator;
     }
     const nparams = params.len - 1;  // one less for the Allocator param
 
@@ -638,10 +541,10 @@ fn toHandler(handler_fn: anytype) !Handler {
                     Value =>    return Handler { .fn1 = handler_fn },
                     Array =>    return Handler { .fnArr = handler_fn },
                     ObjectMap=> return Handler { .fnObj = handler_fn },
-                    else =>     return HandlerErrors.HandlerInvalidParameterType,
+                    else =>     return RegistrationErrors.HandlerInvalidParameterType,
                 }
             }
-            return HandlerErrors.HandlerInvalidParameter;
+            return RegistrationErrors.HandlerInvalidParameter;
         },
         2 => return Handler { .fn2 = handler_fn },
         3 => return Handler { .fn3 = handler_fn },
@@ -651,7 +554,7 @@ fn toHandler(handler_fn: anytype) !Handler {
         7 => return Handler { .fn7 = handler_fn },
         8 => return Handler { .fn8 = handler_fn },
         9 => return Handler { .fn9 = handler_fn },
-        else => return HandlerErrors.HandlerTooManyParams,
+        else => return RegistrationErrors.HandlerTooManyParams,
     }
 }
 
