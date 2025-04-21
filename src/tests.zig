@@ -738,7 +738,7 @@ test "Request dispatching" {
         defer result.deinit();
         const req = try result.request();
         const res = try registry.run(req);
-        defer alloc.free(res);
+        defer registry.freeResponse(res);
         std.debug.print("response: {s}\n", .{res});
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
