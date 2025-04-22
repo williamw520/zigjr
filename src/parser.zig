@@ -281,7 +281,3 @@ pub const RpcId = union(enum) {
 };
 
 
-test {
-    _ = @import("tests.zig");
-}
-

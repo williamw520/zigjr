@@ -26,6 +26,8 @@ pub const DispatchErrors = errors.DispatchErrors;
 
 
 test {
-    _ = @import("tests.zig");
+    _ = @import("tests/parser_tests.zig");
+    _ = @import("tests/dispatcher_tests.zig");
+    _ = @import("tests/tests.zig");
 }
 

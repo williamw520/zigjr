@@ -1,0 +1,496 @@
+const std = @import("std");
+const testing = std.testing;
+const allocPrint = std.fmt.allocPrint;
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+const nanoTimestamp = std.time.nanoTimestamp;
+const Value = std.json.Value;
+const Array = std.json.Array;
+const ObjectMap = std.json.ObjectMap;
+
+const zigjr = @import("../zigjr.zig");
+const RpcMessage = zigjr.RpcMessage;
+const RpcRequest = zigjr.RpcRequest;
+const ErrorCode = zigjr.ErrorCode;
+const JrErrors = zigjr.JrErrors;
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
+
+// Test handler registration.
+
+fn fun0(alloc: Allocator) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, "Hello", .{});
+}
+
+fn fun1(alloc: Allocator, p1: Value) anyerror![]const u8 {
+    const n1 = p1.string;
+    const str = try allocPrint(alloc, "Hello {s}", .{n1});
+    defer alloc.free(str);
+    return std.json.stringifyAlloc(alloc, str, .{});
+}
+
+fn fun2(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
+    const n1 = p1.integer;
+    const n2 = p2.integer;
+    return std.json.stringifyAlloc(alloc, n1 - n2, .{});
+}
+
+fn fun2a(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, (p1.integer - p2.integer) * 2, .{});
+}
+
+fn fun3(alloc: Allocator, p1: Value, p2: Value, p3: Value) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, p1.integer + p2.integer + p3.integer, .{});
+}
+
+fn fun9(alloc: Allocator, p1: Value, p2: Value, p3: Value, p4: Value,
+        p5: Value, p6: Value, p7: Value, p8: Value, p9: Value) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc,
+                                   p1.integer + p2.integer + p3.integer + p4.integer +
+                                   p5.integer + p6.integer + p7.integer + p8.integer + p9.integer,
+                                   .{});
+}
+
+fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
+    const str = try allocPrint(alloc, "Hello {}", .{array});
+    defer alloc.free(str);
+    return std.json.stringifyAlloc(alloc, str, .{});
+}
+
+fn addArray(alloc: Allocator, array: Array) anyerror![]const u8 {
+    var sum: isize = 0;
+    for (array.items) |value| {
+        sum += value.integer;
+    }
+    return std.json.stringifyAlloc(alloc, sum, .{});
+}
+
+const MyErrors = error {
+    MissingName,
+};
+
+fn funObj(alloc: Allocator, map: ObjectMap) anyerror![]const u8 {
+    if (map.get("name")) |name| {
+        const str = try allocPrint(alloc, "Hello {s}", .{name.string});
+        defer alloc.free(str);
+        return std.json.stringifyAlloc(alloc, str, .{});
+    } else {
+        return MyErrors.MissingName;
+    }
+}
+
+fn fun_too_many_params(_: Allocator, p1: Value, p2: Value, p3: Value, p4: Value, p5: Value,
+                       p6: Value, p7: Value, p8: Value, p9: Value, p10: Value) anyerror![]const u8 {
+    _=p1; _=p2; _=p3; _=p4; _=p5; _=p6; _=p7; _=p8; _=p9; _=p10;
+}
+
+fn fun_missing_allocator() void {}
+
+fn fun_wrong_return_type(_: Allocator) void {}
+
+fn fun_wrong_param_type(alloc: Allocator, _: u8) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, "Hello", .{});
+}
+
+fn fun_wrong_param_type2(alloc: Allocator, _: Value, _: u8) anyerror![]const u8 {
+    return std.json.stringifyAlloc(alloc, "Hello", .{});
+}
+
+test "Register handlers" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fun0", fun0);
+        try testing.expect(registry.get("fun0") != null);
+        try registry.register("fun1", fun1);
+        try registry.register("subtract", fun2);
+        try registry.register("sum3", fun3);
+        try registry.register("sum9", fun9);
+        try registry.register("funArray", funArray);
+        try registry.register("funObj", funObj);
+
+        // Re-register handler
+        try registry.register("fun2", fun2a);
+        try testing.expect(registry.get("fun2") != null);
+        try testing.expect(registry.get("fun2").?.fn2 != fun2);
+        try testing.expect(registry.get("fun2").?.fn2 == fun2a);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test validation on registering handler with too many params, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+        try testing.expectError(zigjr.RegistrationErrors.HandlerTooManyParams,
+                                registry.register("fun_too_many_params", fun_too_many_params));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test validation on registering handler with the wrong param type, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+        try testing.expectError(zigjr.RegistrationErrors.HandlerInvalidParameterType,
+                                registry.register("fun_wrong_param_type", fun_wrong_param_type));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test validation on registering a reserved name prefix 'rpc.', expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+        try testing.expectError(zigjr.RegistrationErrors.InvalidMethodName,
+                                registry.register("rpc.abc", fun0));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test validation on registering a handler with missing allocator, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+        try testing.expectError(zigjr.RegistrationErrors.MissingAllocator,
+                                registry.register("fun_missing_allocator", fun_missing_allocator));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Uncomment to test catching registration errors on compile, expect compile error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = zigjr.Registry.init(alloc);
+        defer registry.deinit();
+        // These would cause compile errors, as expected.
+        // try registry.register("fun_wrong_return_type", fun_wrong_return_type);
+        // try registry.register("fun_wrong_param_type2", fun_wrong_param_type2);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+// Test request dispatching
+
+fn registerFunctions(alloc: Allocator) !zigjr.Registry {
+    var registry = zigjr.Registry.init(alloc);
+    try registry.register("fun0", fun0);
+    try registry.register("fun1", fun1);
+    try registry.register("subtract", fun2);
+    try registry.register("sum3", fun3);
+    try registry.register("sum9", fun9);
+    try registry.register("funArray", funArray);
+    try registry.register("funObj", funObj);
+    try registry.register("addArray", addArray);
+
+    // std.debug.print("addArray handler: {any}\n", .{registry.get("addArray")});
+
+    return registry;
+}
+
+test "Dispatching to 0-parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "Hello");
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 2-integer parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("result").?.integer, 20);
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 1-string parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "Hello FUN1");
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 3-integer parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "sum3", "params": [1, 2, 3], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("result").?.integer, 6);
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 9-integer parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "sum9", "params": [1, 2, 3, 4, 5, 6, 7, 8, 9], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("result").?.integer, 45);
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to an array-based parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "addArray", "params": [1, 2, 3, 4, 5, 6, 7, 8, 9], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("result").?.integer, 45);
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to an object-based parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "funObj", "params": {"name": "abc"}, "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "Hello abc");
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to an object-based parameter method without the needed value, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "funObj", "params": {"no-name": "abc"}, "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("error").?.object.get("code").?.integer, @intFromEnum(ErrorCode.ServerError));
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to non-existing method, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "no-method"}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("error").?.object.get("code").?.integer, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqual(parsed.value.object.get("id").?.null, {});
+
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("id").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 0-parameter method with mismatched parameter count, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [1], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("error").?.object.get("code").?.integer, @intFromEnum(ErrorCode.InvalidParams));
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("id").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 0-parameter method with empty parameter array" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "Hello");
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+
+        // std.debug.print("response: {s}\n", .{response});
+        // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("id").?});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Dispatching to 1-parameter method with mismatched parameters, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
+
+        var buffer = std.ArrayList(u8).init(alloc);
+        defer buffer.deinit();
+
+        for (0..10)|i| {
+            if (i == 1) continue;
+            buffer.clearRetainingCapacity();
+            for (0..i)|j| {
+                if (j != 0) try buffer.appendSlice(", ");
+                try buffer.writer().print("{}", .{j});
+            }
+            const req_json = try allocPrint(alloc,
+                \\{{"jsonrpc": "2.0", "method": "fun1", "params": [{s}], "id": 1}}
+                , .{buffer.items});
+            // std.debug.print("req_json: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            var result = zigjr.parseJson(alloc, req_json);
+            defer result.deinit();
+
+            const response = try registry.run(try result.request());
+            defer registry.freeResponse(response);
+            // std.debug.print("response: {s}\n", .{response});
+
+            const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+            defer parsed.deinit();
+            try testing.expectEqual(parsed.value.object.get("error").?.object.get("code").?.integer, @intFromEnum(ErrorCode.InvalidParams));
+        }            
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+

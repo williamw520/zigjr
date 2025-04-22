@@ -290,7 +290,3 @@ fn errorToCodeMsg(err: anyerror) struct {i32, []const u8} {
 }
 
 
-test {
-    _ = @import("tests.zig");
-}
-
