@@ -7,6 +7,7 @@
 //
 
 const std = @import("std");
+const assert = std.debug.assert;
 const Type = std.builtin.Type;
 const Allocator = std.mem.Allocator;
 const StringHashMap = std.hash_map.StringHashMap;
@@ -101,24 +102,28 @@ pub const Registry = struct {
         };
     }
 
-    fn dispatchOnArray(self: *Self, method: []const u8, arr: Array) anyerror![]const u8 {
-        const handler = self.handlers.get(method);
-        if (handler == null) return DispatchErrors.MethodNotFound;
-        if (paramLen(handler.?) != arr.items.len) return DispatchErrors.MismatchedParameterCounts;
+    fn dispatchOnArray(self: *Self, method: []const u8, array: Array) anyerror![]const u8 {
+        const handler = self.handlers.get(method) orelse return DispatchErrors.MethodNotFound;
 
-        return switch (handler.?) {
+        // Dispatch on array based parameter.
+        if (handler == .fnArr) return handler.fnArr(self.alloc, array);
+
+        // Dispatch on fixed-length based parameters.
+        const p = array.items;
+        if (paramLen(handler) != p.len) return DispatchErrors.MismatchedParameterCounts;
+        return switch (handler) {
             .fn0 => |f| f(self.alloc),
-            .fn1 => |f| f(self.alloc, arr.items[0]),
-            .fn2 => |f| f(self.alloc, arr.items[0], arr.items[1]),
-            .fn3 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2]),
-            .fn4 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3]),
-            .fn5 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4]),
-            .fn6 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5]),
-            .fn7 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6]),
-            .fn8 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7]),
-            .fn9 => |f| f(self.alloc, arr.items[0], arr.items[1], arr.items[2], arr.items[3], arr.items[4], arr.items[5], arr.items[6], arr.items[7], arr.items[8]),
-            .fnArr  => |f| f(self.alloc, arr),
-            else    => DispatchErrors.NoHandlerForArrayParam,
+            .fn1 => |f| f(self.alloc, p[0]),
+            .fn2 => |f| f(self.alloc, p[0], p[1]),
+            .fn3 => |f| f(self.alloc, p[0], p[1], p[2]),
+            .fn4 => |f| f(self.alloc, p[0], p[1], p[2], p[3]),
+            .fn5 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4]),
+            .fn6 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4], p[5]),
+            .fn7 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4], p[5], p[6]),
+            .fn8 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]),
+            .fn9 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]),
+            .fnArr => unreachable,  // already handled previously; shouldn't here.
+            .fnObj => unreachable,  // already handled previously; shouldn't here.
         };
     }
 
@@ -152,17 +157,17 @@ pub const Registry = struct {
         return switch (id) {
             .num => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": {},
-                               \\   "error": {{ code: {}, "message": "{s}" }}
+                               \\   "error": {{ "code": {}, "message": "{s}" }}
                                \\}}
                                , .{id.num, code, msg}),
             .str => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": "{s}",
-                               \\   "error": {{ code: {}, "message": "{s}" }}
+                               \\   "error": {{ "code": {}, "message": "{s}" }}
                                \\}}
                                , .{id.str, code, msg}),
             .null => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": null,
-                               \\   "error": {{ code: {}, "message": "{s}" }}
+                               \\   "error": {{ "code": {}, "message": "{s}" }}
                                \\}}
                                , .{code, msg}),
         };
