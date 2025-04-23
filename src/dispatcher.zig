@@ -32,12 +32,12 @@ pub const Registry = struct {
     const Self = @This();
 
     alloc:      Allocator,
-    handlers:   StringHashMap(Handler),
+    handlers:   StringHashMap(HandlerInfo),
 
     pub fn init(allocator: Allocator) Self {
         return .{
             .alloc = allocator,
-            .handlers = StringHashMap(Handler).init(allocator),
+            .handlers = StringHashMap(HandlerInfo).init(allocator),
         };
     }
 
@@ -45,15 +45,21 @@ pub const Registry = struct {
         self.handlers.deinit();
     }
 
-    pub fn register(self: *Self, method: []const u8, handler_fn: anytype) !void {
+    pub fn register(self: *Self, method: []const u8, handler_fn: anytype,
+                    options: struct {
+                        raw_params: bool = false,
+    }) !void {
         if (std.mem.startsWith(u8, method, "rpc.")) {
             return RegistrationErrors.InvalidMethodName;    // By spec, "rpc." is reserved.
         }
-        const fn_ptr = try toHandler(handler_fn);
-        try self.handlers.put(method, fn_ptr);
+        const handle_info = HandlerInfo {
+            .handler_fn = try toHandlerFn(handler_fn),
+            .raw_params = options.raw_params,
+        };
+        try self.handlers.put(method, handle_info);
     }
 
-    pub fn get(self: *Self, method: []const u8) ?Handler {
+    pub fn get(self: *Self, method: []const u8) ?HandlerInfo {
         return self.handlers.get(method);
     }
 
@@ -89,29 +95,30 @@ pub const Registry = struct {
     }
 
     fn dispatchOnNone(self: *Self, method: []const u8) anyerror![]const u8 {
-        const handler = self.handlers.get(method);
-        if (handler == null) return DispatchErrors.MethodNotFound;
-        if (paramLen(handler.?)) |nparams| {
+        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
+        const handler_fn    = handler_info.handler_fn;
+        if (paramLen(handler_fn)) |nparams| {
             if (nparams > 0) return DispatchErrors.MismatchedParameterCounts;
         } else {
             return DispatchErrors.MismatchedParameterCounts;
         }
-        return switch (handler.?) {
+        return switch (handler_fn) {
             .fn0 => |f| f(self.alloc),
             else => DispatchErrors.MismatchedParameterCounts,
         };
     }
 
     fn dispatchOnArray(self: *Self, method: []const u8, array: Array) anyerror![]const u8 {
-        const handler = self.handlers.get(method) orelse return DispatchErrors.MethodNotFound;
+        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
+        const handler_fn    = handler_info.handler_fn;
 
         // Dispatch on array based parameter.
-        if (handler == .fnArr) return handler.fnArr(self.alloc, array);
+        if (handler_fn == .fnArr) return handler_fn.fnArr(self.alloc, array);
 
         // Dispatch on fixed-length based parameters.
         const p = array.items;
-        if (paramLen(handler) != p.len) return DispatchErrors.MismatchedParameterCounts;
-        return switch (handler) {
+        if (paramLen(handler_fn) != p.len) return DispatchErrors.MismatchedParameterCounts;
+        return switch (handler_fn) {
             .fn0 => |f| f(self.alloc),
             .fn1 => |f| f(self.alloc, p[0]),
             .fn2 => |f| f(self.alloc, p[0], p[1]),
@@ -128,9 +135,9 @@ pub const Registry = struct {
     }
 
     fn dispatchOnObject(self: *Self, method: []const u8, obj: ObjectMap) anyerror![]const u8 {
-        const handler = self.handlers.get(method);
-        if (handler == null) return DispatchErrors.MethodNotFound;
-        return switch (handler.?) {
+        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
+        const handler_fn    = handler_info.handler_fn;
+        return switch (handler_fn) {
             .fnObj  => |f| f(self.alloc, obj),
             else    => DispatchErrors.NoHandlerForObjectParam,
         };
@@ -175,6 +182,11 @@ pub const Registry = struct {
 
 };
 
+const HandlerInfo = struct {
+    handler_fn: HandlerFn,
+    raw_params: bool,
+};
+
 /// The returned JSON string must be allocated with the passed in allocator.
 /// The caller will free it with the allocator after using it in the Response message.
 /// Call std.json.stringifyAlloc() to build the returned JSON will take care of it.
@@ -192,7 +204,7 @@ const HandlerArr = *const fn(Allocator, Array) anyerror![]const u8;
 const HandlerObj = *const fn(Allocator, ObjectMap) anyerror![]const u8;
 
 // Use tagged union to wrap different types of handler.
-const Handler = union(enum) {
+const HandlerFn = union(enum) {
     fn0: Handler0,
     fn1: Handler1,
     fn2: Handler2,
@@ -207,7 +219,7 @@ const Handler = union(enum) {
     fnObj: HandlerObj,
 };
 
-fn toHandler(handler_fn: anytype) !Handler {
+fn toHandlerFn(handler_fn: anytype) !HandlerFn {
     const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
     const params = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params,
@@ -219,32 +231,32 @@ fn toHandler(handler_fn: anytype) !Handler {
     const nparams = params.len - 1;  // one less for the Allocator param
 
     switch (nparams) {
-        0 => return Handler { .fn0 = handler_fn },
+        0 => return HandlerFn { .fn0 = handler_fn },
         1 => {
             // Single-param handler can be a Value, Array, or Object handler.
             if (params[1].type)|typ| {
                 switch (typ) {
-                    Value =>    return Handler { .fn1 = handler_fn },
-                    Array =>    return Handler { .fnArr = handler_fn },
-                    ObjectMap=> return Handler { .fnObj = handler_fn },
+                    Value =>    return HandlerFn { .fn1 = handler_fn },
+                    Array =>    return HandlerFn { .fnArr = handler_fn },
+                    ObjectMap=> return HandlerFn { .fnObj = handler_fn },
                     else =>     return RegistrationErrors.HandlerInvalidParameterType,
                 }
             }
             return RegistrationErrors.HandlerInvalidParameter;
         },
-        2 => return Handler { .fn2 = handler_fn },
-        3 => return Handler { .fn3 = handler_fn },
-        4 => return Handler { .fn4 = handler_fn },
-        5 => return Handler { .fn5 = handler_fn },
-        6 => return Handler { .fn6 = handler_fn },
-        7 => return Handler { .fn7 = handler_fn },
-        8 => return Handler { .fn8 = handler_fn },
-        9 => return Handler { .fn9 = handler_fn },
+        2 => return HandlerFn { .fn2 = handler_fn },
+        3 => return HandlerFn { .fn3 = handler_fn },
+        4 => return HandlerFn { .fn4 = handler_fn },
+        5 => return HandlerFn { .fn5 = handler_fn },
+        6 => return HandlerFn { .fn6 = handler_fn },
+        7 => return HandlerFn { .fn7 = handler_fn },
+        8 => return HandlerFn { .fn8 = handler_fn },
+        9 => return HandlerFn { .fn9 = handler_fn },
         else => return RegistrationErrors.HandlerTooManyParams,
     }
 }
 
-fn paramLen(handler: Handler) ?usize {
+fn paramLen(handler: HandlerFn) ?usize {
     return switch (handler) {
         .fn0 => 0,
         .fn1 => 1,

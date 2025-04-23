@@ -80,6 +80,20 @@ fn funObj(alloc: Allocator, map: ObjectMap) anyerror![]const u8 {
     }
 }
 
+const CatInfo = struct {
+    cat_name: []const u8,
+    weight: f64,
+    eye_color: []const u8,
+};
+
+fn funCat(alloc: Allocator, obj: Value) anyerror![]const u8 {
+    const cat_info = try std.json.parseFromValue(CatInfo, alloc, obj, .{});
+    _=cat_info;
+    // std.debug.print("cat_info: {any}\n", .{cat_info});
+    return std.json.stringifyAlloc(alloc, "ok", .{});
+}
+
+    
 fn fun_too_many_params(_: Allocator, p1: Value, p2: Value, p3: Value, p4: Value, p5: Value,
                        p6: Value, p7: Value, p8: Value, p9: Value, p10: Value) anyerror![]const u8 {
     _=p1; _=p2; _=p3; _=p4; _=p5; _=p6; _=p7; _=p8; _=p9; _=p10;
@@ -103,20 +117,21 @@ test "Register handlers" {
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fun0", fun0);
+        try registry.register("fun0", fun0, .{});
         try testing.expect(registry.get("fun0") != null);
-        try registry.register("fun1", fun1);
-        try registry.register("subtract", fun2);
-        try registry.register("sum3", fun3);
-        try registry.register("sum9", fun9);
-        try registry.register("funArray", funArray);
-        try registry.register("funObj", funObj);
+        try registry.register("fun1", fun1, .{});
+        try registry.register("subtract", fun2, .{});
+        try registry.register("sum3", fun3, .{});
+        try registry.register("sum9", fun9, .{});
+        try registry.register("funArray", funArray, .{});
+        try registry.register("funObj", funObj, .{});
+        try registry.register("funCat", funCat, .{});
 
         // Re-register handler
-        try registry.register("fun2", fun2a);
+        try registry.register("fun2", fun2a, .{});
         try testing.expect(registry.get("fun2") != null);
-        try testing.expect(registry.get("fun2").?.fn2 != fun2);
-        try testing.expect(registry.get("fun2").?.fn2 == fun2a);
+        try testing.expect(registry.get("fun2").?.handler_fn.fn2 != fun2);
+        try testing.expect(registry.get("fun2").?.handler_fn.fn2 == fun2a);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -127,7 +142,7 @@ test "Test validation on registering handler with too many params, expect error"
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
         try testing.expectError(zigjr.RegistrationErrors.HandlerTooManyParams,
-                                registry.register("fun_too_many_params", fun_too_many_params));
+                                registry.register("fun_too_many_params", fun_too_many_params, .{}));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -138,7 +153,7 @@ test "Test validation on registering handler with the wrong param type, expect e
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
         try testing.expectError(zigjr.RegistrationErrors.HandlerInvalidParameterType,
-                                registry.register("fun_wrong_param_type", fun_wrong_param_type));
+                                registry.register("fun_wrong_param_type", fun_wrong_param_type, .{}));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -149,7 +164,7 @@ test "Test validation on registering a reserved name prefix 'rpc.', expect error
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
         try testing.expectError(zigjr.RegistrationErrors.InvalidMethodName,
-                                registry.register("rpc.abc", fun0));
+                                registry.register("rpc.abc", fun0, .{}));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -160,7 +175,7 @@ test "Test validation on registering a handler with missing allocator, expect er
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
         try testing.expectError(zigjr.RegistrationErrors.MissingAllocator,
-                                registry.register("fun_missing_allocator", fun_missing_allocator));
+                                registry.register("fun_missing_allocator", fun_missing_allocator, .{}));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -171,8 +186,8 @@ test "Uncomment to test catching registration errors on compile, expect compile 
         var registry = zigjr.Registry.init(alloc);
         defer registry.deinit();
         // These would cause compile errors, as expected.
-        // try registry.register("fun_wrong_return_type", fun_wrong_return_type);
-        // try registry.register("fun_wrong_param_type2", fun_wrong_param_type2);
+        // try registry.register("fun_wrong_return_type", fun_wrong_return_type, .{});
+        // try registry.register("fun_wrong_param_type2", fun_wrong_param_type2, .{});
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -181,14 +196,15 @@ test "Uncomment to test catching registration errors on compile, expect compile 
 
 fn registerFunctions(alloc: Allocator) !zigjr.Registry {
     var registry = zigjr.Registry.init(alloc);
-    try registry.register("fun0", fun0);
-    try registry.register("fun1", fun1);
-    try registry.register("subtract", fun2);
-    try registry.register("sum3", fun3);
-    try registry.register("sum9", fun9);
-    try registry.register("funArray", funArray);
-    try registry.register("funObj", funObj);
-    try registry.register("addArray", addArray);
+    try registry.register("fun0", fun0, .{});
+    try registry.register("fun1", fun1, .{});
+    try registry.register("subtract", fun2, .{});
+    try registry.register("sum3", fun3, .{});
+    try registry.register("sum9", fun9, .{});
+    try registry.register("funArray", funArray, .{});
+    try registry.register("funObj", funObj, .{});
+    try registry.register("funCat", funCat, .{ .raw_params = true });
+    try registry.register("addArray", addArray, .{});
 
     // std.debug.print("addArray handler: {any}\n", .{registry.get("addArray")});
 
@@ -356,6 +372,41 @@ test "Dispatching to an object-based parameter method" {
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
+// test "Dispatching to an object-based parameter method FunCat" {
+//     const alloc = gpa.allocator();
+//     {
+//         var registry = try registerFunctions(alloc);
+//         defer registry.deinit();
+
+//         const cat_info = CatInfo {
+//             .cat_name = "foo",
+//             .weight = 7.5,
+//             .eye_color = "brown",
+//         };
+//         const cat_json = std.json.stringifyAlloc(alloc, cat_info, .{});
+//         defer alloc.free(cat_json);
+//         const req_json = try allocPrint(alloc,
+//             \\{{"jsonrpc": "2.0", "method": "fun1", "params": {s}, "id": 1}}
+//                                             , .{cat_json});
+//         // std.debug.print("req_json: {s}\n", .{req_json});
+//         defer alloc.free(req_json);
+//         var result = zigjr.parseJson(alloc, req_json);
+//         defer result.deinit();
+
+//         const response = try registry.run(try result.request());
+//         defer registry.freeResponse(response);
+
+//         const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+//         defer parsed.deinit();
+//         try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "ok");
+//         try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+//         // std.debug.print("response: {s}\n", .{response});
+//         // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
+//     }
+//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+// }
+
 
 test "Dispatching to an object-based parameter method without the needed value, expect error" {
     const alloc = gpa.allocator();
