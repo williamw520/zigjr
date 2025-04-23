@@ -87,10 +87,11 @@ const CatInfo = struct {
 };
 
 fn funCat(alloc: Allocator, obj: Value) anyerror![]const u8 {
-    const cat_info = try std.json.parseFromValue(CatInfo, alloc, obj, .{});
-    _=cat_info;
+    const parsed = try std.json.parseFromValue(CatInfo, alloc, obj, .{});
+    defer parsed.deinit();
+    const cat_info = parsed.value;
     // std.debug.print("cat_info: {any}\n", .{cat_info});
-    return std.json.stringifyAlloc(alloc, "ok", .{});
+    return std.json.stringifyAlloc(alloc, cat_info, .{});
 }
 
     
@@ -125,7 +126,7 @@ test "Register handlers" {
         try registry.register("sum9", fun9, .{});
         try registry.register("funArray", funArray, .{});
         try registry.register("funObj", funObj, .{});
-        try registry.register("funCat", funCat, .{});
+        try registry.register("funCat", funCat, .{ .raw_params = true });
 
         // Re-register handler
         try registry.register("fun2", fun2a, .{});
@@ -373,39 +374,41 @@ test "Dispatching to an object-based parameter method" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-// test "Dispatching to an object-based parameter method FunCat" {
-//     const alloc = gpa.allocator();
-//     {
-//         var registry = try registerFunctions(alloc);
-//         defer registry.deinit();
+test "Dispatching to an object-based parameter method FunCat" {
+    const alloc = gpa.allocator();
+    {
+        var registry = try registerFunctions(alloc);
+        defer registry.deinit();
 
-//         const cat_info = CatInfo {
-//             .cat_name = "foo",
-//             .weight = 7.5,
-//             .eye_color = "brown",
-//         };
-//         const cat_json = std.json.stringifyAlloc(alloc, cat_info, .{});
-//         defer alloc.free(cat_json);
-//         const req_json = try allocPrint(alloc,
-//             \\{{"jsonrpc": "2.0", "method": "fun1", "params": {s}, "id": 1}}
-//                                             , .{cat_json});
-//         // std.debug.print("req_json: {s}\n", .{req_json});
-//         defer alloc.free(req_json);
-//         var result = zigjr.parseJson(alloc, req_json);
-//         defer result.deinit();
+        const cat_info = CatInfo {
+            .cat_name = "foo",
+            .weight = 7.5,
+            .eye_color = "brown",
+        };
+        const cat_json = try std.json.stringifyAlloc(alloc, cat_info, .{});
+        defer alloc.free(cat_json);
+        const req_json = try allocPrint(alloc,
+            \\{{"jsonrpc": "2.0", "method": "funCat", "params": {s}, "id": 1}}
+            , .{cat_json});
+        defer alloc.free(req_json);
+        var result = zigjr.parseJson(alloc, req_json);
+        defer result.deinit();
 
-//         const response = try registry.run(try result.request());
-//         defer registry.freeResponse(response);
+        const response = try registry.run(try result.request());
+        defer registry.freeResponse(response);
+        // std.debug.print("response: {s}\n", .{response});
 
-//         const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
-//         defer parsed.deinit();
-//         try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "ok");
-//         try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
-//         // std.debug.print("response: {s}\n", .{response});
-//         // std.debug.print("parsed: {any}\n", .{parsed.value.object.get("result").?});
-//     }
-//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-// }
+        const parsed = try std.json.parseFromSlice(Value, alloc, response, .{});
+        defer parsed.deinit();
+        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+
+        const res_result = parsed.value.object.get("result").?;
+        const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, res_result, .{});
+        defer parsed_cat.deinit();
+        try testing.expectEqualDeep(cat_info, parsed_cat.value);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 
 test "Dispatching to an object-based parameter method without the needed value, expect error" {

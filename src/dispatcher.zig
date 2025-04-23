@@ -28,6 +28,10 @@ const RegistrationErrors = errors.RegistrationErrors;
 const DispatchErrors = errors.DispatchErrors;
 
 
+pub const RegisterOptions = struct {
+    raw_params: bool = false,
+};
+
 pub const Registry = struct {
     const Self = @This();
 
@@ -45,16 +49,13 @@ pub const Registry = struct {
         self.handlers.deinit();
     }
 
-    pub fn register(self: *Self, method: []const u8, handler_fn: anytype,
-                    options: struct {
-                        raw_params: bool = false,
-    }) !void {
+    pub fn register(self: *Self, method: []const u8, handler_fn: anytype, opt: RegisterOptions) !void {
         if (std.mem.startsWith(u8, method, "rpc.")) {
             return RegistrationErrors.InvalidMethodName;    // By spec, "rpc." is reserved.
         }
         const handle_info = HandlerInfo {
-            .handler_fn = try toHandlerFn(handler_fn),
-            .raw_params = options.raw_params,
+            .handler_fn = try toHandlerFn(handler_fn, opt),
+            .raw_params = opt.raw_params,
         };
         try self.handlers.put(method, handle_info);
     }
@@ -86,17 +87,24 @@ pub const Registry = struct {
     }
 
     fn dispatch(self: *Self, req: RpcRequest) anyerror![]const u8 {
-        return switch (req.params) {
-            .null   =>      self.dispatchOnNone(req.method),
-            .array  => |a|  self.dispatchOnArray(req.method, a),
-            .object => |o|  self.dispatchOnObject(req.method, o),
-            else    => DispatchErrors.InvalidParams,
-        };
+        const handler_info  = self.get(req.method) orelse return DispatchErrors.MethodNotFound;
+        const handler_fn    = handler_info.handler_fn;
+
+        if (handler_info.raw_params) {
+            if (req.params != .object) return DispatchErrors.WrongRequestParamTypeForRawParams;
+            return handler_fn.fnVal(self.alloc, req.params);
+        } else {
+            return switch (req.params) {
+                .null   =>          self.dispatchOnNone(req, handler_fn),
+                .array  => |array|  self.dispatchOnArray(req, handler_fn, array),
+                .object => |object| self.dispatchOnObject(req, handler_fn, object),
+                else    => DispatchErrors.InvalidParams,
+            };
+        }
     }
 
-    fn dispatchOnNone(self: *Self, method: []const u8) anyerror![]const u8 {
-        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
-        const handler_fn    = handler_info.handler_fn;
+    fn dispatchOnNone(self: *Self, req: RpcRequest, handler_fn: HandlerFn) anyerror![]const u8 {
+        _=req;
         if (paramLen(handler_fn)) |nparams| {
             if (nparams > 0) return DispatchErrors.MismatchedParameterCounts;
         } else {
@@ -108,9 +116,8 @@ pub const Registry = struct {
         };
     }
 
-    fn dispatchOnArray(self: *Self, method: []const u8, array: Array) anyerror![]const u8 {
-        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
-        const handler_fn    = handler_info.handler_fn;
+    fn dispatchOnArray(self: *Self, req: RpcRequest, handler_fn: HandlerFn, array: Array) anyerror![]const u8 {
+        _=req;
 
         // Dispatch on array based parameter.
         if (handler_fn == .fnArr) return handler_fn.fnArr(self.alloc, array);
@@ -131,12 +138,12 @@ pub const Registry = struct {
             .fn9 => |f| f(self.alloc, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]),
             .fnArr => unreachable,  // already handled previously; shouldn't here.
             .fnObj => unreachable,  // already handled previously; shouldn't here.
+            .fnVal => unreachable,  // already handled previously; shouldn't here.
         };
     }
 
-    fn dispatchOnObject(self: *Self, method: []const u8, obj: ObjectMap) anyerror![]const u8 {
-        const handler_info  = self.get(method) orelse return DispatchErrors.MethodNotFound;
-        const handler_fn    = handler_info.handler_fn;
+    fn dispatchOnObject(self: *Self, req: RpcRequest, handler_fn: HandlerFn, obj: ObjectMap) anyerror![]const u8 {
+        _=req;
         return switch (handler_fn) {
             .fnObj  => |f| f(self.alloc, obj),
             else    => DispatchErrors.NoHandlerForObjectParam,
@@ -202,6 +209,7 @@ const Handler8 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, 
 const Handler9 = *const fn(Allocator, Value, Value, Value, Value, Value, Value, Value, Value, Value) anyerror![]const u8;
 const HandlerArr = *const fn(Allocator, Array) anyerror![]const u8;
 const HandlerObj = *const fn(Allocator, ObjectMap) anyerror![]const u8;
+const HandlerVal = *const fn(Allocator, Value) anyerror![]const u8;
 
 // Use tagged union to wrap different types of handler.
 const HandlerFn = union(enum) {
@@ -217,9 +225,10 @@ const HandlerFn = union(enum) {
     fn9: Handler9,
     fnArr: HandlerArr,
     fnObj: HandlerObj,
+    fnVal: HandlerVal,
 };
 
-fn toHandlerFn(handler_fn: anytype) !HandlerFn {
+fn toHandlerFn(handler_fn: anytype, opt: RegisterOptions) !HandlerFn {
     const fn_type_info: Type = @typeInfo(@TypeOf(handler_fn));
     const params = switch (fn_type_info) {
         .@"fn" =>|info_fn| info_fn.params,
@@ -228,7 +237,19 @@ fn toHandlerFn(handler_fn: anytype) !HandlerFn {
     if (params.len == 0) {
         return RegistrationErrors.MissingAllocator;
     }
+    const p0type = params[0].type orelse return RegistrationErrors.MissingAllocator;
+    if (p0type != Allocator) return RegistrationErrors.MissingAllocator;
+
     const nparams = params.len - 1;  // one less for the Allocator param
+
+    // Raw-params handler.
+    if (opt.raw_params) {
+        if (nparams != 1)
+            return RegistrationErrors.MismatchedParameterCountsForRawParams;
+        const p1type = params[1].type orelse return RegistrationErrors.InvalidParamTypeForRawParams;
+        if (p1type != Value) return RegistrationErrors.InvalidParamTypeForRawParams;
+        return HandlerFn { .fnVal = handler_fn };
+    }
 
     switch (nparams) {
         0 => return HandlerFn { .fn0 = handler_fn },

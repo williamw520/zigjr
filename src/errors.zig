@@ -33,6 +33,8 @@ pub const RegistrationErrors = error {
     HandlerInvalidParameter,
     HandlerInvalidParameterType,
     HandlerTooManyParams,
+    MismatchedParameterCountsForRawParams,
+    InvalidParamTypeForRawParams,
 };
 
 pub const DispatchErrors = error {
@@ -41,5 +43,6 @@ pub const DispatchErrors = error {
     MismatchedParameterCounts,
     MethodNotFound,
     InvalidParams,
+    WrongRequestParamTypeForRawParams,
 };
 
