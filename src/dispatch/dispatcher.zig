@@ -17,15 +17,17 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
-const parser = @import("parser.zig");
+const parser = @import("../jsonrpc/parser.zig");
 const RpcRequest = parser.RpcRequest;
 const RpcId = parser.RpcId;
 
-const errors = @import("errors.zig");
-const ErrorCode = errors.ErrorCode;
-const JrErrors = errors.JrErrors;
-const RegistrationErrors = errors.RegistrationErrors;
-const DispatchErrors = errors.DispatchErrors;
+const jsonrpc_errors = @import("../jsonrpc/jsonrpc_errors.zig");
+const ErrorCode = jsonrpc_errors.ErrorCode;
+const JrErrors = jsonrpc_errors.JrErrors;
+
+const dispatcher_errors = @import("dispatch_erros.zig");
+pub const RegistrationErrors = dispatcher_errors.RegistrationErrors;
+pub const DispatchErrors = dispatcher_errors.DispatchErrors;
 
 
 pub const RegisterOptions = struct {
@@ -76,7 +78,7 @@ pub const Registry = struct {
             return self.response(req, result_json);
         } else |dispatch_err| {
             // Return any dispatching error as an error response.
-            const code, const msg = errorToCodeMsg(dispatch_err);
+            const code, const msg = errorToMsg(dispatch_err);
             return self.responseError(req.id, code, msg);
         }
     }
@@ -285,7 +287,7 @@ fn paramLen(handler: HandlerFn) ?usize {
     };
 }
 
-fn errorToCodeMsg(err: anyerror) struct {i32, []const u8} {
+fn errorToMsg(err: anyerror) struct {i32, []const u8} {
     return switch (err) {
         DispatchErrors.MethodNotFound => .{
             @intFromEnum(ErrorCode.MethodNotFound),

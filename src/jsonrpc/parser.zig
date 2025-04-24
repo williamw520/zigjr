@@ -18,9 +18,9 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
-const errors = @import("errors.zig");
-const ErrorCode = errors.ErrorCode;
-const JrErrors = errors.JrErrors;
+const jsonrpc_errors = @import("jsonrpc_errors.zig");
+const ErrorCode = jsonrpc_errors.ErrorCode;
+const JrErrors = jsonrpc_errors.JrErrors;
 
 
 
