@@ -36,6 +36,37 @@ const HelloDispatcher = struct {
     }
 };
 
+const IntCalcDispatcher = struct {
+    pub fn run(alloc: Allocator, req: RpcRequest) anyerror![]const u8 {
+        const params = try req.arrayParams();
+        const a = params.items[0].integer;
+        const b = params.items[1].integer;
+        if (std.mem.eql(u8, req.method, "add")) {
+            return std.json.stringifyAlloc(alloc, add(a, b), .{});
+        } else if (std.mem.eql(u8, req.method, "sub")) {
+            return std.json.stringifyAlloc(alloc, sub(a, b), .{});
+        } else if (std.mem.eql(u8, req.method, "multiply")) {
+            return std.json.stringifyAlloc(alloc, multiply(a, b), .{});
+        } else if (std.mem.eql(u8, req.method, "divide")) {
+            return std.json.stringifyAlloc(alloc, divide(a, b), .{});
+        } else {
+            return DispatchErrors.MethodNotFound;
+        }
+    }
+
+    pub fn getErrorCodeMsg(err: anyerror) struct {ErrorCode, []const u8} {
+        return switch (err) {
+            DispatchErrors.MethodNotFound => .{ ErrorCode.MethodNotFound, "Method not found." },
+            else => .{ ErrorCode.InternalError, @errorName(err) }
+        };
+    }
+
+    fn add(a: i64, b: i64) i64 { return a + b; }
+    fn sub(a: i64, b: i64) i64 { return a - b; }
+    fn multiply(a: i64, b: i64) i64 { return a * b; }
+    fn divide(a: i64, b: i64) i64 { return @divTrunc(a, b); }
+};
+
 
 test "Response to a request of hello method" {
     const alloc = gpa.allocator();
@@ -72,6 +103,25 @@ test "Response to a request of unknown method, expect error" {
         res.deinit();
         // std.debug.print("resResult: {any}\n", .{(try resResult.err())});
         try testing.expectEqual((try res.err()).code, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqual(res.body.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of integer add" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseJson(alloc,
+            \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
+        );
+        defer result.deinit();
+        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
+
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        try testing.expectEqual((try res.result()).integer, 3);
         try testing.expectEqual(res.body.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});

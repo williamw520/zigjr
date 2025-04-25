@@ -76,6 +76,15 @@ fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u
 }
 
 
+pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
+    const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
+    return .{
+        .alloc = alloc,
+        .parsed = parsed,
+        .body = parsed.value,
+    };
+}
+
 pub const RpcResponse = struct {
     const Self = @This();
     alloc:      Allocator,
@@ -116,13 +125,5 @@ pub const RpcResponseErr = struct {
     data:       ?Value = null,
 };
 
-pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
-    const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
-    return .{
-        .alloc = alloc,
-        .parsed = parsed,
-        .body = parsed.value,
-    };
-}
 
 
