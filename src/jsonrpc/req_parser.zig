@@ -24,7 +24,7 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 
 
-pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
+pub fn parseRequest(alloc: Allocator, json_str: []const u8) RpcResult {
     const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
         var req = RpcRequest{};
@@ -42,7 +42,7 @@ pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
     };
 }
 
-pub fn parseReader(alloc: Allocator, json_reader: anytype) RpcResult {
+pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RpcResult {
     var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
     defer rp.deinit();
     // NOTE: Stream parsing of JSON's via Reader is impossible.

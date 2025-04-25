@@ -6,20 +6,21 @@
 // MIT License.  See the LICENSE file.
 //
 
-const parser = @import("jsonrpc/parser.zig");
+const req_parser = @import("jsonrpc/req_parser.zig");
+const res_parser = @import("jsonrpc/res_parser.zig");
 const responder = @import("jsonrpc/responder.zig");
 const dispatcher = @import("dispatch/dispatcher.zig");
 const jsonrpc_errors = @import("jsonrpc/jsonrpc_errors.zig");
 const dispatcher_errors = @import("dispatch/dispatch_erros.zig");
 
-pub const parseJson = parser.parseJson;
-pub const parseReader = parser.parseReader;
+pub const parseRequest = req_parser.parseRequest;
+pub const parseRequestReader = req_parser.parseRequestReader;
+pub const parseResponse = res_parser.parseResponse;
 pub const response = responder.response;
-pub const parseResponse = responder.parseResponse;
 
-pub const RpcMessage = parser.RpcMessage;
-pub const RpcRequest = parser.RpcRequest;
-pub const RpcId = parser.RpcId;
+pub const RpcMessage = req_parser.RpcMessage;
+pub const RpcRequest = req_parser.RpcRequest;
+pub const RpcId = req_parser.RpcId;
 
 pub const Registry = dispatcher.Registry;
 
