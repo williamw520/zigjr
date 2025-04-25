@@ -30,6 +30,7 @@ pub const DispatchErrors = dispatcher_errors.DispatchErrors;
 
 test {
     _ = @import("tests/parser_tests.zig");
+    _ = @import("tests/responder_tests.zig");
     _ = @import("tests/dispatcher_tests.zig");
     _ = @import("tests/tests.zig");
 }

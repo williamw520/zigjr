@@ -24,15 +24,15 @@ const JrErrors = jsonrpc_errors.JrErrors;
 pub fn response(alloc: Allocator, req: RpcRequest, dispatcher: anytype) ![]const u8 {
     if (req.hasError()) {
         // For parsing or validation error on the request, return an error response.
-        return responseError(req.id, @intFromEnum(req.err.code), req.err.err_msg);
+        return responseError(alloc, req.id, req.err.code, req.err.err_msg);
     }
-    if (dispatcher.run(req)) |result_json| {
+    if (dispatcher.run(alloc, req)) |result_json| {
         defer alloc.free(result_json);
-        return responseOk(req, result_json);
+        return responseOk(alloc, req, result_json);
     } else |dispatch_err| {
         // Return any dispatching error as an error response.
-        const code, const msg = dispatcher.errorToMsg(dispatch_err);
-        return responseError(req.id, code, msg);
+        const code: ErrorCode, const msg: []const u8 = dispatcher.getErrorCodeMsg(dispatch_err);
+        return responseError(alloc, req.id, code, msg);
     }
 }
 
@@ -40,7 +40,7 @@ pub fn response(alloc: Allocator, req: RpcRequest, dispatcher: anytype) ![]const
 /// Caller needs to call self.alloc.free() on the returned message free the memory.
 fn responseOk(alloc: Allocator, req: RpcRequest, result_json: []const u8) ![]const u8 {
     if (req.hasError()) {
-        return responseError(req.id, @intFromEnum(req.err.code), req.err.err_msg);
+        return responseError(alloc, req.id, req.err.code, req.err.err_msg);
     }
     return switch (req.id) {
         .num => allocPrint(alloc,
@@ -55,22 +55,17 @@ fn responseOk(alloc: Allocator, req: RpcRequest, result_json: []const u8) ![]con
 
 /// Build an Error message.
 /// Caller needs to call self.alloc.free() on the returned message free the memory.
-fn responseError(alloc: Allocator, id: RpcId, code: i64, msg: []const u8) ![]const u8 {
+fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) ![]const u8 {
+    const code: i64 = @intFromEnum(errCode);
     return switch (id) {
         .num => allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0",  "id": {},
-            \\   "error": {{ "code": {}, "message": "{s}" }}
-            \\}}
+            \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}" }} }}
             , .{id.num, code, msg}),
         .str => allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0",  "id": "{s}",
-            \\   "error": {{ "code": {}, "message": "{s}" }}
-            \\}}
+            \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}" }} }}
             , .{id.str, code, msg}),
         .null => allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0",  "id": null,
-            \\   "error": {{ "code": {}, "message": "{s}" }}
-            \\}}
+            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
             , .{code, msg}),
     };
 }

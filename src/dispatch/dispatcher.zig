@@ -78,7 +78,7 @@ pub const Registry = struct {
             return self.response(req, result_json);
         } else |dispatch_err| {
             // Return any dispatching error as an error response.
-            const code, const msg = errorToMsg(dispatch_err);
+            const code, const msg = getErrorCodeMsg(dispatch_err);
             return self.responseError(req.id, code, msg);
         }
     }
@@ -287,7 +287,7 @@ fn paramLen(handler: HandlerFn) ?usize {
     };
 }
 
-fn errorToMsg(err: anyerror) struct {i32, []const u8} {
+fn getErrorCodeMsg(err: anyerror) struct {i32, []const u8} {
     return switch (err) {
         DispatchErrors.MethodNotFound => .{
             @intFromEnum(ErrorCode.MethodNotFound),
