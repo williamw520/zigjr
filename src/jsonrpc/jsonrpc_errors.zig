@@ -23,6 +23,9 @@ pub const JrErrors = error {
     NotArray,
     NotObject,
     NotificationHasNoResponse,
+    NotResultResponse,
+    NotErrResponse,
+    InvalidResponse,
 };
 
 

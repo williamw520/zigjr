@@ -27,7 +27,7 @@ const JrErrors = jsonrpc_errors.JrErrors;
 pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
     const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
-        const req = RpcRequest.initErr(RpcError.initParseError(parse_err));
+        const req = RpcRequest.initErr(ReqError.initParseError(parse_err));
         return .{
             .alloc = alloc,
             .parsed = null,
@@ -51,7 +51,7 @@ pub fn parseReader(alloc: Allocator, json_reader: anytype) RpcResult {
     // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
     // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
     const parsed = rp.next() catch |parse_err| {
-        const req = RpcRequest.initErr(RpcError.initParseError(parse_err));
+        const req = RpcRequest.initErr(ReqError.initParseError(parse_err));
         return .{
             .alloc = alloc,
             .parsed = null,
@@ -143,9 +143,9 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .null = {} },    // default for optional field.
-    err:        RpcError = .{},             // parse error and validation error.
+    err:        ReqError = .{},             // parse error and validation error.
 
-    fn initErr(err: RpcError) Self {
+    fn initErr(err: ReqError) Self {
         return .{ .err = err };
     }
 
@@ -158,7 +158,7 @@ pub const RpcRequest = struct {
             .method  = body.method,
             .params  = if (body.params == .value) body.params.value else Value { .null = {} },
             .id      = body.id,
-            .err     = RpcError.validateBody(body) orelse .{},
+            .err     = ReqError.validateBody(body) orelse .{},
         };
     }
 
@@ -203,7 +203,35 @@ const RpcRequestBody = struct {
     id:         RpcId = .{ .null = {} },        // default for optional field.
 };
 
-const RpcError = struct {
+const RpcParamsBody = union(enum) {
+    nul:        void,
+    value:      Value,
+    invalid:    void,
+
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParamsBody {
+        return switch (try source.peekNextTokenType()) {
+            .object_begin   => .{ .value    = try innerParse(Value, alloc, source, options) },
+            .array_begin    => .{ .value    = try innerParse(Value, alloc, source, options) },
+            else            => .{ .invalid  = {} },
+        };
+    }
+};
+
+pub const RpcId = union(enum) {
+    null:       void,
+    num:        i64,
+    str:        []const u8,
+
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
+        return switch (try source.peekNextTokenType()) {
+            .number => .{ .num = try innerParse(i64, alloc, source, options) },
+            .string => .{ .str = try innerParse([]const u8, alloc, source, options) },
+            else => error.UnexpectedToken,
+        };
+    }
+};
+
+const ReqError = struct {
     const Self = @This();
 
     code:       ErrorCode = ErrorCode.None,
@@ -248,35 +276,7 @@ const RpcError = struct {
                 .req_id = body.id,
             };
         }
-        return null;    // return null RpcError for validation passed.
-    }
-};
-
-const RpcParamsBody = union(enum) {
-    nul:        void,
-    value:      Value,
-    invalid:    void,
-
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParamsBody {
-        return switch (try source.peekNextTokenType()) {
-            .object_begin   => .{ .value    = try innerParse(Value, alloc, source, options) },
-            .array_begin    => .{ .value    = try innerParse(Value, alloc, source, options) },
-            else            => .{ .invalid  = {} },
-        };
-    }
-};
-
-pub const RpcId = union(enum) {
-    null:       void,
-    num:        i64,
-    str:        []const u8,
-
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
-        return switch (try source.peekNextTokenType()) {
-            .number => .{ .num = try innerParse(i64, alloc, source, options) },
-            .string => .{ .str = try innerParse([]const u8, alloc, source, options) },
-            else => error.UnexpectedToken,
-        };
+        return null;    // return null ReqError for validation passed.
     }
 };
 

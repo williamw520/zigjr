@@ -9,6 +9,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
+const Value = std.json.Value;
 
 const parser = @import("parser.zig");
 const RpcRequest = parser.RpcRequest;
@@ -56,7 +57,7 @@ fn responseOk(alloc: Allocator, req: RpcRequest, result_json: []const u8) ![]con
 /// Build an Error message.
 /// Caller needs to call self.alloc.free() on the returned message free the memory.
 fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) ![]const u8 {
-    const code: i64 = @intFromEnum(errCode);
+    const code: i32 = @intFromEnum(errCode);
     return switch (id) {
         .num => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}" }} }}
@@ -67,6 +68,56 @@ fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u
         .null => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
             , .{code, msg}),
+    };
+}
+
+
+pub const RpcResponse = struct {
+    const Self = @This();
+    alloc:      Allocator,
+    parsed:     ?std.json.Parsed(RpcResponseBody) = null,
+    body:       RpcResponseBody,
+
+    pub fn deinit(self: *Self) void {
+        if (self.parsed) |parsed| parsed.deinit();
+    }
+
+    pub fn hasResult(self: *Self) bool {
+        return self.body.result != .null;
+    }
+
+    pub fn isErr(self: *Self) bool {
+        return self.body.@"error".code != 0;
+    }
+
+    pub fn result(self: *Self) !Value {
+        return if (self.hasResult()) self.body.result else JrErrors.NotResultResponse;
+    }
+
+    pub fn err(self: *Self) !RpcResponseErr {
+        return if (self.isErr()) self.body.@"error" else JrErrors.NotErrResponse;
+    }
+};
+
+pub const RpcResponseBody = struct {
+    jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
+    id:         RpcId = .{ .null = {} },    // default for optional field.
+    result:     Value = .{ .null = {} },    // default for optional field.
+    @"error":   RpcResponseErr = .{},       // parse error and validation error.
+};
+
+pub const RpcResponseErr = struct {
+    code:       i32 = 0,
+    message:    []const u8 = "",
+    data:       ?Value = null,
+};
+
+pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
+    const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
+    return .{
+        .alloc = alloc,
+        .parsed = parsed,
+        .body = parsed.value,
     };
 }
 

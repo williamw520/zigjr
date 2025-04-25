@@ -44,15 +44,15 @@ test "Response to a request of hello method" {
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
         defer result.deinit();
-        const req = try result.request();
-        const res = try zigjr.response(alloc, req, HelloDispatcher);
-        defer alloc.free(res);
-        // std.debug.print("response: {s}\n", .{res});
+        const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
 
-        const parsed = try std.json.parseFromSlice(Value, alloc, res, .{});
-        defer parsed.deinit();
-        try testing.expectEqualSlices(u8, parsed.value.object.get("result").?.string, "hello back");
-        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        // std.debug.print("resResult: {any}\n", .{(try res.result())});
+        try testing.expectEqualSlices(u8, (try res.result()).string, "hello back");
+        try testing.expectEqual(res.body.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
@@ -64,15 +64,15 @@ test "Response to a request of unknown method, expect error" {
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
         );
         defer result.deinit();
-        const req = try result.request();
-        const res = try zigjr.response(alloc, req, HelloDispatcher);
-        defer alloc.free(res);
-        // std.debug.print("response: {s}\n", .{res});
+        const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
 
-        const parsed = try std.json.parseFromSlice(Value, alloc, res, .{});
-        defer parsed.deinit();
-        try testing.expectEqual(parsed.value.object.get("error").?.object.get("code").?.integer, @intFromEnum(ErrorCode.MethodNotFound));
-        try testing.expectEqual(parsed.value.object.get("id").?.integer, 1);
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        // std.debug.print("resResult: {any}\n", .{(try resResult.err())});
+        try testing.expectEqual((try res.err()).code, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqual(res.body.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
