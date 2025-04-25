@@ -205,6 +205,7 @@ test "Parse valid request, with no params, with no id" {
         );
         defer result.deinit();
         const req = try result.request();
+        // std.debug.print("Request: {any}\n", .{req});
         try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
         try testing.expect(result.rpc_msg == .request);
         switch (result.rpc_msg) {
@@ -449,7 +450,7 @@ test "Parse non-object nor non-array params '1234', expect error." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.ParseError);
+        try testing.expect((try result.request()).err.code == ErrorCode.InvalidParams);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -461,7 +462,8 @@ test "Parse non-object nor non-array params 'abcd', expect error." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5d"}
         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        // std.debug.print("Request: {any}\n", .{try result.request()});
+        try testing.expect((try result.request()).err.code == ErrorCode.InvalidParams);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }

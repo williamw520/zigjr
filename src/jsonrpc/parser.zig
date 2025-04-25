@@ -27,7 +27,8 @@ const JrErrors = jsonrpc_errors.JrErrors;
 pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
     const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
-        const req = RpcRequest.initErr(ReqError.initParseError(parse_err));
+        var req = RpcRequest{};
+        req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
@@ -51,7 +52,8 @@ pub fn parseReader(alloc: Allocator, json_reader: anytype) RpcResult {
     // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
     // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
     const parsed = rp.next() catch |parse_err| {
-        const req = RpcRequest.initErr(ReqError.initParseError(parse_err));
+        var req = RpcRequest{};
+        req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
@@ -125,11 +127,15 @@ pub const RpcMessage = union(enum) {
     // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
         return switch (try source.peekNextTokenType()) {
-            .object_begin => .{
-                .request = try innerParse(RpcRequest, alloc, source, options)
+            .object_begin => {
+                var req = try innerParse(RpcRequest, alloc, source, options);
+                req.validate();
+                return .{ .request = req };
             },
-            .array_begin => .{
-                .batch   = try innerParse([]RpcRequest, alloc, source, options)
+            .array_begin => {
+                const batch = try innerParse([]RpcRequest, alloc, source, options);
+                for (batch)|*req| req.validate();
+                return .{ .batch = batch };
             },
             else => error.UnexpectedToken,  // there're only two cases; any others are error.
         };
@@ -143,23 +149,14 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .null = {} },    // default for optional field.
-    err:        ReqError = .{},             // parse error and validation error.
+    err:        ReqError = .{},             // attach parsing error and validation error here.
 
-    fn initErr(err: ReqError) Self {
-        return .{ .err = err };
+    fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
+        self.err = ReqError.fromParseError(parse_err);
     }
 
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !Self {
-        // Parse errors are bubbled up to the caller of parser to be handled.
-        const body = try innerParse(RpcRequestBody, alloc, source, options);
-        // At this point, the body has passed parsing.  Copy and validate its content.
-        return .{
-            .jsonrpc = body.jsonrpc,
-            .method  = body.method,
-            .params  = if (body.params == .value) body.params.value else Value { .null = {} },
-            .id      = body.id,
-            .err     = ReqError.validateBody(body) orelse .{},
-        };
+    fn validate(self: *Self) void {
+        self.err = ReqError.validateRequest(self) orelse .{};
     }
 
     pub fn hasParams(self: Self) bool {
@@ -196,27 +193,6 @@ pub const RpcRequest = struct {
     
 };
 
-const RpcRequestBody = struct {
-    jsonrpc:    [3]u8 = .{ '0', '.', '0' },     // default to fail validation.
-    method:     []u8 = "",
-    params:     RpcParamsBody = .{ .nul = {} }, // default for optional field.
-    id:         RpcId = .{ .null = {} },        // default for optional field.
-};
-
-const RpcParamsBody = union(enum) {
-    nul:        void,
-    value:      Value,
-    invalid:    void,
-
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcParamsBody {
-        return switch (try source.peekNextTokenType()) {
-            .object_begin   => .{ .value    = try innerParse(Value, alloc, source, options) },
-            .array_begin    => .{ .value    = try innerParse(Value, alloc, source, options) },
-            else            => .{ .invalid  = {} },
-        };
-    }
-};
-
 pub const RpcId = union(enum) {
     null:       void,
     num:        i64,
@@ -240,7 +216,7 @@ const ReqError = struct {
 
     // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
     // The memory is freed all together in Parsed(T).deinit().
-    fn initParseError(parse_err: ParseError(Scanner)) Self {
+    fn fromParseError(parse_err: ParseError(Scanner)) Self {
         return switch (parse_err) {
             error.MissingField, error.UnknownField, error.DuplicateField,
             error.LengthMismatch, error.UnexpectedEndOfInput =>
@@ -252,9 +228,7 @@ const ReqError = struct {
         };
     }
 
-    // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
-    // The memory is freed all together in Parsed(T).deinit().
-    fn validateBody(body: RpcRequestBody) ?Self {
+    fn validateRequest(body: *RpcRequest) ?Self {
         if (!std.mem.eql(u8, &body.jsonrpc, "2.0")) {
             return .{
                 .code = ErrorCode.InvalidRequest,
@@ -262,7 +236,7 @@ const ReqError = struct {
                 .req_id = body.id,
             };
         }
-        if (body.params == .invalid) {
+        if (body.params != .array and body.params != .object and body.params != .null) {
             return .{
                 .code = ErrorCode.InvalidParams,
                 .err_msg = "'Params' must be an array, an object, or not defined.",
@@ -278,6 +252,7 @@ const ReqError = struct {
         }
         return null;    // return null ReqError for validation passed.
     }
+    
 };
 
 
