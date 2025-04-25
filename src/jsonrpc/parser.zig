@@ -26,20 +26,19 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
     const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
-        // std.debug.print("parse_err: {any}\n", .{parse_err});
         // Create an empty request with the error set so callers can have uniform request handling.
         var req = RpcRequest{};
         req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpc_msg = RpcMessage { .request = req },
+            .rpcmsg = RpcMessage { .request = req },
         };
     };
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .rpc_msg = parsed.value,
+        .rpcmsg = parsed.value,
     };
 }
 
@@ -58,13 +57,13 @@ pub fn parseReader(alloc: Allocator, json_reader: anytype) RpcResult {
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpc_msg = RpcMessage { .request = req },
+            .rpcmsg = RpcMessage { .request = req },
         };
     };
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .rpc_msg = parsed.value,
+        .rpcmsg = parsed.value,
     };
 }
 
@@ -95,29 +94,29 @@ pub const RpcResult = struct {
     const Self = @This();
     alloc:      Allocator,
     parsed:     ?std.json.Parsed(RpcMessage) = null,
-    rpc_msg:    RpcMessage,
+    rpcmsg:    RpcMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
     pub fn isRequest(self: *Self) bool {
-        return self.rpc_msg == .request;
+        return self.rpcmsg == .request;
     }
 
     pub fn isBatch(self: *Self) bool {
-        return self.rpc_msg == .batch;
+        return self.rpcmsg == .batch;
     }
 
     /// Shortcut to access the inner tagged union invariant request.
-    /// Can also access via switch(rpc_msg) .request => 
+    /// Can also access via switch(rpcmsg) .request => 
     pub fn request(self: *Self) !RpcRequest {
-        return if (self.isRequest()) self.rpc_msg.request else JrErrors.NotSingleRpcRequest;
+        return if (self.isRequest()) self.rpcmsg.request else JrErrors.NotSingleRpcRequest;
     }
 
     /// Shortcut to access the inner tagged union invariant batch.
     pub fn batch(self: *Self) ![]const RpcRequest {
-        return if (self.isBatch()) self.rpc_msg.batch else JrErrors.NotBatchRpcRequest;
+        return if (self.isBatch()) self.rpcmsg.batch else JrErrors.NotBatchRpcRequest;
     }
 };
 

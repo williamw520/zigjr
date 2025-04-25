@@ -25,9 +25,9 @@ test "Parsing valid request, single integer param, integer id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -61,9 +61,9 @@ test "Parsing valid request, single string param, string id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -97,9 +97,9 @@ test "Parsing valid request, tw0 integer params, integer id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -135,9 +135,9 @@ test "Parsing valid request, object params, integer id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -171,9 +171,9 @@ test "Parse valid request, with 0 params, with no id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -206,9 +206,9 @@ test "Parse valid request, with no params, with no id" {
         defer result.deinit();
         const req = try result.request();
         // std.debug.print("Request: {any}\n", .{req});
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -498,9 +498,9 @@ test "Parsing valid request with parseReader, single integer param, integer id" 
         var result = zigjr.parseReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -536,9 +536,9 @@ test "Parsing valid request with parseReader, single string param, string id" {
         var result = zigjr.parseReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpc_msg) == RpcMessage);
-        try testing.expect(result.rpc_msg == .request);
-        switch (result.rpc_msg) {
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(result.rpcmsg == .request);
+        switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
