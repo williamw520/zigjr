@@ -24,7 +24,10 @@ pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .body = parsed.value,
+        .jsonrpc = parsed.value.jsonrpc,
+        .id = parsed.value.id,
+        .result = parsed.value.result,
+        .err = parsed.value.@"error",
     };
 }
 
@@ -32,26 +35,21 @@ pub const RpcResponse = struct {
     const Self = @This();
     alloc:      Allocator,
     parsed:     ?std.json.Parsed(RpcResponseBody) = null,
-    body:       RpcResponseBody,
+    jsonrpc:    [3]u8,
+    id:         RpcId,
+    result:     Value,
+    err:        RpcResponseErr,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
     pub fn hasResult(self: *Self) bool {
-        return self.body.result != .null;
+        return self.result != .null;
     }
 
-    pub fn isErr(self: *Self) bool {
-        return self.body.@"error".code != 0;
-    }
-
-    pub fn result(self: *Self) !Value {
-        return if (self.hasResult()) self.body.result else JrErrors.NotResultResponse;
-    }
-
-    pub fn err(self: *Self) !RpcResponseErr {
-        return if (self.isErr()) self.body.@"error" else JrErrors.NotErrResponse;
+    pub fn hasErr(self: *Self) bool {
+        return self.err.code != 0;
     }
 };
 

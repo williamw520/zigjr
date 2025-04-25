@@ -39,6 +39,7 @@ const HelloDispatcher = struct {
 const IntCalcDispatcher = struct {
     pub fn run(alloc: Allocator, req: RpcRequest) anyerror![]const u8 {
         const params = try req.arrayParams();
+        if (params.items.len != 2) return DispatchErrors.InvalidParams;
         const a = params.items[0].integer;
         const b = params.items[1].integer;
         if (std.mem.eql(u8, req.method, "add")) {
@@ -75,15 +76,16 @@ test "Response to a request of hello method" {
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
         defer result.deinit();
+
         const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
         defer alloc.free(response);
         // std.debug.print("response: {s}\n", .{response});
 
         var res = try zigjr.parseResponse(alloc, response);
         res.deinit();
-        // std.debug.print("resResult: {any}\n", .{(try res.result())});
-        try testing.expectEqualSlices(u8, (try res.result()).string, "hello back");
-        try testing.expectEqual(res.body.id.num, 1);
+        // std.debug.print("resResult: {any}\n", .{res.result});
+        try testing.expectEqualSlices(u8, res.result.string, "hello back");
+        try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
@@ -95,15 +97,16 @@ test "Response to a request of unknown method, expect error" {
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
         );
         defer result.deinit();
+
         const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
         defer alloc.free(response);
         // std.debug.print("response: {s}\n", .{response});
 
         var res = try zigjr.parseResponse(alloc, response);
         res.deinit();
-        // std.debug.print("resResult: {any}\n", .{(try resResult.err())});
-        try testing.expectEqual((try res.err()).code, @intFromEnum(ErrorCode.MethodNotFound));
-        try testing.expectEqual(res.body.id.num, 1);
+        try testing.expect(res.hasErr());
+        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
@@ -121,12 +124,91 @@ test "Response to a request of integer add" {
 
         var res = try zigjr.parseResponse(alloc, response);
         res.deinit();
-        try testing.expectEqual((try res.result()).integer, 3);
-        try testing.expectEqual(res.body.id.num, 1);
+        try testing.expectEqual(res.result.integer, 3);
+        try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
+test "Response to a request of integer sub" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
+
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        try testing.expectEqual(res.result.integer, -1);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of integer multiply" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
+
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        try testing.expectEqual(res.result.integer, 20);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of integer divide" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
+
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        try testing.expectEqual(res.result.integer, 3);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of integer add with missing parameter, expect error" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "add", "params": [1], "id": 1}
+        );
+        defer result.deinit();
+        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
+        defer alloc.free(response);
+        // std.debug.print("response: {s}\n", .{response});
+
+        var res = try zigjr.parseResponse(alloc, response);
+        res.deinit();
+        try testing.expect(res.hasErr());
+        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InternalError));
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
 
 
 
@@ -161,7 +243,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect(std.mem.eql(u8, (try req.arrayParams()).items[0].string, "FUN1"));
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(std.mem.eql(u8, req.id.str, "1"));
         try testing.expect(req.hasError() == false);
     }
@@ -199,7 +281,7 @@ test "Parsing valid request, tw0 integer params, integer id" {
         try testing.expect((try req.arrayParams()).items.len == 2);
         try testing.expect((try req.arrayParams()).items[0].integer == 42);
         try testing.expect((try req.arrayParams()).items[1].integer == 22);
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(req.id.num == 2);
         try testing.expect(req.hasError() == false);
     }
@@ -235,7 +317,7 @@ test "Parsing valid request, object params, integer id" {
         try testing.expect(req.objectParams() != JrErrors.NotObject);
         try testing.expect(std.mem.eql(u8, (try req.objectParams()).get("name").?.string, "foobar"));
         try testing.expect((try req.objectParams()).get("weight").?.integer == 150);
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(req.id.num == 3);
         try testing.expect(req.hasError() == false);
     }
@@ -269,7 +351,7 @@ test "Parse valid request, with 0 params, with no id" {
         try testing.expect(req.arrayParams()  != JrErrors.NotArray);
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 0);
-        try testing.expect(!req.hasValidId());
+        try testing.expect(!req.id.isValid());
         try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
@@ -301,7 +383,7 @@ test "Parse valid request, with no params, with no id" {
         try testing.expect(!req.hasObjectParams());
         try testing.expect(req.arrayParams()  == JrErrors.NotArray);
         try testing.expect(req.objectParams() == JrErrors.NotObject);
-        try testing.expect(!req.hasValidId());
+        try testing.expect(!req.id.isValid());
         try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
@@ -316,7 +398,7 @@ test "Parse valid request, with no params, with string id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(std.mem.eql(u8, req.id.str, "5a"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -334,8 +416,8 @@ test "Parse valid request batch, with no params, with string id" {
         try testing.expect(!result.isRequest());
         const reqs = try result.batch();
         try testing.expect(reqs.len == 2);
-        try testing.expect(reqs[0].hasValidId());
-        try testing.expect(reqs[1].hasValidId());
+        try testing.expect(reqs[0].id.isValid());
+        try testing.expect(reqs[1].id.isValid());
         try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
         try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
     }
@@ -578,7 +660,7 @@ test "Parsing valid request with parseRequestReader, single integer param, integ
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect((try req.arrayParams()).items[0].integer == 42);
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(req.id.num == 1);
         try testing.expect(req.hasError() == false);
     }
@@ -616,7 +698,7 @@ test "Parsing valid request with parseRequestReader, single string param, string
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect(std.mem.eql(u8, (try req.arrayParams()).items[0].string, "FUN1"));
-        try testing.expect(req.hasValidId());
+        try testing.expect(req.id.isValid());
         try testing.expect(std.mem.eql(u8, req.id.str, "1"));
         try testing.expect(req.hasError() == false);
     }

@@ -179,10 +179,6 @@ pub const RpcRequest = struct {
         return if (self.params == .object) self.params.object else JrErrors.NotObject;
     }
 
-    pub fn hasValidId(self: Self) bool {
-        return self.id == .num or self.id == .str;
-    }
-
     pub fn hasError(self: Self) bool {
         return self.err.code != ErrorCode.None;
     }
@@ -207,6 +203,10 @@ pub const RpcId = union(enum) {
             .string     => .{ .str = value.string   },
             else        => error.UnexpectedToken,
         };
+    }
+
+    pub fn isValid(self: @This()) bool {
+        return self == .num or self == .str;
     }
 };
 
