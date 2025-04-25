@@ -26,6 +26,7 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 pub fn parseJson(alloc: Allocator, json_str: []const u8) RpcResult {
     const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
+        // std.debug.print("parse_err: {any}\n", .{parse_err});
         // Create an empty request with the error set so callers can have uniform request handling.
         var req = RpcRequest{};
         req.setParseErr(parse_err);
@@ -148,7 +149,7 @@ pub const RpcRequest = struct {
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
-    id:         RpcId = .{ .null = {} },    // default for optional field.
+    id:         RpcId = .{ .none = {} },    // default for optional field.
     err:        ReqError = .{},             // attach parsing error and validation error here.
 
     fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
@@ -179,8 +180,8 @@ pub const RpcRequest = struct {
         return if (self.params == .object) self.params.object else JrErrors.NotObject;
     }
 
-    pub fn hasId(self: Self) bool {
-        return self.id != .null;
+    pub fn hasValidId(self: Self) bool {
+        return self.id == .num or self.id == .str;
     }
 
     pub fn hasError(self: Self) bool {
@@ -194,15 +195,18 @@ pub const RpcRequest = struct {
 };
 
 pub const RpcId = union(enum) {
-    null:       void,
+    none:       void,                   // id is missing (not set at all).
+    null:       void,                   // id is set to null.
     num:        i64,
     str:        []const u8,
 
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
-        return switch (try source.peekNextTokenType()) {
-            .number => .{ .num = try innerParse(i64, alloc, source, options) },
-            .string => .{ .str = try innerParse([]const u8, alloc, source, options) },
-            else => error.UnexpectedToken,
+        const value = try innerParse(Value, alloc, source, options);
+        return switch (value) {
+            .null       => .{ .null = value.null    },
+            .integer    => .{ .num = value.integer  },
+            .string     => .{ .str = value.string   },
+            else        => error.UnexpectedToken,
         };
     }
 };

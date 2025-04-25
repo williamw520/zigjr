@@ -164,6 +164,7 @@ pub const Registry = struct {
             .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
                                    , .{result_json, req.id.str}),
             .null => JrErrors.NotificationHasNoResponse,
+            .none => JrErrors.NotificationHasNoResponse,
         };
     }
 
@@ -182,6 +183,11 @@ pub const Registry = struct {
                                \\}}
                                , .{id.str, code, msg}),
             .null => allocPrint(self.alloc,
+                               \\{{ "jsonrpc": "2.0",  "id": null,
+                               \\   "error": {{ "code": {}, "message": "{s}" }}
+                               \\}}
+                               , .{code, msg}),
+            .none => allocPrint(self.alloc,
                                \\{{ "jsonrpc": "2.0",  "id": null,
                                \\   "error": {{ "code": {}, "message": "{s}" }}
                                \\}}

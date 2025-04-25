@@ -111,7 +111,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect(std.mem.eql(u8, (try req.arrayParams()).items[0].string, "FUN1"));
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(std.mem.eql(u8, req.id.str, "1"));
         try testing.expect(req.hasError() == false);
     }
@@ -149,7 +149,7 @@ test "Parsing valid request, tw0 integer params, integer id" {
         try testing.expect((try req.arrayParams()).items.len == 2);
         try testing.expect((try req.arrayParams()).items[0].integer == 42);
         try testing.expect((try req.arrayParams()).items[1].integer == 22);
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(req.id.num == 2);
         try testing.expect(req.hasError() == false);
     }
@@ -185,7 +185,7 @@ test "Parsing valid request, object params, integer id" {
         try testing.expect(req.objectParams() != JrErrors.NotObject);
         try testing.expect(std.mem.eql(u8, (try req.objectParams()).get("name").?.string, "foobar"));
         try testing.expect((try req.objectParams()).get("weight").?.integer == 150);
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(req.id.num == 3);
         try testing.expect(req.hasError() == false);
     }
@@ -219,8 +219,8 @@ test "Parse valid request, with 0 params, with no id" {
         try testing.expect(req.arrayParams()  != JrErrors.NotArray);
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 0);
-        try testing.expect(!req.hasId());
-        try testing.expect(req.id == zigjr.RpcId.null);
+        try testing.expect(!req.hasValidId());
+        try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -251,8 +251,8 @@ test "Parse valid request, with no params, with no id" {
         try testing.expect(!req.hasObjectParams());
         try testing.expect(req.arrayParams()  == JrErrors.NotArray);
         try testing.expect(req.objectParams() == JrErrors.NotObject);
-        try testing.expect(!req.hasId());
-        try testing.expect(req.id == zigjr.RpcId.null);
+        try testing.expect(!req.hasValidId());
+        try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -266,7 +266,7 @@ test "Parse valid request, with no params, with string id" {
         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(std.mem.eql(u8, req.id.str, "5a"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -284,8 +284,8 @@ test "Parse valid request batch, with no params, with string id" {
         try testing.expect(!result.isRequest());
         const reqs = try result.batch();
         try testing.expect(reqs.len == 2);
-        try testing.expect(reqs[0].hasId());
-        try testing.expect(reqs[1].hasId());
+        try testing.expect(reqs[0].hasValidId());
+        try testing.expect(reqs[1].hasValidId());
         try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
         try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
     }
@@ -528,7 +528,7 @@ test "Parsing valid request with parseReader, single integer param, integer id" 
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect((try req.arrayParams()).items[0].integer == 42);
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(req.id.num == 1);
         try testing.expect(req.hasError() == false);
     }
@@ -566,7 +566,7 @@ test "Parsing valid request with parseReader, single string param, string id" {
         try testing.expect(req.objectParams() == JrErrors.NotObject);
         try testing.expect((try req.arrayParams()).items.len == 1);
         try testing.expect(std.mem.eql(u8, (try req.arrayParams()).items[0].string, "FUN1"));
-        try testing.expect(req.hasId());
+        try testing.expect(req.hasValidId());
         try testing.expect(std.mem.eql(u8, req.id.str, "1"));
         try testing.expect(req.hasError() == false);
     }

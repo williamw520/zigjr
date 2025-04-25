@@ -51,6 +51,7 @@ fn responseOk(alloc: Allocator, req: RpcRequest, result_json: []const u8) ![]con
             \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
             , .{result_json, req.id.str}),
         .null => JrErrors.NotificationHasNoResponse,
+        .none => JrErrors.NotificationHasNoResponse,
     };
 }
 
@@ -66,6 +67,9 @@ fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u
             \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}" }} }}
             , .{id.str, code, msg}),
         .null => allocPrint(alloc,
+            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
+            , .{code, msg}),
+        .none => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
             , .{code, msg}),
     };
