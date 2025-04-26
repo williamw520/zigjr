@@ -22,7 +22,7 @@ pub const JrErrors = error {
     NotBatchRpcRequest,
     NotArray,
     NotObject,
-    NotificationHasNoResponse,
+    MissingIdForResponse,
     NotResultResponse,
     NotErrResponse,
     InvalidResponse,

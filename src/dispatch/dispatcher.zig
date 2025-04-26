@@ -163,8 +163,8 @@ pub const Registry = struct {
                                    , .{result_json, req.id.num}),
             .str => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
                                    , .{result_json, req.id.str}),
-            .null => JrErrors.NotificationHasNoResponse,
-            .none => JrErrors.NotificationHasNoResponse,
+            .null => JrErrors.MissingIdForResponse,
+            .none => JrErrors.MissingIdForResponse,
         };
     }
 
