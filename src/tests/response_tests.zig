@@ -7,10 +7,12 @@ const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
+const stringifyAlloc = std.json.stringifyAlloc;
 
 const zigjr = @import("../zigjr.zig");
 const RpcMessage = zigjr.RpcMessage;
 const RpcRequest = zigjr.RpcRequest;
+const DispatchResult = zigjr.DispatchResult;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 const DispatchErrors = zigjr.DispatchErrors;
@@ -20,46 +22,41 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 const HelloDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) anyerror![]const u8 {
+    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
-            return std.json.stringifyAlloc(alloc, "hello back", .{});
+            return .{ .result = try stringifyAlloc(alloc, "hello back", .{}) };
         } else {
-            return DispatchErrors.MethodNotFound;
+            return .{
+                .err = .{
+                    .code = ErrorCode.MethodNotFound,
+                    .msg = "Method not found.",
+                }
+            };
         }
-    }
-
-    pub fn getErrorCodeMsg(err: anyerror) struct {ErrorCode, []const u8} {
-        return switch (err) {
-            DispatchErrors.MethodNotFound => .{ ErrorCode.MethodNotFound, "Method not found." },
-            else => .{ ErrorCode.InternalError, @errorName(err) }
-        };
     }
 };
 
 const IntCalcDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) anyerror![]const u8 {
+    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
         const params = try req.arrayParams();
-        if (params.items.len != 2) return DispatchErrors.InvalidParams;
+        if (params.items.len != 2) return .{
+            .err = .{ .code = ErrorCode.InvalidParams }
+        };
         const a = params.items[0].integer;
         const b = params.items[1].integer;
+        var result: i64 = 0;
         if (std.mem.eql(u8, req.method, "add")) {
-            return std.json.stringifyAlloc(alloc, add(a, b), .{});
+            result = add(a, b);
         } else if (std.mem.eql(u8, req.method, "sub")) {
-            return std.json.stringifyAlloc(alloc, sub(a, b), .{});
+            result = sub(a, b);
         } else if (std.mem.eql(u8, req.method, "multiply")) {
-            return std.json.stringifyAlloc(alloc, multiply(a, b), .{});
+            result = multiply(a, b);
         } else if (std.mem.eql(u8, req.method, "divide")) {
-            return std.json.stringifyAlloc(alloc, divide(a, b), .{});
+            result = divide(a, b);
         } else {
-            return DispatchErrors.MethodNotFound;
+            return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
-    }
-
-    pub fn getErrorCodeMsg(err: anyerror) struct {ErrorCode, []const u8} {
-        return switch (err) {
-            DispatchErrors.MethodNotFound => .{ ErrorCode.MethodNotFound, "Method not found." },
-            else => .{ ErrorCode.InternalError, @errorName(err) }
-        };
+        return .{ .result = try stringifyAlloc(alloc, result, .{}) };
     }
 
     fn add(a: i64, b: i64) i64 { return a + b; }
@@ -77,11 +74,12 @@ test "Response to a request of hello method" {
         );
         defer result.deinit();
 
-        const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), HelloDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("response: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         // std.debug.print("resResult: {any}\n", .{res.result});
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
@@ -98,11 +96,12 @@ test "Response to a request of unknown method, expect error" {
         );
         defer result.deinit();
 
-        const response = try zigjr.response(alloc, try result.request(), HelloDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), HelloDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.MethodNotFound));
@@ -118,11 +117,12 @@ test "Response to a request of integer add" {
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
         );
         defer result.deinit();
-        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), IntCalcDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
@@ -138,11 +138,12 @@ test "Response to a request of integer sub" {
         );
         defer result.deinit();
 
-        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), IntCalcDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expectEqual(res.result.integer, -1);
         try testing.expectEqual(res.id.num, 1);
@@ -158,11 +159,12 @@ test "Response to a request of integer multiply" {
         );
         defer result.deinit();
 
-        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), IntCalcDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expectEqual(res.result.integer, 20);
         try testing.expectEqual(res.id.num, 1);
@@ -178,11 +180,12 @@ test "Response to a request of integer divide" {
         );
         defer result.deinit();
 
-        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), IntCalcDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
@@ -197,14 +200,15 @@ test "Response to a request of integer add with missing parameter, expect error"
             \\{"jsonrpc": "2.0", "method": "add", "params": [1], "id": 1}
         );
         defer result.deinit();
-        const response = try zigjr.response(alloc, try result.request(), IntCalcDispatcher);
-        defer alloc.free(response);
-        // std.debug.print("response: {s}\n", .{response});
+        const response = try zigjr.respond(alloc, try result.request(), IntCalcDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res = try zigjr.parseResponse(alloc, response);
+        var res = try zigjr.parseResponse(alloc, res_json);
         res.deinit();
         try testing.expect(res.hasErr());
-        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InternalError));
+        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InvalidParams));
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});

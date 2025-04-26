@@ -19,20 +19,46 @@ const ErrorCode = jsonrpc_errors.ErrorCode;
 const JrErrors = jsonrpc_errors.JrErrors;
 
 
+/// Return value from dispatcher.run() expected by respond() below.
+/// The result and data json, if set, will be freed by respond().  It's best that
+/// they're produced by std.json.stringifyAlloc() using the passed in allocator to run().
+pub const DispatchResult = union(enum) {
+    none:       void,               // No result, for notification call.
+    result:     []const u8,         // Result json string.  Will be freed by respond().
+    err:        struct {
+        code:   ErrorCode,
+        msg:    []const u8 = "",    // Constant error message.  Will NOT be freed by respond().
+        data:   ?[]const u8 = null, // Error data json string.  Will be freed by respond().
+    },
+};
+
 /// Run a handler on the request and generate a Response JSON string.
-/// Call freeResponse() to free the string.
-pub fn response(alloc: Allocator, req: RpcRequest, dispatcher: anytype) ![]const u8 {
+/// Call freeRespond() to free the string.
+pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
     if (req.hasError()) {
         // For parsing or validation error on the request, return an error response.
-        return responseError(alloc, req.id, req.err.code, req.err.err_msg);
+        return try responseError(alloc, req.id, req.err.code, req.err.err_msg);
     }
-    if (dispatcher.run(alloc, req)) |result_json| {
-        defer alloc.free(result_json);
-        return responseOk(alloc, req, result_json);
-    } else |dispatch_err| {
-        // Return any dispatching error as an error response.
-        const code: ErrorCode, const msg: []const u8 = dispatcher.getErrorCodeMsg(dispatch_err);
-        return responseError(alloc, req.id, code, msg);
+
+    // Limit the 'anytype' dispatcher to have a .run() method returning DispatchResult.
+    // Any runtime errors (OutOfMemory, etc) are passed up to callers.
+    const retval: DispatchResult = try dispatcher.run(alloc, req);
+    switch (retval) {
+        .none   => {
+            return null;            // null for no result on a notification request.
+        },
+        .result => |result_json| {
+            defer alloc.free(result_json);
+            return try responseOk(alloc, req, result_json);
+        },
+        .err    => |err| {
+            if (err.data)|data_json| {
+                defer alloc.free(data_json);
+                return try responseErrorData(alloc, req.id, err.code, err.msg, data_json);
+            } else {
+                return try responseError(alloc, req.id, err.code, err.msg);
+            }
+        },
     }
 }
 
@@ -49,8 +75,7 @@ fn responseOk(alloc: Allocator, req: RpcRequest, result_json: []const u8) ![]con
         .str => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
             , .{result_json, req.id.str}),
-        .null => JrErrors.NotificationHasNoResponse,
-        .none => JrErrors.NotificationHasNoResponse,
+        .null, .none => JrErrors.NotificationHasNoResponse,
     };
 }
 
@@ -65,12 +90,27 @@ fn responseError(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u
         .str => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}" }} }}
             , .{id.str, code, msg}),
-        .null => allocPrint(alloc,
+        .null, .none => allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
             , .{code, msg}),
-        .none => allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
-            , .{code, msg}),
+    };
+}
+
+/// Build an Error message.
+/// Caller needs to call self.alloc.free() on the returned message free the memory.
+fn responseErrorData(alloc: Allocator, id: RpcId, errCode: ErrorCode,
+                     msg: []const u8, data: []const u8) ![]const u8 {
+    const code: i32 = @intFromEnum(errCode);
+    return switch (id) {
+        .num => allocPrint(alloc,
+            \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            , .{id.num, code, msg, data}),
+        .str => allocPrint(alloc,
+            \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            , .{id.str, code, msg, data}),
+        .null, .none => allocPrint(alloc,
+            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            , .{code, msg, data}),
     };
 }
 

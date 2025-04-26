@@ -53,7 +53,7 @@ pub const RpcResponse = struct {
     }
 };
 
-pub const RpcResponseBody = struct {
+const RpcResponseBody = struct {
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     id:         RpcId = .{ .null = {} },    // default for optional field.
     result:     Value = .{ .null = {} },    // default for optional field.
