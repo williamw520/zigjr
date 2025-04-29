@@ -179,6 +179,10 @@ pub const RpcRequest = struct {
         return if (self.params == .object) self.params.object else JrErrors.NotObject;
     }
 
+    pub fn isNotification(self: Self) bool {
+        return !self.id.isValid();
+    }
+
     pub fn hasError(self: Self) bool {
         return self.err.code != ErrorCode.None;
     }
@@ -186,7 +190,7 @@ pub const RpcRequest = struct {
     pub fn isError(self: Self, code: ErrorCode) bool {
         return self.err.code == code;
     }
-    
+
 };
 
 pub const RpcId = union(enum) {
