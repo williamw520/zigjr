@@ -8,6 +8,7 @@
 
 const req_parser = @import("jsonrpc/req_parser.zig");
 const res_parser = @import("jsonrpc/res_parser.zig");
+const messages = @import("jsonrpc/messages.zig");
 const responder = @import("jsonrpc/responder.zig");
 const dispatcher = @import("dispatch/dispatcher.zig");
 const jsonrpc_errors = @import("jsonrpc/jsonrpc_errors.zig");
@@ -21,10 +22,11 @@ pub const RpcRequest = req_parser.RpcRequest;
 pub const RpcId = req_parser.RpcId;
 
 pub const respond = responder.respond;
-pub const responseOk = responder.responseOk;
-pub const responseError = responder.responseError;
-pub const responseErrorData = responder.responseErrorData;
 pub const DispatchResult = responder.DispatchResult;
+
+pub const responseOk = messages.responseOk;
+pub const responseError = messages.responseError;
+pub const responseErrorData = messages.responseErrorData;
 
 pub const Registry = dispatcher.Registry;
 
