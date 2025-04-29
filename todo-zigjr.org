@@ -1,0 +1,15 @@
+
+TODOs
+* TODO Add dispatcher.free() to free on the DispatchResult, to let the dispatcher handle freeing memory.
+* TODO Add inc(), dec(), and get() to CounterDispatcher test.
+* TODO Add notification testing.  Just use CounterDispatcher.
+* TODO Test on float number in request and response messages.
+* TODO Add batch dispatching in responder.
+* TODO Add batch result handling.
+* TODO Add batch response message builder.
+* TODO Add streaming API, lrcr based and Content-Length based.
+* TODO Message logging.
+* TODO Add CLI on running request and response and on streaming.
+* TODO Add network server and client example.
+* TODO LSP example.
+
