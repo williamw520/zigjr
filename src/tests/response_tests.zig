@@ -44,7 +44,8 @@ const HelloDispatcher = struct {
 
 const IntCalcDispatcher = struct {
     pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
-        const params = try req.arrayParams();
+        const params = req.arrayParams() orelse
+            return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         }
@@ -88,7 +89,8 @@ const IntCalcDispatcher = struct {
 
 const FloatCalcDispatcher = struct {
     pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
-        const params = try req.arrayParams();
+        const params = req.arrayParams() orelse
+            return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         }

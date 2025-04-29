@@ -171,12 +171,12 @@ pub const RpcRequest = struct {
         return self.params == .object;
     }
 
-    pub fn arrayParams(self: Self) !std.json.Array {
-        return if (self.params == .array) self.params.array else JrErrors.NotArray;
+    pub fn arrayParams(self: Self) ?std.json.Array {
+        return if (self.params == .array) self.params.array else null;
     }
 
-    pub fn objectParams(self: Self) !std.json.ObjectMap {
-        return if (self.params == .object) self.params.object else JrErrors.NotObject;
+    pub fn objectParams(self: Self) ?std.json.ObjectMap {
+        return if (self.params == .object) self.params.object else null;
     }
 
     pub fn isNotification(self: Self) bool {
