@@ -1,6 +1,6 @@
 
 TODOs
-* TODO Add dispatcher.free() to free on the DispatchResult, to let the dispatcher handle freeing memory.
+* DONE Add dispatcher.free() to free on the DispatchResult. Let the dispatcher handle freeing memory.
 * TODO Add inc(), dec(), and get() to CounterDispatcher test.
 * TODO Add notification testing.  Just use CounterDispatcher.
 * TODO Test on float number in request and response messages.

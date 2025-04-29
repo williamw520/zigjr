@@ -25,7 +25,7 @@ const HelloDispatcher = struct {
     pub fn run(_: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
-                .cs_json = "\"hello back\"",
+                .result = "\"hello back\"",
             };
         } else {
             return .{
@@ -35,6 +35,10 @@ const HelloDispatcher = struct {
                 }
             };
         }
+    }
+
+    pub fn free(_: Allocator, _: DispatchResult) void {
+        // All result data are constant strings.  Nothing to free.
     }
 };
 
@@ -62,11 +66,20 @@ const IntCalcDispatcher = struct {
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
+
         return .{
-            .json = try stringifyAlloc(alloc, result, .{})
+            .result = try stringifyAlloc(alloc, result, .{})
         };
     }
 
+    pub fn free(alloc: Allocator, dr: DispatchResult) void {
+        switch (dr) {
+            .result => alloc.free(dr.result),
+            .err => {},
+            else => {},
+        }
+    }
+    
     fn add(a: i64, b: i64) i64 { return a + b; }
     fn sub(a: i64, b: i64) i64 { return a - b; }
     fn multiply(a: i64, b: i64) i64 { return a * b; }
@@ -79,8 +92,16 @@ const CounterDispatcher = struct {
     pub fn run(self: *@This(), alloc: Allocator, _: RpcRequest) !DispatchResult {
         self.count += 1;
         return .{
-            .json = try stringifyAlloc(alloc, self.count, .{})
+            .result = try stringifyAlloc(alloc, self.count, .{})
         };
+    }
+
+    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
+        switch (dr) {
+            .result => alloc.free(dr.result),
+            .err => {},
+            else => {},
+        }
     }
 };
 

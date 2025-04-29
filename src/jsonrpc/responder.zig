@@ -20,16 +20,15 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 
 /// Return value from dispatcher.run() expected by respond() below.
-/// The result and data json, if set, will be freed by respond().  It's best that
-/// they're produced by std.json.stringifyAlloc() using the passed in allocator to run().
+/// For the result JSON and data JSON string, it's best that they're produced by
+/// std.json.stringifyAlloc() to ensure a valid JSON string.
 pub const DispatchResult = union(enum) {
     none:       void,               // No result, for notification call.
-    json:       []const u8,         // Allocated json result.  Will be freed by respond().
-    cs_json:    []const u8,         // Constant string json result.  Will be NOT freed.
+    result:     []const u8,         // JSON string for the result value.
     err:        struct {
         code:   ErrorCode,
-        msg:    []const u8 = "",    // Constant error message.  Will NOT be freed by respond().
-        data:   ?[]const u8 = null, // Error data json string.  Will be freed by respond().
+        msg:    []const u8 = "",    // Error text string.
+        data:   ?[]const u8 = null, // JSON string for additional error data value.
     },
 };
 
@@ -41,25 +40,23 @@ pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const
         return try responseError(alloc, req.id, req.err.code, req.err.err_msg);
     }
 
-    // Limit the 'anytype' dispatcher to have a .run() method returning DispatchResult.
+    // Limit the 'anytype' dispatcher to have a run() method returning a DispatchResult.
+    // Limit the 'anytype' dispatcher to have a free() method to free the DispatchResult.
     // Callers of respond() need to handle any errors coming from their dispatcher.
-    // The dispatcher can use 'alloc' to allocate memory for the result json or error data.
-    // They will be freed in here afterward.
+    // The dispatcher can use 'alloc' to allocate memory for the result data fields.
+    // They should be freed in the dispatcher.free() callback.
     const dresult: DispatchResult = try dispatcher.run(alloc, req);
     switch (dresult) {
         .none => {
             return null;            // null for no result on a notification request.
         },
-        .json => |json| {
-            defer alloc.free(json);
-            return try responseOk(alloc, req.id, json);
-        },
-        .cs_json => |json| {
+        .result => |json| {
+            defer dispatcher.free(alloc, dresult);
             return try responseOk(alloc, req.id, json);
         },
         .err => |err| {
+            defer dispatcher.free(alloc, dresult);
             if (err.data)|data_json| {
-                defer alloc.free(data_json);
                 return try responseErrorData(alloc, req.id, err.code, err.msg, data_json);
             } else {
                 return try responseError(alloc, req.id, err.code, err.msg);
