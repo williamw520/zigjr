@@ -89,17 +89,23 @@ const IntCalcDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn run(self: *@This(), alloc: Allocator, _: RpcRequest) !DispatchResult {
-        self.count += 1;
-        return .{
-            .result = try stringifyAlloc(alloc, self.count, .{})
-        };
+    pub fn run(self: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
+        if (std.mem.eql(u8, req.method, "inc")) {
+            self.count += 1;
+            return .{ .none = {} };     // treat request as notification
+        } else if (std.mem.eql(u8, req.method, "dec")) {
+            self.count -= 1;
+            return .{ .none = {} };     // treat request as notification
+        } else if (std.mem.eql(u8, req.method, "get")) {
+            return .{ .result = try stringifyAlloc(alloc, self.count, .{}) };
+        } else {
+            return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
+        }
     }
 
     pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
         switch (dr) {
             .result => alloc.free(dr.result),
-            .err => {},
             else => {},
         }
     }
@@ -259,33 +265,60 @@ test "Response to a request of integer add with missing parameter, expect error"
 test "Response using an object based dispatcher." {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
-            \\{"jsonrpc": "2.0", "method": "foobar", "id": 1}
-        );
-        defer result.deinit();
-
         var dispatcher = CounterDispatcher{};
         {
-            const res_json = (try zigjr.respond(alloc, try result.request(), &dispatcher)) orelse "";
-            defer alloc.free(res_json);
-            // std.debug.print("res_json: {s}\n", .{res_json});
-            var res = try zigjr.parseResponse(alloc, res_json);
-            defer res.deinit();
-            try testing.expectEqual(res.result.integer, 1);
+            var result = zigjr.parseRequest(alloc,
+                \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            );
+            defer result.deinit();
+
+            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            // std.debug.print("res_json: {any}\n", .{res});
+            try testing.expectEqual(res, null);
         }
         {
+            var result = zigjr.parseRequest(alloc,
+                \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            );
+            defer result.deinit();
+
+            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            try testing.expectEqual(res, null);
+        }
+        {
+            var result = zigjr.parseRequest(alloc,
+                \\{"jsonrpc": "2.0", "method": "get", "id": 1}
+            );
+            defer result.deinit();
+
             const res_json = (try zigjr.respond(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
+
             var res = try zigjr.parseResponse(alloc, res_json);
             defer res.deinit();
             try testing.expectEqual(res.result.integer, 2);
         }
         {
+            var result = zigjr.parseRequest(alloc,
+                \\{"jsonrpc": "2.0", "method": "dec", "id": 1}
+            );
+            defer result.deinit();
+
+            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            try testing.expectEqual(res, null);
+        }
+        {
+            var result = zigjr.parseRequest(alloc,
+                \\{"jsonrpc": "2.0", "method": "get", "id": 1}
+            );
+            defer result.deinit();
+
             const res_json = (try zigjr.respond(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
+
             var res = try zigjr.parseResponse(alloc, res_json);
             defer res.deinit();
-            try testing.expectEqual(res.result.integer, 3);
+            try testing.expectEqual(res.result.integer, 1);
         }
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
