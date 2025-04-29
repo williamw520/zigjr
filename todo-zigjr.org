@@ -3,7 +3,7 @@ TODOs
 * DONE Add dispatcher.free() to free on the DispatchResult. Let the dispatcher handle freeing memory.
 * DONE Add inc(), dec(), and get() to CounterDispatcher test.
 * DONE Add notification testing.  Just use CounterDispatcher.
-* TODO Test on float number in request and response messages.
+* DONE Test on float number in request and response messages.
 * TODO Add batch dispatching in responder.
 * TODO Add batch result handling.
 * TODO Add batch response message builder.

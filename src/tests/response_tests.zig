@@ -86,6 +86,51 @@ const IntCalcDispatcher = struct {
     fn divide(a: i64, b: i64) i64 { return @divTrunc(a, b); }
 };
 
+const FloatCalcDispatcher = struct {
+    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
+        const params = try req.arrayParams();
+        if (params.items.len != 2) {
+            return .{ .err = .{ .code = ErrorCode.InvalidParams } };
+        }
+        const a = switch (params.items[0]) {
+            .float   => |f| f,
+            .integer => |n| @as(f64, @floatFromInt(n)),
+            else => return .{ .err = .{ .code = ErrorCode.InvalidParams } }
+        };
+        const b = switch (params.items[1]) {
+            .float   => |f| f,
+            .integer => |n| @as(f64, @floatFromInt(n)),
+            else => return .{ .err = .{ .code = ErrorCode.InvalidParams } }
+        };
+
+        var result: f64 = 0;
+        if (std.mem.eql(u8, req.method, "add")) {
+            result = a + b;
+        } else if (std.mem.eql(u8, req.method, "sub")) {
+            result = a - b;
+        } else if (std.mem.eql(u8, req.method, "multiply")) {
+            result = a * b;
+        } else if (std.mem.eql(u8, req.method, "divide")) {
+            result = a / b;
+        } else {
+            return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
+        }
+
+        return .{
+            .result = try stringifyAlloc(alloc, result, .{})
+        };
+    }
+
+    pub fn free(alloc: Allocator, dr: DispatchResult) void {
+        switch (dr) {
+            .result => alloc.free(dr.result),
+            .err => {},
+            else => {},
+        }
+    }
+
+};
+
 const CounterDispatcher = struct {
     count:  isize = 0,
     
@@ -257,6 +302,89 @@ test "Response to a request of integer add with missing parameter, expect error"
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InvalidParams));
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of float add" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
+        );
+        defer result.deinit();
+        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expectEqual(res.result.float, 3);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of float sub" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
+        );
+        defer result.deinit();
+
+        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expectEqual(res.result.float, -1.0);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of float multiply" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
+        );
+        defer result.deinit();
+
+        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expectEqual(res.result.float, 20);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Response to a request of float divide" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
+        );
+        defer result.deinit();
+
+        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expectEqual(res.result.float, 10.0/3.0);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
