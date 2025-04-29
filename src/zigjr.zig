@@ -21,7 +21,6 @@ pub const RpcRequest = req_parser.RpcRequest;
 pub const RpcId = req_parser.RpcId;
 
 pub const respond = responder.respond;
-pub const respond2 = responder.respond2;
 pub const responseOk = responder.responseOk;
 pub const responseError = responder.responseError;
 pub const responseErrorData = responder.responseErrorData;

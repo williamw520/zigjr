@@ -24,7 +24,8 @@ const JrErrors = jsonrpc_errors.JrErrors;
 /// they're produced by std.json.stringifyAlloc() using the passed in allocator to run().
 pub const DispatchResult = union(enum) {
     none:       void,               // No result, for notification call.
-    result:     []const u8,         // Result json string.  Will be freed by respond().
+    json:       []const u8,         // Allocated json result.  Will be freed by respond().
+    cs_json:    []const u8,         // Constant string json result.  Will be NOT freed.
     err:        struct {
         code:   ErrorCode,
         msg:    []const u8 = "",    // Constant error message.  Will NOT be freed by respond().
@@ -36,22 +37,27 @@ pub const DispatchResult = union(enum) {
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
     if (req.hasError()) {
-        // For parsing or validation error on the request, return an error response.
+        // Return an error response for the parsing or validation error on the request.
         return try responseError(alloc, req.id, req.err.code, req.err.err_msg);
     }
 
     // Limit the 'anytype' dispatcher to have a .run() method returning DispatchResult.
-    // Callers need to handle any errors coming from their dispatcher.
-    const retval: DispatchResult = try dispatcher.run(alloc, req);
-    switch (retval) {
-        .none   => {
+    // Callers of respond() need to handle any errors coming from their dispatcher.
+    // The dispatcher can use 'alloc' to allocate memory for the result json or error data.
+    // They will be freed in here afterward.
+    const dresult: DispatchResult = try dispatcher.run(alloc, req);
+    switch (dresult) {
+        .none => {
             return null;            // null for no result on a notification request.
         },
-        .result => |result_json| {
-            defer alloc.free(result_json);
-            return try responseOk(alloc, req.id, result_json);
+        .json => |json| {
+            defer alloc.free(json);
+            return try responseOk(alloc, req.id, json);
         },
-        .err    => |err| {
+        .cs_json => |json| {
+            return try responseOk(alloc, req.id, json);
+        },
+        .err => |err| {
             if (err.data)|data_json| {
                 defer alloc.free(data_json);
                 return try responseErrorData(alloc, req.id, err.code, err.msg, data_json);

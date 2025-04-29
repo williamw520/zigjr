@@ -22,9 +22,11 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 const HelloDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn run(_: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
-            return .{ .result = try stringifyAlloc(alloc, "hello back", .{}) };
+            return .{
+                .cs_json = "\"hello back\"",
+            };
         } else {
             return .{
                 .err = .{
@@ -60,7 +62,9 @@ const IntCalcDispatcher = struct {
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
-        return .{ .result = try stringifyAlloc(alloc, result, .{}) };
+        return .{
+            .json = try stringifyAlloc(alloc, result, .{})
+        };
     }
 
     fn add(a: i64, b: i64) i64 { return a + b; }
@@ -74,7 +78,9 @@ const CounterDispatcher = struct {
     
     pub fn run(self: *@This(), alloc: Allocator, _: RpcRequest) !DispatchResult {
         self.count += 1;
-        return .{ .result = try stringifyAlloc(alloc, self.count, .{}) };
+        return .{
+            .json = try stringifyAlloc(alloc, self.count, .{})
+        };
     }
 };
 
@@ -285,5 +291,76 @@ test "Response to a request of integer add with invalid parameter type, expect e
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
+test "Construct a normal response message, simple integer result" {
+    const alloc = gpa.allocator();
+    {
+        const res_json = try zigjr.responseOk(alloc, .{ .num = 1 }, "10");
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expect(!res.hasErr());
+        try testing.expectEqual(res.result.integer, 10);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Construct a normal response message, array result" {
+    const alloc = gpa.allocator();
+    {
+        const res_json = try zigjr.responseOk(alloc, .{ .str = "2" }, "[1, 2, 3]");
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expect(!res.hasErr());
+        try testing.expectEqualSlices(Value, res.result.array.items, &[_]Value{ .{.integer = 1}, .{.integer = 2}, .{.integer=3} });
+        try testing.expectEqualSlices(u8, res.id.str, "2");
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Construct an error response message" {
+    const alloc = gpa.allocator();
+    {
+        const res_json = try zigjr.responseError(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expect(res.hasErr());
+        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InternalError));
+        try testing.expectEqualSlices(u8, res.err.message, "Internal Error");
+        try testing.expect(res.id == .null);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "Construct an error response message with data" {
+    const alloc = gpa.allocator();
+    {
+        const res_json = try zigjr.responseErrorData(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res = try zigjr.parseResponse(alloc, res_json);
+        defer res.deinit();
+
+        try testing.expect(res.hasErr());
+        try testing.expectEqual(res.err.code, @intFromEnum(ErrorCode.InternalError));
+        try testing.expectEqualSlices(u8, res.err.message, "Internal Error");
+        try testing.expect(res.err.data != null);
+        try testing.expectEqual(res.err.data.?.integer, 123);
+        try testing.expect(res.id == .null);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
 
 
