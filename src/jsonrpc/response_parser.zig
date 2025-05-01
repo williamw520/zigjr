@@ -23,18 +23,6 @@ const ErrorCode = jsonrpc_errors.ErrorCode;
 const JrErrors = jsonrpc_errors.JrErrors;
 
 
-// pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
-//     const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
-//     return .{
-//         .alloc = alloc,
-//         .parsed = parsed,
-//         .jsonrpc = parsed.value.jsonrpc,
-//         .id = parsed.value.id,
-//         .result = parsed.value.result,
-//         .err = parsed.value.@"error",
-//     };
-// }
-
 pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResult {
     // Parse error is passed back to the caller directly.
     const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
@@ -70,7 +58,7 @@ pub const RpcResponseResult = struct {
     }
 
     /// Shortcut to access the inner tagged union invariant batch.
-    pub fn batch(self: *Self) ![]const ?RpcResponse {
+    pub fn batch(self: *Self) ?[]const RpcResponse {
         return if (self.isBatch()) self.rpcmsg.batch else null;
     }
     
@@ -117,19 +105,6 @@ pub const RpcResponse = struct {
     }
     
 };
-
-// const RpcResponseBody = struct {
-//     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
-//     id:         RpcId = .{ .null = {} },    // default for optional field.
-//     result:     Value = .{ .null = {} },    // default for optional field.
-//     @"error":   RpcResponseErr = .{},       // parse error and validation error.
-
-//     fn validate(self: *@This()) !void {
-//         if (!std.mem.eql(u8, &self.jsonrpc, "2.0")) {
-//             return JrErrors.InvalidJsonRpcversion;
-//         }
-//     }
-// };
 
 pub const RpcResponseErr = struct {
     code:       i32 = 0,

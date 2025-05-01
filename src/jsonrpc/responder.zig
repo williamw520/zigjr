@@ -69,12 +69,14 @@ pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const
 }
 
 /// Run the handler on the list of requests one by one and generate the array of responses
-/// for the requests in one JSON response string contained in an ArrayList(u8).
+/// for the requests in one JSON response string.
 /// Each request has one response except for notification.  Errors are returned as well.
-/// Caller needs to call ArrayList(u8).deinit() on the returned message to free the memory.
-pub fn respondBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype) !ArrayList(u8) {
-    var buffer = ArrayList(u8).init(alloc);
+/// Caller needs to call alloc.free on the returned JSON to free the memory.
+pub fn respondBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype) ![]const u8 {
     var count: usize = 0;
+    var buffer = ArrayList(u8).init(alloc);
+    defer buffer.deinit();
+
     try buffer.appendSlice("[");
     for (reqs) |req| {
         const response_json = try respond(alloc, req, dispatcher);
@@ -86,6 +88,7 @@ pub fn respondBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anyt
         }
     }
     try buffer.appendSlice("]");
-    return buffer;
+
+    return try alloc.dupe(u8, buffer.items);
 }
 

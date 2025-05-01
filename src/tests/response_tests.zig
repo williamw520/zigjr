@@ -2,7 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const allocPrint = std.fmt.allocPrint;
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 const Array = std.json.Array;
@@ -585,18 +584,43 @@ test "Handle batch requests with the CounterDispatcher" {
         };
         const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
         defer batch_req_json.deinit();
-        std.debug.print("batch request json {s}\n", .{batch_req_json.items});
+        // std.debug.print("batch request json {s}\n", .{batch_req_json.items});
 
-        var parsed_result = zigjr.parseRequest(alloc, batch_req_json.items);
-        defer parsed_result.deinit();
-        try testing.expect(parsed_result.isBatch());
-        try testing.expect((try parsed_result.batch())[0].id.num == 1);
-        try testing.expect((try parsed_result.batch())[1].id.num == 2);
+        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json.items);
+        defer batch_req_result.deinit();
+        try testing.expect(batch_req_result.isBatch());
+        try testing.expect((try batch_req_result.batch())[0].id.num == 1);
+        try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        const batch_res_json = try zigjr.respondBatch(alloc, try parsed_result.batch(), &dispatcher);
-        defer batch_res_json.deinit();
-        std.debug.print("batch response json {s}\n", .{batch_res_json.items});
+        const batch_res_json = try zigjr.respondBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        defer alloc.free(batch_res_json);
+        // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
+        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_res_result.deinit();
+        const batch_res = batch_res_result.batch().?;
+        // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
+
+        try testing.expect(!batch_res[0].hasErr());
+        try testing.expectEqual(batch_res[0].err().code, @intFromEnum(ErrorCode.None));
+        try testing.expectEqualSlices(u8, batch_res[0].err().message, "");
+        try testing.expect(batch_res[0].err().data == null);
+        try testing.expect(batch_res[0].id.num == 2);
+        try testing.expect(batch_res[0].result.integer == 1);
+
+        try testing.expect(batch_res[1].hasErr());
+        try testing.expectEqual(batch_res[1].err().code, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqualSlices(u8, batch_res[1].err().message, "MethodNotFound");
+        try testing.expect(batch_res[1].err().data == null);
+        try testing.expect(batch_res[1].id.num == 99);
+        try testing.expect(batch_res[1].result == .null);
+
+        try testing.expect(!batch_res[2].hasErr());
+        try testing.expectEqual(batch_res[2].err().code, @intFromEnum(ErrorCode.None));
+        try testing.expectEqualSlices(u8, batch_res[2].err().message, "");
+        try testing.expect(batch_res[2].err().data == null);
+        try testing.expect(batch_res[2].id.num == 4);
+        try testing.expect(batch_res[2].result.integer == 0);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
