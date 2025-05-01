@@ -26,6 +26,7 @@ pub const JrErrors = error {
     NotResultResponse,
     NotErrResponse,
     InvalidResponse,
+    InvalidParamsType,
 };
 
 

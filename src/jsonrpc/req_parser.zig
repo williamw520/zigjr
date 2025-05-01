@@ -100,11 +100,11 @@ pub const RpcResult = struct {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
-    pub fn isRequest(self: *Self) bool {
+    pub fn isRequest(self: Self) bool {
         return self.rpcmsg == .request;
     }
 
-    pub fn isBatch(self: *Self) bool {
+    pub fn isBatch(self: Self) bool {
         return self.rpcmsg == .batch;
     }
 

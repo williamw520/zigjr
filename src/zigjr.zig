@@ -24,9 +24,11 @@ pub const RpcId = req_parser.RpcId;
 pub const respond = responder.respond;
 pub const DispatchResult = responder.DispatchResult;
 
-pub const responseOk = messages.responseOk;
-pub const responseError = messages.responseError;
-pub const responseErrorData = messages.responseErrorData;
+pub const requestJson = messages.requestJson;
+pub const batchJson = messages.batchJson;
+pub const responseJson = messages.responseJson;
+pub const responseErrorJson = messages.responseErrorJson;
+pub const responseErrorDataJson = messages.responseErrorDataJson;
 
 pub const Registry = dispatcher.Registry;
 

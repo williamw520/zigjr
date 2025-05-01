@@ -39,7 +39,7 @@ pub const DispatchResult = union(enum) {
 pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
-        return try messages.responseError(alloc, req.id, req.err.code, req.err.err_msg);
+        return try messages.responseErrorJson(alloc, req.id, req.err.code, req.err.err_msg);
     }
 
     // Limit the 'anytype' dispatcher to have a run() method returning a DispatchResult.
@@ -54,14 +54,14 @@ pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const
         },
         .result => |json| {
             defer dispatcher.free(alloc, dresult);
-            return try messages.responseOk(alloc, req.id, json);
+            return try messages.responseJson(alloc, req.id, json);
         },
         .err => |err| {
             defer dispatcher.free(alloc, dresult);
             if (err.data)|data_json| {
-                return try messages.responseErrorData(alloc, req.id, err.code, err.msg, data_json);
+                return try messages.responseErrorDataJson(alloc, req.id, err.code, err.msg, data_json);
             } else {
-                return try messages.responseError(alloc, req.id, err.code, err.msg);
+                return try messages.responseErrorJson(alloc, req.id, err.code, err.msg);
             }
         },
     }

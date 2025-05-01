@@ -478,7 +478,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
 test "Construct a normal response message, simple integer result" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseOk(alloc, .{ .num = 1 }, "10");
+        const res_json = try zigjr.responseJson(alloc, .{ .num = 1 }, "10");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -495,7 +495,7 @@ test "Construct a normal response message, simple integer result" {
 test "Construct a normal response message, array result" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseOk(alloc, .{ .str = "2" }, "[1, 2, 3]");
+        const res_json = try zigjr.responseJson(alloc, .{ .str = "2" }, "[1, 2, 3]");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -512,7 +512,7 @@ test "Construct a normal response message, array result" {
 test "Construct an error response message" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseError(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
+        const res_json = try zigjr.responseErrorJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -530,7 +530,7 @@ test "Construct an error response message" {
 test "Construct an error response message with data" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseErrorData(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
+        const res_json = try zigjr.responseErrorDataJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
