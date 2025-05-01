@@ -92,19 +92,20 @@ pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) ![]con
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) ![]const u8 {
     const code: i32 = @intFromEnum(errCode);
+    const msg_txt = if (msg.len == 0) @tagName(errCode) else msg;
     switch (id) {
         .num => return allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}" }} }}
-            , .{id.num, code, msg}),
+            , .{id.num, code, msg_txt}),
         .str => return allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}" }} }}
-            , .{id.str, code, msg}),
+            , .{id.str, code, msg_txt}),
         .none => return allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
-            , .{code, msg}),
+            , .{code, msg_txt}),
         .null => return allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
-            , .{code, msg}),
+            , .{code, msg_txt}),
     }
 }
 

@@ -9,6 +9,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
+const ArrayList = std.ArrayList;
 
 const parser = @import("req_parser.zig");
 const RpcRequest = parser.RpcRequest;
@@ -34,7 +35,7 @@ pub const DispatchResult = union(enum) {
     },
 };
 
-/// Run a handler on the request and generate a Response JSON string.
+/// Run the handler on the request and generate a response JSON string.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
     if (req.hasError()) {
@@ -65,5 +66,26 @@ pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const
             }
         },
     }
+}
+
+/// Run the handler on the list of requests one by one and generate the array of responses
+/// for the requests in one JSON response string contained in an ArrayList(u8).
+/// Each request has one response except for notification.  Errors are returned as well.
+/// Caller needs to call ArrayList(u8).deinit() on the returned message to free the memory.
+pub fn respondBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype) !ArrayList(u8) {
+    var buffer = ArrayList(u8).init(alloc);
+    var count: usize = 0;
+    try buffer.appendSlice("[");
+    for (reqs) |req| {
+        const response_json = try respond(alloc, req, dispatcher);
+        if (response_json)|res_json| {
+            defer alloc.free(res_json);
+            if (count > 0) try buffer.appendSlice(", ");
+            try buffer.appendSlice(res_json);
+            count += 1;
+        }
+    }
+    try buffer.appendSlice("]");
+    return buffer;
 }
 

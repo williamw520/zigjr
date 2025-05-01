@@ -548,3 +548,37 @@ test "Construct an error response message with data" {
 }    
 
 
+test "Handle batch requests with the CounterDispatcher" {
+    const alloc = gpa.allocator();
+    {
+        var dispatcher = CounterDispatcher{};
+        const req_jsons = [_][]const u8{
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
+            ,
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
+            ,
+            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
+            ,
+        };
+        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        defer batch_req_json.deinit();
+        std.debug.print("batch request json {s}\n", .{batch_req_json.items});
+
+        var parsed_result = zigjr.parseRequest(alloc, batch_req_json.items);
+        defer parsed_result.deinit();
+        try testing.expect(parsed_result.isBatch());
+        try testing.expect((try parsed_result.batch())[0].id.num == 1);
+        try testing.expect((try parsed_result.batch())[1].id.num == 2);
+
+        const batch_res_json = try zigjr.respondBatch(alloc, try parsed_result.batch(), &dispatcher);
+        defer batch_res_json.deinit();
+        std.debug.print("batch response json {s}\n", .{batch_res_json.items});
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+

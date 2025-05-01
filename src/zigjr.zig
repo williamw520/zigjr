@@ -22,6 +22,7 @@ pub const RpcRequest = req_parser.RpcRequest;
 pub const RpcId = req_parser.RpcId;
 
 pub const respond = responder.respond;
+pub const respondBatch = responder.respondBatch;
 pub const DispatchResult = responder.DispatchResult;
 
 pub const requestJson = messages.requestJson;

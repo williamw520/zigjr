@@ -765,7 +765,7 @@ test "Build batch request json with array params and str Id." {
         const batch_json = try zigjr.batchJson(alloc, &req_jsons);
         defer batch_json.deinit();
         defer for (req_jsons)|json| alloc.free(json);
-        // std.debug.print("req_json {s}\n", .{req.items});
+        // std.debug.print("req_json {s}\n", .{batch_json.items});
         try testing.expectEqualSlices(u8, batch_json.items,
             \\[{ "jsonrpc": "2.0", "method": "foo", "params": [1,2] },{ "jsonrpc": "2.0", "method": "bar", "params": {"a":1,"b":2}, "id": 2 }]
         );

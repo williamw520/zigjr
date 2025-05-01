@@ -6,8 +6,9 @@ TODOs
 * DONE Test on float number in request and response messages.
 * DONE Add check for notification request.
 * DONE Add batch response message builder.
-* TODO Add batch dispatching in responder.
-* TODO Add batch result handling.
+* DONE Add batch dispatching in responder.
+* TODO Add parsing batch result.
+* TODO Add test on parsing empty batch request.
 * TODO Add streaming API, lrcr based and Content-Length based.
 * TODO Message logging.
 * TODO Add CLI on running request and response and on streaming.
