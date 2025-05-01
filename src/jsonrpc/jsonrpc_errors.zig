@@ -20,6 +20,8 @@ pub const ErrorCode = enum(i32) {
 pub const JrErrors = error {
     NotSingleRpcRequest,
     NotBatchRpcRequest,
+    NotSingleRpcResponse,
+    NotBatchRpcResponse,
     NotArray,
     NotObject,
     MissingIdForResponse,
@@ -27,6 +29,7 @@ pub const JrErrors = error {
     NotErrResponse,
     InvalidResponse,
     InvalidParamsType,
+    InvalidJsonRpcversion,
 };
 
 

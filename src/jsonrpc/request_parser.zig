@@ -94,7 +94,7 @@ pub const RpcResult = struct {
     const Self = @This();
     alloc:      Allocator,
     parsed:     ?std.json.Parsed(RpcMessage) = null,
-    rpcmsg:    RpcMessage,
+    rpcmsg:     RpcMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();

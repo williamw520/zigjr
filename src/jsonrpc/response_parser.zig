@@ -9,6 +9,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
+const Scanner = std.json.Scanner;
+const ParseOptions = std.json.ParseOptions;
+const innerParse = std.json.innerParse;
+const ParseError = std.json.ParseError;
 const Value = std.json.Value;
 
 const req_parser = @import("request_parser.zig");
@@ -19,46 +23,113 @@ const ErrorCode = jsonrpc_errors.ErrorCode;
 const JrErrors = jsonrpc_errors.JrErrors;
 
 
-pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
-    const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
+// pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponse {
+//     const parsed = try std.json.parseFromSlice(RpcResponseBody, alloc, json_str, .{});
+//     return .{
+//         .alloc = alloc,
+//         .parsed = parsed,
+//         .jsonrpc = parsed.value.jsonrpc,
+//         .id = parsed.value.id,
+//         .result = parsed.value.result,
+//         .err = parsed.value.@"error",
+//     };
+// }
+
+pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResult {
+    // Parse error is passed back to the caller directly.
+    const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .jsonrpc = parsed.value.jsonrpc,
-        .id = parsed.value.id,
-        .result = parsed.value.result,
-        .err = parsed.value.@"error",
+        .rpcmsg = parsed.value,
     };
 }
 
-pub const RpcResponse = struct {
+pub const RpcResponseResult = struct {
     const Self = @This();
     alloc:      Allocator,
-    parsed:     ?std.json.Parsed(RpcResponseBody) = null,
-    jsonrpc:    [3]u8,
-    id:         RpcId,
-    result:     Value,
-    err:        RpcResponseErr,
+    parsed:     ?std.json.Parsed(RpcResponseMessage) = null,
+    rpcmsg:     RpcResponseMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
-    pub fn hasResult(self: *Self) bool {
-        return self.result != .null;
+    pub fn isResponse(self: Self) bool {
+        return self.rpcmsg == .response;
     }
 
-    pub fn hasErr(self: *Self) bool {
-        return self.err.code != 0;
+    pub fn isBatch(self: Self) bool {
+        return self.rpcmsg == .batch;
+    }
+
+    /// Shortcut to access the inner tagged union invariant request.
+    /// Can also access via switch(rpcmsg) .request => 
+    pub fn response(self: *Self) ?RpcResponse {
+        return if (self.isResponse()) self.rpcmsg.response else null;
+    }
+
+    /// Shortcut to access the inner tagged union invariant batch.
+    pub fn batch(self: *Self) ![]const ?RpcResponse {
+        return if (self.isBatch()) self.rpcmsg.batch else null;
+    }
+    
+};
+
+const RpcResponseMessage = union(enum) {
+    response:   RpcResponse,                // JSON-RPC's single response
+    batch:      []RpcResponse,              // JSON-RPC's batch of responses.
+
+    // Custom parsing when the JSON parser encounters a field of this type.
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcResponseMessage {
+        return switch (try source.peekNextTokenType()) {
+            .object_begin => .{ .response = try innerParse(RpcResponse, alloc, source, options) },
+            .array_begin => .{ .batch = try innerParse([]RpcResponse, alloc, source, options) },
+            else => error.UnexpectedToken,  // there're only two cases; any others are error.
+        };
     }
 };
 
-const RpcResponseBody = struct {
+pub const RpcResponse = struct {
+    const Self = @This();
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     id:         RpcId = .{ .null = {} },    // default for optional field.
     result:     Value = .{ .null = {} },    // default for optional field.
     @"error":   RpcResponseErr = .{},       // parse error and validation error.
+
+    pub fn err(self: Self) RpcResponseErr {
+        return self.@"error";
+    }
+
+    pub fn hasResult(self: Self) bool {
+        return self.result != .null;
+    }
+
+    pub fn hasErr(self: Self) bool {
+        return self.err().code != 0 or !self.isValid();
+    }
+
+    pub fn isValid(self: Self) bool {
+        if (!std.mem.eql(u8, &self.jsonrpc, "2.0")) {
+            return false;
+        }
+        return true;
+    }
+    
 };
+
+// const RpcResponseBody = struct {
+//     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
+//     id:         RpcId = .{ .null = {} },    // default for optional field.
+//     result:     Value = .{ .null = {} },    // default for optional field.
+//     @"error":   RpcResponseErr = .{},       // parse error and validation error.
+
+//     fn validate(self: *@This()) !void {
+//         if (!std.mem.eql(u8, &self.jsonrpc, "2.0")) {
+//             return JrErrors.InvalidJsonRpcversion;
+//         }
+//     }
+// };
 
 pub const RpcResponseErr = struct {
     code:       i32 = 0,
