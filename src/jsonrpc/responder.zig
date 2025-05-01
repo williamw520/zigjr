@@ -11,7 +11,7 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
-const parser = @import("req_parser.zig");
+const parser = @import("request_parser.zig");
 const RpcRequest = parser.RpcRequest;
 const RpcId = parser.RpcId;
 

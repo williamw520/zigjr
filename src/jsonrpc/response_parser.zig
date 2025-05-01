@@ -11,7 +11,7 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const Value = std.json.Value;
 
-const req_parser = @import("req_parser.zig");
+const req_parser = @import("request_parser.zig");
 const RpcId = req_parser.RpcId;
 
 const jsonrpc_errors = @import("jsonrpc_errors.zig");

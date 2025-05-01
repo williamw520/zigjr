@@ -6,8 +6,8 @@
 // MIT License.  See the LICENSE file.
 //
 
-const req_parser = @import("jsonrpc/req_parser.zig");
-const res_parser = @import("jsonrpc/res_parser.zig");
+const req_parser = @import("jsonrpc/request_parser.zig");
+const res_parser = @import("jsonrpc/response_parser.zig");
 const messages = @import("jsonrpc/messages.zig");
 const responder = @import("jsonrpc/responder.zig");
 const dispatcher = @import("dispatch/dispatcher.zig");

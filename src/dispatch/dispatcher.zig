@@ -17,7 +17,7 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
-const parser = @import("../jsonrpc/req_parser.zig");
+const parser = @import("../jsonrpc/request_parser.zig");
 const RpcRequest = parser.RpcRequest;
 const RpcId = parser.RpcId;
 
