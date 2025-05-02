@@ -583,10 +583,10 @@ test "Handle batch requests with the CounterDispatcher" {
             ,
         };
         const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
-        defer batch_req_json.deinit();
-        // std.debug.print("batch request json {s}\n", .{batch_req_json.items});
+        defer alloc.free(batch_req_json);
+        // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json.items);
+        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json);
         defer batch_req_result.deinit();
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);

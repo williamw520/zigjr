@@ -63,14 +63,20 @@ pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: Rp
 
 /// Build a batch message of request jsons.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) !ArrayList(u8) {
+pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) ![]const u8 {
+    var count: usize = 0;
     var buffer = ArrayList(u8).init(alloc);
+    defer buffer.deinit();
+
     try buffer.appendSlice("[");
-    const joined = try std.mem.join(alloc, ",", request_jsons);
-    defer alloc.free(joined);
-    try buffer.appendSlice(joined);
+    for (request_jsons) |json| {
+        if (count > 0) try buffer.appendSlice(", ");
+        try buffer.appendSlice(json);
+        count += 1;
+    }
     try buffer.appendSlice("]");
-    return buffer;
+
+    return try alloc.dupe(u8, buffer.items);
 }
 
 /// Build a normal response message.

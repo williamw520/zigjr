@@ -762,15 +762,16 @@ test "Build batch request json with array params and str Id." {
             try zigjr.requestJson(alloc, "foo", [_]i64{1, 2}, .{ .none = {} }),
             try zigjr.requestJson(alloc, "bar", ParamsTest{}, .{ .num = 2 }),
         };
-        const batch_json = try zigjr.batchJson(alloc, &req_jsons);
-        defer batch_json.deinit();
         defer for (req_jsons)|json| alloc.free(json);
+
+        const batch_json = try zigjr.batchJson(alloc, &req_jsons);
+        defer alloc.free(batch_json);
         // std.debug.print("req_json {s}\n", .{batch_json.items});
-        try testing.expectEqualSlices(u8, batch_json.items,
-            \\[{ "jsonrpc": "2.0", "method": "foo", "params": [1,2] },{ "jsonrpc": "2.0", "method": "bar", "params": {"a":1,"b":2}, "id": 2 }]
+        try testing.expectEqualSlices(u8, batch_json,
+            \\[{ "jsonrpc": "2.0", "method": "foo", "params": [1,2] }, { "jsonrpc": "2.0", "method": "bar", "params": {"a":1,"b":2}, "id": 2 }]
         );
 
-        var result = zigjr.parseRequest(alloc, batch_json.items);
+        var result = zigjr.parseRequest(alloc, batch_json);
         defer result.deinit();
         try testing.expect(result.isBatch());
         try testing.expect(!(try result.batch())[0].id.isValid());
