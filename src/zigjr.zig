@@ -17,7 +17,7 @@ const dispatcher_errors = @import("dispatch/dispatch_erros.zig");
 pub const parseRequest = req_parser.parseRequest;
 pub const parseRequestReader = req_parser.parseRequestReader;
 pub const parseResponse = res_parser.parseResponse;
-pub const RpcMessage = req_parser.RpcMessage;
+pub const RpcRequestMessage = req_parser.RpcRequestMessage;
 pub const RpcRequest = req_parser.RpcRequest;
 pub const RpcId = req_parser.RpcId;
 

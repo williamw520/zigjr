@@ -7,8 +7,8 @@ TODOs
 * DONE Add check for notification request.
 * DONE Add batch response message builder.
 * DONE Add batch dispatching in responder.
-* TODO Add parsing batch result.
-* TODO Rename RpcMessage to RpcRequestMessage.
+* DONE Add parsing batch result.
+* DONE Rename RpcMessage to RpcRequestMessage.
 * TODO Add test on parsing empty batch request.
 * TODO Add streaming API, lrcr based and Content-Length based.
 * TODO Message logging.

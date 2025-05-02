@@ -25,14 +25,14 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 
 pub fn parseRequest(alloc: Allocator, json_str: []const u8) RpcResult {
-    const parsed = std.json.parseFromSlice(RpcMessage, alloc, json_str, .{}) catch |parse_err| {
+    const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
         var req = RpcRequest{};
         req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpcmsg = RpcMessage { .request = req },
+            .rpcmsg = RpcRequestMessage { .request = req },
         };
     };
     return .{
@@ -57,7 +57,7 @@ pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RpcResult {
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpcmsg = RpcMessage { .request = req },
+            .rpcmsg = RpcRequestMessage { .request = req },
         };
     };
     return .{
@@ -84,8 +84,8 @@ fn ReaderParser(comptime JsonReaderType: type) type {
             self.jreader.deinit();
         }
 
-        pub fn next(self: *Self) !Parsed(RpcMessage) {
-            return try std.json.parseFromTokenSource(RpcMessage, self.alloc, &self.jreader, .{});
+        pub fn next(self: *Self) !Parsed(RpcRequestMessage) {
+            return try std.json.parseFromTokenSource(RpcRequestMessage, self.alloc, &self.jreader, .{});
         }
     };
 }
@@ -93,8 +93,8 @@ fn ReaderParser(comptime JsonReaderType: type) type {
 pub const RpcResult = struct {
     const Self = @This();
     alloc:      Allocator,
-    parsed:     ?std.json.Parsed(RpcMessage) = null,
-    rpcmsg:     RpcMessage,
+    parsed:     ?std.json.Parsed(RpcRequestMessage) = null,
+    rpcmsg:     RpcRequestMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
@@ -120,12 +120,12 @@ pub const RpcResult = struct {
     }
 };
 
-pub const RpcMessage = union(enum) {
+pub const RpcRequestMessage = union(enum) {
     request:    RpcRequest,                 // JSON-RPC's single request
     batch:      []RpcRequest,               // JSON-RPC's batch of requests
 
     // Custom parsing when the JSON parser encounters a field of this type.
-    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcMessage {
+    pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcRequestMessage {
         return switch (try source.peekNextTokenType()) {
             .object_begin => {
                 var req = try innerParse(RpcRequest, alloc, source, options);

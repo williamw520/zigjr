@@ -9,7 +9,7 @@ const ObjectMap = std.json.ObjectMap;
 const stringifyAlloc = std.json.stringifyAlloc;
 
 const zigjr = @import("../zigjr.zig");
-const RpcMessage = zigjr.RpcMessage;
+const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const DispatchResult = zigjr.DispatchResult;
 const ErrorCode = zigjr.ErrorCode;

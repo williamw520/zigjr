@@ -9,7 +9,7 @@ const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
-const RpcMessage = zigjr.RpcMessage;
+const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
@@ -25,7 +25,7 @@ test "Parsing valid request, single integer param, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -61,7 +61,7 @@ test "Parsing valid request, single string param, string id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -97,7 +97,7 @@ test "Parsing valid request, tw0 integer params, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -135,7 +135,7 @@ test "Parsing valid request, object params, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -171,7 +171,7 @@ test "Parse valid request, with 0 params, with no id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -206,7 +206,7 @@ test "Parse valid request, with no params, with no id" {
         defer result.deinit();
         const req = try result.request();
         // std.debug.print("Request: {any}\n", .{req});
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -498,7 +498,7 @@ test "Parsing valid request with parseRequestReader, single integer param, integ
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
@@ -536,7 +536,7 @@ test "Parsing valid request with parseRequestReader, single string param, string
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcMessage);
+        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
         try testing.expect(result.rpcmsg == .request);
         switch (result.rpcmsg) {
             .request    => |r| { _=r; try testing.expect(true);  },
