@@ -265,7 +265,7 @@ test "Parse valid request batch, with no params, with string id" {
     {
         var result = zigjr.parseRequest(alloc,
                                         \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
-                                            \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
+                                        \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
                                         );
         defer result.deinit();
         try testing.expect(result.isBatch());
@@ -278,6 +278,21 @@ test "Parse valid request batch, with no params, with string id" {
         try testing.expect(reqs[1].id.isValid());
         try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
         try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Parse a valid empty request batch" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+                                        \\[ ]
+                                        );
+        defer result.deinit();
+        try testing.expect(result.isBatch());
+        try testing.expect(!result.isRequest());
+        const reqs = try result.batch();
+        try testing.expect(reqs.len == 0);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
