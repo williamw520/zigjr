@@ -23,48 +23,47 @@ const ErrorCode = jsonrpc_errors.ErrorCode;
 const JrErrors = jsonrpc_errors.JrErrors;
 
 
-pub fn parseResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResult {
+pub fn parseResponse(alloc: Allocator, json_str: []const u8) !ResponseResult {
     // Parse error is passed back to the caller directly.
     const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .rpcmsg = parsed.value,
+        .response_msg = parsed.value,
     };
 }
 
-pub const RpcResponseResult = struct {
+pub const ResponseResult = struct {
     const Self = @This();
-    alloc:      Allocator,
-    parsed:     ?std.json.Parsed(RpcResponseMessage) = null,
-    rpcmsg:     RpcResponseMessage,
+    alloc:          Allocator,
+    parsed:         ?std.json.Parsed(RpcResponseMessage) = null,
+    response_msg:   RpcResponseMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
     pub fn isResponse(self: Self) bool {
-        return self.rpcmsg == .response;
+        return self.response_msg == .response;
     }
 
     pub fn isBatch(self: Self) bool {
-        return self.rpcmsg == .batch;
+        return self.response_msg == .batch;
     }
 
-    /// Shortcut to access the inner tagged union invariant request.
-    /// Can also access via switch(rpcmsg) .request => 
-    pub fn response(self: *Self) ?RpcResponse {
-        return if (self.isResponse()) self.rpcmsg.response else null;
+    /// Shortcut to access the inner tagged union invariant response.
+    pub fn response(self: *Self) !RpcResponse {
+        return if (self.isResponse()) self.response_msg.response else JrErrors.NotSingleRpcResponse;
     }
 
     /// Shortcut to access the inner tagged union invariant batch.
-    pub fn batch(self: *Self) ?[]const RpcResponse {
-        return if (self.isBatch()) self.rpcmsg.batch else null;
+    pub fn batch(self: *Self) ![]const RpcResponse {
+        return if (self.isBatch()) self.response_msg.batch else JrErrors.NotBatchRpcResponse;
     }
     
 };
 
-const RpcResponseMessage = union(enum) {
+pub const RpcResponseMessage = union(enum) {
     response:   RpcResponse,                // JSON-RPC's single response
     batch:      []RpcResponse,              // JSON-RPC's batch of responses.
 

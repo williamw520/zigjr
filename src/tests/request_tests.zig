@@ -25,9 +25,9 @@ test "Parsing valid request, single integer param, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -61,9 +61,9 @@ test "Parsing valid request, single string param, string id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -97,9 +97,9 @@ test "Parsing valid request, tw0 integer params, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -135,9 +135,9 @@ test "Parsing valid request, object params, integer id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -171,9 +171,9 @@ test "Parse valid request, with 0 params, with no id" {
                                         );
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -206,9 +206,9 @@ test "Parse valid request, with no params, with no id" {
         defer result.deinit();
         const req = try result.request();
         // std.debug.print("Request: {any}\n", .{req});
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -295,7 +295,7 @@ test "Parse empty request, expect error." {
         defer result.deinit();
         const req = try result.request();
         try testing.expect(req.hasError());
-        try testing.expect(req.err.code == ErrorCode.InvalidRequest);
+        try testing.expect(req.err().code == ErrorCode.InvalidRequest);
         try testing.expect(req.isError(ErrorCode.InvalidRequest));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -310,7 +310,7 @@ test "Parse incomplete opening request {, expect error." {
         defer result.deinit();
         const req = try result.request();
         try testing.expect(req.hasError());
-        try testing.expect(req.err.code == ErrorCode.InvalidRequest);
+        try testing.expect(req.err().code == ErrorCode.InvalidRequest);
         try testing.expect(req.isError(ErrorCode.InvalidRequest));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -323,8 +323,8 @@ test "Parse incomplete closing request }, expect error." {
                                         \\}
                                         );
         defer result.deinit();
-        // std.debug.print("Error {}, {s}\n", .{(try result.request()).err.code, (try result.request()).err.err_msg});
-        try testing.expect((try result.request()).err.code == ErrorCode.ParseError);
+        // std.debug.print("Error {}, {s}\n", .{(try result.request()).err().code, (try result.request()).err().err_msg});
+        try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -336,7 +336,7 @@ test "Parse empty object request {}, expect error." {
                                         \\{}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -348,7 +348,7 @@ test "Parse invalid syntax request, expect error." {
                                         \\ foo abc 123
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.ParseError);
+        try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -360,7 +360,7 @@ test "Parse incomplete missing value request, expect error." {
                                         \\{"foo":
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -372,7 +372,7 @@ test "Parse missing value request, expect error." {
                                         \\{"foo": }
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -384,7 +384,7 @@ test "Parse missing value for 'jsonrpc' property, expect error." {
                                         \\{"jsonrpc": }
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.ParseError);
+        try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -396,7 +396,7 @@ test "Parse incomplete jsonrpc request 'jsonrpc' only, expect error." {
                                         \\{"jsonrpc": "2.0"}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -408,7 +408,7 @@ test "Parse duplicate 'params' properties, expect error." {
                                         \\{"jsonrpc": "2.0", "methodx": "foobar", "params": [], "id": "4"}
                                         );
         defer result.deinit();
-        // try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        // try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -420,7 +420,7 @@ test "Parse invalid jsonrpc version 0.0, expect error." {
                                         \\{"jsonrpc": "0.0", "method": "foobar", "params": [], "id": "5"}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -432,7 +432,7 @@ test "Parse invalid jsonrpc version 1.0, expect error." {
                                         \\{"jsonrpc": "1.0", "method": "foobar", "params": [], "id": "5"}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -444,7 +444,7 @@ test "Parse invalid jsonrpc version 3.0, expect error." {
                                         \\{"jsonrpc": "3.0", "method": "foobar", "params": [], "id": "5"}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -456,7 +456,7 @@ test "Parse empty method, expect error." {
                                         \\{"jsonrpc": "2.0", "method": ""}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -468,7 +468,7 @@ test "Parse non-object nor non-array params '1234', expect error." {
                                         \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
                                         );
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidParams);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -481,7 +481,7 @@ test "Parse non-object nor non-array params 'abcd', expect error." {
                                         );
         defer result.deinit();
         // std.debug.print("Request: {any}\n", .{try result.request()});
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidParams);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -498,9 +498,9 @@ test "Parsing valid request with parseRequestReader, single integer param, integ
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -536,9 +536,9 @@ test "Parsing valid request with parseRequestReader, single string param, string
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
         const req = try result.request();
-        try testing.expect(@TypeOf(result.rpcmsg) == RpcRequestMessage);
-        try testing.expect(result.rpcmsg == .request);
-        switch (result.rpcmsg) {
+        try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
+        try testing.expect(result.request_msg == .request);
+        switch (result.request_msg) {
             .request    => |r| { _=r; try testing.expect(true);  },
             .batch      => |b| { _=b; try testing.expect(false); },
         }
@@ -573,7 +573,7 @@ test "Parse missing value request with parseRequestReader, expect error." {
         const json_reader = json_stream.reader();
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -587,7 +587,7 @@ test "Parse empty method with parseRequest, expect error." {
         const json_reader = json_stream.reader();
         var result = zigjr.parseRequestReader(alloc, json_reader);
         defer result.deinit();
-        try testing.expect((try result.request()).err.code == ErrorCode.InvalidRequest);
+        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }

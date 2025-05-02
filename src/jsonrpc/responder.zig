@@ -36,18 +36,18 @@ pub const DispatchResult = union(enum) {
 };
 
 /// Run the handler on the request and generate a response JSON string.
+/// A 'null' return value signifies the request is a notification.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
+/// Any error coming from the dispatcher is passed back to caller.
+///
+/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
+pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
-        return try messages.responseErrorJson(alloc, req.id, req.err.code, req.err.err_msg);
+        return try messages.responseErrorJson(alloc, req.id, req.err().code, req.err().err_msg);
     }
 
-    // Limit the 'anytype' dispatcher to have a run() method returning a DispatchResult.
-    // Limit the 'anytype' dispatcher to have a free() method to free the DispatchResult.
-    // Callers of respond() need to handle any errors coming from their dispatcher.
-    // The dispatcher can use 'alloc' to allocate memory for the result data fields.
-    // They should be freed in the dispatcher.free() callback.
     const dresult: DispatchResult = try dispatcher.run(alloc, req);
     switch (dresult) {
         .none => {
@@ -68,18 +68,23 @@ pub fn respond(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const
     }
 }
 
-/// Run the handler on the list of requests one by one and generate the array of responses
-/// for the requests in one JSON response string.
-/// Each request has one response except for notification.  Errors are returned as well.
-/// Caller needs to call alloc.free on the returned JSON to free the memory.
-pub fn respondBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype) ![]const u8 {
+/// Run the handler on the list of requests one by one and generate 
+/// an array of responses for the requests in one JSON response string.
+/// Each request has one response item except for notification.
+/// Errors are returned as array items in the JSON.
+/// Caller needs to call alloc.free() on the returned message to free the memory.
+/// Any error coming from the dispatcher is passed back to caller.
+///
+/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
+pub fn runBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype) ![]const u8 {
     var count: usize = 0;
     var buffer = ArrayList(u8).init(alloc);
     defer buffer.deinit();
 
     try buffer.appendSlice("[");
     for (reqs) |req| {
-        const response_json = try respond(alloc, req, dispatcher);
+        const response_json = try runRequest(alloc, req, dispatcher);
         if (response_json)|res_json| {
             defer alloc.free(res_json);
             if (count > 0) try buffer.appendSlice(", ");

@@ -166,14 +166,14 @@ test "Response to a request of hello method" {
         );
         defer req_result.deinit();
 
-        const response = try zigjr.respond(alloc, try req_result.request(), HelloDispatcher);
+        const response = try zigjr.runRequest(alloc, try req_result.request(), HelloDispatcher);
         const res_json = response orelse "";
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
 
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
@@ -190,13 +190,13 @@ test "Response to a request of unknown method, expect error" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), HelloDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), HelloDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
@@ -213,13 +213,13 @@ test "Response to a request of integer add" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
@@ -235,13 +235,13 @@ test "Response to a request of integer sub" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.integer, -1);
         try testing.expectEqual(res.id.num, 1);
@@ -257,13 +257,13 @@ test "Response to a request of integer multiply" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.integer, 20);
         try testing.expectEqual(res.id.num, 1);
@@ -279,13 +279,13 @@ test "Response to a request of integer divide" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
@@ -301,13 +301,13 @@ test "Response to a request of integer add with missing parameter, expect error"
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
@@ -323,13 +323,13 @@ test "Response to a request of float add" {
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
         );
         defer result.deinit();
-        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.float, 3);
         try testing.expectEqual(res.id.num, 1);
@@ -345,13 +345,13 @@ test "Response to a request of float sub" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.float, -1.0);
         try testing.expectEqual(res.id.num, 1);
@@ -367,13 +367,13 @@ test "Response to a request of float multiply" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.float, 20);
         try testing.expectEqual(res.id.num, 1);
@@ -389,13 +389,13 @@ test "Response to a request of float divide" {
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expectEqual(res.result.float, 10.0/3.0);
         try testing.expectEqual(res.id.num, 1);
@@ -413,7 +413,7 @@ test "Response using an object based dispatcher." {
             );
             defer result.deinit();
 
-            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.runRequest(alloc, try result.request(), &dispatcher);
             // std.debug.print("res_json: {any}\n", .{res});
             try testing.expectEqual(res, null);
         }
@@ -423,7 +423,7 @@ test "Response using an object based dispatcher." {
             );
             defer result.deinit();
 
-            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.runRequest(alloc, try result.request(), &dispatcher);
             try testing.expectEqual(res, null);
         }
         {
@@ -432,12 +432,12 @@ test "Response using an object based dispatcher." {
             );
             defer result.deinit();
 
-            const res_json = (try zigjr.respond(alloc, try result.request(), &dispatcher)) orelse "";
+            const res_json = (try zigjr.runRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseResponse(alloc, res_json);
             defer res_result.deinit();
-            const res = res_result.response().?;
+            const res = try res_result.response();
             try testing.expectEqual(res.result.integer, 2);
         }
         {
@@ -446,7 +446,7 @@ test "Response using an object based dispatcher." {
             );
             defer result.deinit();
 
-            const res = try zigjr.respond(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.runRequest(alloc, try result.request(), &dispatcher);
             try testing.expectEqual(res, null);
         }
         {
@@ -455,12 +455,12 @@ test "Response using an object based dispatcher." {
             );
             defer result.deinit();
 
-            const res_json = (try zigjr.respond(alloc, try result.request(), &dispatcher)) orelse "";
+            const res_json = (try zigjr.runRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseResponse(alloc, res_json);
             defer res_result.deinit();
-            const res = res_result.response().?;
+            const res = try res_result.response();
             try testing.expectEqual(res.result.integer, 1);
         }
     }
@@ -475,12 +475,12 @@ test "Response to a request of integer add with invalid parameter type, expect e
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.respond(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
@@ -498,7 +498,7 @@ test "Construct a normal response message, simple integer result" {
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
  
         try testing.expect(!res.hasErr());
         try testing.expectEqual(res.result.integer, 10);
@@ -516,7 +516,7 @@ test "Construct a normal response message, array result" {
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(!res.hasErr());
         try testing.expectEqualSlices(Value, res.result.array.items, &[_]Value{ .{.integer = 1}, .{.integer = 2}, .{.integer=3} });
@@ -534,7 +534,7 @@ test "Construct an error response message" {
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InternalError));
@@ -553,7 +553,7 @@ test "Construct an error response message with data" {
 
         var res_result = try zigjr.parseResponse(alloc, res_json);
         defer res_result.deinit();
-        const res = res_result.response().?;
+        const res = try res_result.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InternalError));
@@ -592,13 +592,13 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        const batch_res_json = try zigjr.respondBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.runBatch(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
         defer batch_res_result.deinit();
-        const batch_res = batch_res_result.batch().?;
+        const batch_res = try batch_res_result.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
 
         try testing.expect(!batch_res[0].hasErr());

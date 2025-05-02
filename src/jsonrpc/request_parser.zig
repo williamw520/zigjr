@@ -24,25 +24,25 @@ const JrErrors = jsonrpc_errors.JrErrors;
 
 
 
-pub fn parseRequest(alloc: Allocator, json_str: []const u8) RpcResult {
+pub fn parseRequest(alloc: Allocator, json_str: []const u8) RequestResult {
     const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
-        var req = RpcRequest{};
-        req.setParseErr(parse_err);
+        var empty_req = RpcRequest{};
+        empty_req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpcmsg = RpcRequestMessage { .request = req },
+            .request_msg = RpcRequestMessage { .request = empty_req },
         };
     };
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .rpcmsg = parsed.value,
+        .request_msg = parsed.value,
     };
 }
 
-pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RpcResult {
+pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RequestResult {
     var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
     defer rp.deinit();
     // NOTE: Stream parsing of JSON's via Reader is impossible.
@@ -52,18 +52,18 @@ pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RpcResult {
     // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
     // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
     const parsed = rp.next() catch |parse_err| {
-        var req = RpcRequest{};
-        req.setParseErr(parse_err);
+        var empty_req = RpcRequest{};
+        empty_req.setParseErr(parse_err);
         return .{
             .alloc = alloc,
             .parsed = null,
-            .rpcmsg = RpcRequestMessage { .request = req },
+            .request_msg = RpcRequestMessage { .request = empty_req },
         };
     };
     return .{
         .alloc = alloc,
         .parsed = parsed,
-        .rpcmsg = parsed.value,
+        .request_msg = parsed.value,
     };
 }
 
@@ -90,33 +90,33 @@ fn ReaderParser(comptime JsonReaderType: type) type {
     };
 }
 
-pub const RpcResult = struct {
+pub const RequestResult = struct {
     const Self = @This();
-    alloc:      Allocator,
-    parsed:     ?std.json.Parsed(RpcRequestMessage) = null,
-    rpcmsg:     RpcRequestMessage,
+    alloc:          Allocator,
+    parsed:         ?std.json.Parsed(RpcRequestMessage) = null,
+    request_msg:    RpcRequestMessage,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
     }
 
     pub fn isRequest(self: Self) bool {
-        return self.rpcmsg == .request;
+        return self.request_msg == .request;
     }
 
     pub fn isBatch(self: Self) bool {
-        return self.rpcmsg == .batch;
+        return self.request_msg == .batch;
     }
 
     /// Shortcut to access the inner tagged union invariant request.
-    /// Can also access via switch(rpcmsg) .request => 
+    /// Can also access via switch(request_msg) .request => , .batch =>
     pub fn request(self: *Self) !RpcRequest {
-        return if (self.isRequest()) self.rpcmsg.request else JrErrors.NotSingleRpcRequest;
+        return if (self.isRequest()) self.request_msg.request else JrErrors.NotSingleRpcRequest;
     }
 
     /// Shortcut to access the inner tagged union invariant batch.
     pub fn batch(self: *Self) ![]const RpcRequest {
-        return if (self.isBatch()) self.rpcmsg.batch else JrErrors.NotBatchRpcRequest;
+        return if (self.isBatch()) self.request_msg.batch else JrErrors.NotBatchRpcRequest;
     }
 };
 
@@ -149,14 +149,30 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .none = {} },    // default for optional field.
-    err:        ReqError = .{},             // attach parsing error and validation error here.
+    _err:       ReqError = .{},             // attach parsing error and validation error here.
 
     fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
-        self.err = ReqError.fromParseError(parse_err);
+        self._err = ReqError.fromParseError(parse_err);
     }
 
     fn validate(self: *Self) void {
-        self.err = ReqError.validateRequest(self) orelse .{};
+        self._err = ReqError.validateRequest(self) orelse .{};
+    }
+
+    pub fn err(self: Self) ReqError {
+        return self._err;
+    }
+
+    pub fn hasError(self: Self) bool {
+        return self.err().code != ErrorCode.None;
+    }
+
+    pub fn isError(self: Self, code: ErrorCode) bool {
+        return self.err().code == code;
+    }
+
+    pub fn isNotification(self: Self) bool {
+        return !self.id.isValid();
     }
 
     pub fn hasParams(self: Self) bool {
@@ -178,19 +194,6 @@ pub const RpcRequest = struct {
     pub fn objectParams(self: Self) ?std.json.ObjectMap {
         return if (self.params == .object) self.params.object else null;
     }
-
-    pub fn isNotification(self: Self) bool {
-        return !self.id.isValid();
-    }
-
-    pub fn hasError(self: Self) bool {
-        return self.err.code != ErrorCode.None;
-    }
-
-    pub fn isError(self: Self, code: ErrorCode) bool {
-        return self.err.code == code;
-    }
-
 };
 
 pub const RpcId = union(enum) {
@@ -214,15 +217,13 @@ pub const RpcId = union(enum) {
     }
 };
 
-const ReqError = struct {
+pub const ReqError = struct {
     const Self = @This();
 
     code:       ErrorCode = ErrorCode.None,
     err_msg:    []const u8 = "",                // only constant string, no allocation.
     req_id:     RpcId = .{ .null = {} },        // request id related to the error.
 
-    // The alloc passed in is from std.json.parseFromTokenSource() and it's an ArenaAllocator.
-    // The memory is freed all together in Parsed(T).deinit().
     fn fromParseError(parse_err: ParseError(Scanner)) Self {
         return switch (parse_err) {
             error.MissingField, error.UnknownField, error.DuplicateField,

@@ -10,6 +10,7 @@ TODOs
 * DONE Add parsing batch result.
 * DONE Rename RpcMessage to RpcRequestMessage.
 * TODO Add test on parsing empty batch request.
+* TODO Add test on parsing batch requests with reader.
 * TODO Add streaming API, lrcr based and Content-Length based.
 * TODO Message logging.
 * TODO Add CLI on running request and response and on streaming.

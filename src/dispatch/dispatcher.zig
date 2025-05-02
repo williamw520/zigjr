@@ -71,7 +71,7 @@ pub const Registry = struct {
     pub fn run(self: *Self, req: RpcRequest) ![]const u8 {
         if (req.hasError()) {
             // For parsing or validation error on the request, return an error response.
-            return self.responseErrorJson(req.id, @intFromEnum(req.err.code), req.err.err_msg);
+            return self.responseErrorJson(req.id, @intFromEnum(req.err().code), req.err().err_msg);
         }
         if (self.dispatch(req)) |result_json| {
             defer self.alloc.free(result_json);
@@ -156,7 +156,7 @@ pub const Registry = struct {
     /// Caller needs to call self.alloc.free() on the returned message free the memory.
     fn response(self: Self, req: RpcRequest, result_json: []const u8) ![]const u8 {
         if (req.hasError()) {
-            return self.responseErrorJson(req.id, @intFromEnum(req.err.code), req.err.err_msg);
+            return self.responseErrorJson(req.id, @intFromEnum(req.err().code), req.err().err_msg);
         }
         return switch (req.id) {
             .num => allocPrint(self.alloc, \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}

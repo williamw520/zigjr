@@ -19,7 +19,7 @@ const ErrorCode = jsonrpc_errors.ErrorCode;
 const JrErrors = jsonrpc_errors.JrErrors;
 
 
-/// Build a request message.
+/// Build a request message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: RpcId) ![]const u8 {
     const pinfo = @typeInfo(@TypeOf(params));
@@ -61,7 +61,7 @@ pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: Rp
     }
 }
 
-/// Build a batch message of request jsons.
+/// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) ![]const u8 {
     var count: usize = 0;
@@ -79,7 +79,7 @@ pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) ![]const u
     return try alloc.dupe(u8, buffer.items);
 }
 
-/// Build a normal response message.
+/// Build a normal response message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) ![]const u8 {
     switch (id) {
@@ -94,7 +94,7 @@ pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) ![]con
     }
 }
 
-/// Build an error response message.
+/// Build an error response message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) ![]const u8 {
     const code: i32 = @intFromEnum(errCode);
@@ -115,7 +115,7 @@ pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: [
     }
 }
 
-/// Build an error response message, with the error data field set.
+/// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn responseErrorDataJson(alloc: Allocator, id: RpcId, errCode: ErrorCode,
                              msg: []const u8, data: []const u8) ![]const u8 {

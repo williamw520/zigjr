@@ -16,13 +16,20 @@ const dispatcher_errors = @import("dispatch/dispatch_erros.zig");
 
 pub const parseRequest = req_parser.parseRequest;
 pub const parseRequestReader = req_parser.parseRequestReader;
-pub const parseResponse = res_parser.parseResponse;
+pub const RequestResult = res_parser.RequestResult;
 pub const RpcRequestMessage = req_parser.RpcRequestMessage;
 pub const RpcRequest = req_parser.RpcRequest;
 pub const RpcId = req_parser.RpcId;
+pub const ReqError = req_parser.ReqError;
 
-pub const respond = responder.respond;
-pub const respondBatch = responder.respondBatch;
+pub const parseResponse = res_parser.parseResponse;
+pub const ResponseResult = res_parser.ResponseResult;
+pub const RpcResponseMessage = res_parser.RpcResponseMessage;
+pub const RpcResponse = res_parser.RpcResponse;
+pub const RpcResponseErr = res_parser.RpcResponseErr;
+
+pub const runRequest = responder.runRequest;
+pub const runBatch = responder.runBatch;
 pub const DispatchResult = responder.DispatchResult;
 
 pub const requestJson = messages.requestJson;
