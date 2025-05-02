@@ -625,3 +625,32 @@ test "Handle batch requests with the CounterDispatcher" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+test "Handle empty batch response" {
+    const alloc = gpa.allocator();
+    {
+        var dispatcher = CounterDispatcher{};
+        const req_jsons = [_][]const u8{};
+        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        defer alloc.free(batch_req_json);
+        // std.debug.print("batch request json {s}\n", .{batch_req_json});
+
+        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json);
+        defer batch_req_result.deinit();
+        try testing.expect(batch_req_result.isBatch());
+        try testing.expect((try batch_req_result.batch()).len == 0);
+
+        const batch_res_json = try zigjr.runBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        defer alloc.free(batch_res_json);
+        // std.debug.print("batch response json {s}\n", .{batch_res_json});
+
+        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_res_result.deinit();
+        const batch_res = try batch_res_result.batch();
+        for (batch_res)|res| std.debug.print("response {any}\n", .{res});
+
+        try testing.expect(batch_res.len == 0);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
