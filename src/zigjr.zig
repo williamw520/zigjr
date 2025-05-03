@@ -30,6 +30,7 @@ pub const RpcResponseErr = res_parser.RpcResponseErr;
 
 pub const runRequest = responder.runRequest;
 pub const runBatch = responder.runBatch;
+pub const runJsonMessage = responder.runJsonMessage;
 pub const DispatchResult = responder.DispatchResult;
 
 pub const requestJson = messages.requestJson;

@@ -36,8 +36,13 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn free(_: Allocator, _: DispatchResult) void {
+    pub fn free(_: Allocator, dresult: DispatchResult) void {
         // All result data are constant strings.  Nothing to free.
+        switch (dresult) {
+            .result => {},
+            .err => {},
+            .none => {},
+        }
     }
 };
 
@@ -72,11 +77,11 @@ const IntCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dr: DispatchResult) void {
-        switch (dr) {
-            .result => alloc.free(dr.result),
+    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+        switch (dresult) {
+            .result => alloc.free(dresult.result),
             .err => {},
-            else => {},
+            .none => {},
         }
     }
     
@@ -122,9 +127,9 @@ const FloatCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dr: DispatchResult) void {
-        switch (dr) {
-            .result => alloc.free(dr.result),
+    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+        switch (dresult) {
+            .result => alloc.free(dresult.result),
             .err => {},
             else => {},
         }
@@ -182,6 +187,27 @@ test "Response to a request of hello method" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
+test "runJsonMessage on a request of hello method" {
+    const alloc = gpa.allocator();
+    {
+        const response = try zigjr.runJsonMessage(alloc,
+            \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
+        , HelloDispatcher);
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("response: {s}\n", .{res_json});
+
+        var res_result = try zigjr.parseResponse(alloc, res_json);
+        defer res_result.deinit();
+        const res = try res_result.response();
+        // std.debug.print("res.result: {s}\n", .{res.result.string});
+
+        try testing.expectEqualSlices(u8, res.result.string, "hello back");
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
 test "Response to a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
@@ -214,6 +240,25 @@ test "Response to a request of integer add" {
         defer result.deinit();
 
         const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        var res_result = try zigjr.parseResponse(alloc, res_json);
+        defer res_result.deinit();
+        const res = try res_result.response();
+
+        try testing.expectEqual(res.result.integer, 3);
+        try testing.expectEqual(res.id.num, 1);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
+
+test "runJsonMessage on a request of integer add" {
+    const alloc = gpa.allocator();
+    {
+        const res_json = try zigjr.runJsonMessage(alloc,
+            \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
+        , IntCalcDispatcher) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -625,6 +670,59 @@ test "Handle batch requests with the CounterDispatcher" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+test "runJsonMessage on batch JSON requests with the CounterDispatcher" {
+    const alloc = gpa.allocator();
+    {
+        var dispatcher = CounterDispatcher{};
+        const req_jsons = [_][]const u8{
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
+            ,
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
+            ,
+            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
+            ,
+        };
+        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        defer alloc.free(batch_req_json);
+        // std.debug.print("batch request json {s}\n", .{batch_req_json});
+
+        const batch_res_json = try zigjr.runJsonMessage(alloc, batch_req_json, &dispatcher) orelse "";
+        defer alloc.free(batch_res_json);
+
+        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_res_result.deinit();
+        const batch_res = try batch_res_result.batch();
+        // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
+
+        try testing.expect(!batch_res[0].hasErr());
+        try testing.expectEqual(batch_res[0].err().code, @intFromEnum(ErrorCode.None));
+        try testing.expectEqualSlices(u8, batch_res[0].err().message, "");
+        try testing.expect(batch_res[0].err().data == null);
+        try testing.expect(batch_res[0].id.num == 2);
+        try testing.expect(batch_res[0].result.integer == 1);
+
+        try testing.expect(batch_res[1].hasErr());
+        try testing.expectEqual(batch_res[1].err().code, @intFromEnum(ErrorCode.MethodNotFound));
+        try testing.expectEqualSlices(u8, batch_res[1].err().message, "MethodNotFound");
+        try testing.expect(batch_res[1].err().data == null);
+        try testing.expect(batch_res[1].id.num == 99);
+        try testing.expect(batch_res[1].result == .null);
+
+        try testing.expect(!batch_res[2].hasErr());
+        try testing.expectEqual(batch_res[2].err().code, @intFromEnum(ErrorCode.None));
+        try testing.expectEqualSlices(u8, batch_res[2].err().message, "");
+        try testing.expect(batch_res[2].err().data == null);
+        try testing.expect(batch_res[2].id.num == 4);
+        try testing.expect(batch_res[2].result.integer == 0);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
 test "Handle empty batch response" {
     const alloc = gpa.allocator();
     {
@@ -652,5 +750,9 @@ test "Handle empty batch response" {
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
+
+
+
 
 

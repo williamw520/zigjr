@@ -12,40 +12,38 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const bufferedWriter = std.io.bufferedWriter;
 
-const req_parser = @import("../jsonrpc/request_parser.zig");
-const RpcRequest = req_parser.RpcRequest;
-const RpcId = req_parser.RpcId;
-
-const jsonrpc_errors = @import("../jsonrpc/jsonrpc_errors.zig");
-const ErrorCode = jsonrpc_errors.ErrorCode;
-const JrErrors = jsonrpc_errors.JrErrors;
-
-const messages = @import("../jsonrpc/messages.zig");
+const responder = @import("../jsonrpc/responder.zig");
 
 
-pub fn streamByDelimiter(alloc: Allocator, comptime delimiter: u8,
-                         reader: anytype, buffered_writer: anytype,
-                         dispatcher: anytype) !void {
-    _=dispatcher;
-
-    var line = std.ArrayList(u8).init(alloc);
-    defer line.deinit();
+/// Provides framing level support for JSON-RPC streaming.
+/// Runs a loop to read a stream of JSON request messages (frames) from the reader,
+/// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
+/// The incoming framed messages are delimitered by the read_delimiter.
+/// The outgoing framed messages are delimitered by the write_delimiter.
+/// A typical JSON-RPC stream is delimitered by '\n' the CR character,
+/// which reqires all message content does not content the character.
+pub fn streamByDelimiter(alloc: Allocator, comptime read_delimiter: u8, comptime write_delimiter: u8,
+                         reader: anytype, buffered_writer: anytype, dispatcher: anytype) !void {
+    var frame = std.ArrayList(u8).init(alloc);  // one frame is one JSON request.
+    defer frame.deinit();
     var buffered_reader = std.io.bufferedReader(reader);
     var buf_reader = buffered_reader.reader();
     var buf_writer = buffered_writer.writer();
 
     while (true) {
-        line.clearRetainingCapacity();
-        const read_count = buf_reader.streamUntilDelimiter(line.writer(), delimiter, null) catch |err| {
+        frame.clearRetainingCapacity();
+        _ = buf_reader.streamUntilDelimiter(frame.writer(), read_delimiter, null) catch |err| {
             switch (err) {
                 error.EndOfStream => break,
                 else => return err,
             }
         };
-        _=read_count;
 
-        try buf_writer.print("Line: {s}\n", .{line.items});
-        try buffered_writer.flush();
+        if (try responder.runJsonMessage(alloc, frame.items, dispatcher))|result_json| {
+            try buf_writer.print("{s}{c}", .{result_json, write_delimiter});
+            try buffered_writer.flush();
+            alloc.free(result_json);
+        }
     }
 }
 

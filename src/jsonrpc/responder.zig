@@ -35,7 +35,7 @@ pub const DispatchResult = union(enum) {
     },
 };
 
-/// Run the handler on the request and generate a response JSON string.
+/// Run the dispatcher on the request and generate a response JSON string.
 /// A 'null' return value signifies the request is a notification.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
@@ -68,7 +68,7 @@ pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]co
     }
 }
 
-/// Run the handler on the list of requests one by one and generate 
+/// Run the dispatcher on the list of requests one by one and generate 
 /// an array of responses for the requests in one JSON response string.
 /// Each request has one response item except for notification.
 /// Errors are returned as array items in the JSON.
@@ -97,5 +97,22 @@ pub fn runBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype)
     return try alloc.dupe(u8, buffer.items);
 }
 
+/// Parse the JSON request message, run the dispatcher on request(s), 
+/// returns the response in one JSON string.
+/// The JSON request message can contain a single request or a batch of requests.
+/// Errors are returned as array items in the JSON.
+/// Caller needs to call alloc.free() on the returned message to free the memory.
+/// Any error coming from the dispatcher is passed back to caller.
+///
+/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
+pub fn runJsonMessage(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !?[]const u8 {
+    var req_result = req_parser.parseRequest(alloc, request_json);
+    defer req_result.deinit();
+    return switch (req_result.request_msg) {
+        .request    => |request|  try runRequest(alloc, request, dispatcher),
+        .batch      => |requests| try runBatch(alloc, requests, dispatcher),
+    };
+}
 
 
