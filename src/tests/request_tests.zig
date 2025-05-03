@@ -297,6 +297,46 @@ test "Parse a valid empty request batch" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+test "Parse valid request batch using Reader, with no params, with string id" {
+    const alloc = gpa.allocator();
+    {
+        var json_stream = std.io.fixedBufferStream(
+            \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
+            \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
+        );
+        const json_reader = json_stream.reader();
+        var result = zigjr.parseRequestReader(alloc, json_reader);
+        defer result.deinit();
+        switch (result.request_msg) {
+            .request    => |r| { _=r; try testing.expect(false);  },
+            .batch      => |b| { _=b; try testing.expect(true); },
+        }
+        try testing.expect(!result.isRequest());
+        try testing.expect(result.isBatch());
+        try testing.expect(result.request() == JrErrors.NotSingleRpcRequest);
+        try testing.expect(result.batch() != JrErrors.NotBatchRpcRequest);
+
+        const reqs = try result.batch();
+        try testing.expect(reqs.len == 2);
+        try testing.expect(std.mem.eql(u8, &reqs[0].jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, &reqs[1].jsonrpc, "2.0"));
+        try testing.expect(std.mem.eql(u8, reqs[0].method, "fun0"));
+        try testing.expect(std.mem.eql(u8, reqs[1].method, "fun0"));
+        try testing.expect(!reqs[0].hasParams());
+        try testing.expect(!reqs[1].hasParams());
+        try testing.expect(reqs[0].arrayParams()  == null);
+        try testing.expect(reqs[1].arrayParams()  == null);
+        try testing.expect(reqs[0].objectParams() == null);
+        try testing.expect(reqs[1].objectParams() == null);
+        try testing.expect(!reqs[0].hasError());
+        try testing.expect(!reqs[1].hasError());
+        try testing.expect(reqs[0].id.isValid());
+        try testing.expect(reqs[1].id.isValid());
+        try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
+        try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 
 // Testing parsing errors and invalid requests.
