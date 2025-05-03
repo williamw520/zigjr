@@ -51,6 +51,7 @@ test {
     _ = @import("tests/response_tests.zig");
     _ = @import("tests/dispatcher_tests.zig");
     _ = @import("tests/tests.zig");
+    _ = @import("tests/stream_tests.zig");
 }
 
 

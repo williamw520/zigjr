@@ -11,9 +11,9 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
-const parser = @import("request_parser.zig");
-const RpcRequest = parser.RpcRequest;
-const RpcId = parser.RpcId;
+const req_parser = @import("request_parser.zig");
+const RpcRequest = req_parser.RpcRequest;
+const RpcId = req_parser.RpcId;
 
 const jsonrpc_errors = @import("jsonrpc_errors.zig");
 const ErrorCode = jsonrpc_errors.ErrorCode;
@@ -96,4 +96,6 @@ pub fn runBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype)
 
     return try alloc.dupe(u8, buffer.items);
 }
+
+
 
