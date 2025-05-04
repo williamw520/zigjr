@@ -51,7 +51,7 @@ pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]co
     const dresult: DispatchResult = try dispatcher.run(alloc, req);
     switch (dresult) {
         .none => {
-            return null;            // null for no result on a notification request.
+            return null;            // notification request has no result.
         },
         .result => |json| {
             defer dispatcher.free(alloc, dresult);
@@ -106,7 +106,7 @@ pub fn runBatch(alloc: Allocator, reqs: []const RpcRequest, dispatcher: anytype)
 ///
 /// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn runJsonMessage(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !?[]const u8 {
+pub fn runMessage(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !?[]const u8 {
     var req_result = req_parser.parseRequest(alloc, request_json);
     defer req_result.deinit();
     return switch (req_result.request_msg) {

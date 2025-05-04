@@ -187,10 +187,10 @@ test "Response to a request of hello method" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
-test "runJsonMessage on a request of hello method" {
+test "runMessage on a request of hello method" {
     const alloc = gpa.allocator();
     {
-        const response = try zigjr.runJsonMessage(alloc,
+        const response = try zigjr.runMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         , HelloDispatcher);
         const res_json = response orelse "";
@@ -253,10 +253,10 @@ test "Response to a request of integer add" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
-test "runJsonMessage on a request of integer add" {
+test "runMessage on a request of integer add" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.runJsonMessage(alloc,
+        const res_json = try zigjr.runMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
         , IntCalcDispatcher) orelse "";
         defer alloc.free(res_json);
@@ -537,7 +537,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
 test "Construct a normal response message, simple integer result" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseJson(alloc, .{ .num = 1 }, "10");
+        const res_json = try zigjr.messages.responseJson(alloc, .{ .num = 1 }, "10");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -555,7 +555,7 @@ test "Construct a normal response message, simple integer result" {
 test "Construct a normal response message, array result" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseJson(alloc, .{ .str = "2" }, "[1, 2, 3]");
+        const res_json = try zigjr.messages.responseJson(alloc, .{ .str = "2" }, "[1, 2, 3]");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -573,7 +573,7 @@ test "Construct a normal response message, array result" {
 test "Construct an error response message" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseErrorJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
+        const res_json = try zigjr.messages.responseErrorJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -592,7 +592,7 @@ test "Construct an error response message" {
 test "Construct an error response message with data" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.responseErrorDataJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
+        const res_json = try zigjr.messages.responseErrorDataJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -627,7 +627,7 @@ test "Handle batch requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -670,7 +670,7 @@ test "Handle batch requests with the CounterDispatcher" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "runJsonMessage on batch JSON requests with the CounterDispatcher" {
+test "runMessage on batch JSON requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
     {
         var dispatcher = CounterDispatcher{};
@@ -686,11 +686,11 @@ test "runJsonMessage on batch JSON requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        const batch_res_json = try zigjr.runJsonMessage(alloc, batch_req_json, &dispatcher) orelse "";
+        const batch_res_json = try zigjr.runMessage(alloc, batch_req_json, &dispatcher) orelse "";
         defer alloc.free(batch_res_json);
 
         var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
@@ -728,7 +728,7 @@ test "Handle empty batch response" {
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{};
-        const batch_req_json = try zigjr.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 

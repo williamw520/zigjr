@@ -42,7 +42,7 @@ pub fn streamByContentLength(alloc: Allocator, reader: anytype, buffered_writer:
             return err;
         };
         if (msg_len == 0) continue;     // skip empty content frame.
-        if (try responder.runJsonMessage(alloc, msg_buf.items, dispatcher))|result_json| {
+        if (try responder.runMessage(alloc, msg_buf.items, dispatcher))|result_json| {
             try frame.writeContentLengthFrame(buf_writer, result_json);
             try buffered_writer.flush();
             alloc.free(result_json);

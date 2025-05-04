@@ -39,7 +39,7 @@ pub fn streamByDelimiter(alloc: Allocator, comptime read_delimiter: u8, comptime
             }
         };
 
-        if (try responder.runJsonMessage(alloc, frame.items, dispatcher))|result_json| {
+        if (try responder.runMessage(alloc, frame.items, dispatcher))|result_json| {
             try buf_writer.print("{s}{c}", .{result_json, write_delimiter});
             try buffered_writer.flush();
             alloc.free(result_json);
