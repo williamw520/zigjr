@@ -30,6 +30,7 @@ pub const JrErrors = error {
     InvalidResponse,
     InvalidParamsType,
     InvalidJsonRpcversion,
+    MissingContentLengthHeader,
 };
 
 

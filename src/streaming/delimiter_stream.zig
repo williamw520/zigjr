@@ -15,7 +15,7 @@ const bufferedWriter = std.io.bufferedWriter;
 const responder = @import("../jsonrpc/responder.zig");
 
 
-/// Provides framing level support for JSON-RPC streaming.
+/// Provides framing level support for JSON-RPC streaming based on frame delimiter.
 /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
 /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
 /// The incoming framed messages are delimitered by the read_delimiter.

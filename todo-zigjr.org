@@ -12,7 +12,10 @@ TODOs
 * DONE Add test on parsing empty batch request.
 * DONE Add test on parsing empty batch response.
 * DONE Add test on parsing batch requests with reader.
-* WORKING Add streaming API, lrcr based and Content-Length based.
+* DONE Add delimiter based request streaming API.
+* DONE Add Content-Length request header based streaming API.
+* TODO Add delimiter based response streaming API.
+* TODO Add Content-Length header based response streaming API.
 * TODO Message logging.
 * TODO Add CLI on running request and response and on streaming.
 * TODO Add network server and client example.
