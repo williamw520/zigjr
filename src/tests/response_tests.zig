@@ -176,16 +176,16 @@ test "Response to a request of hello method" {
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
 
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "runRequestJson on a request of hello method" {
     const alloc = gpa.allocator();
@@ -197,18 +197,18 @@ test "runRequestJson on a request of hello method" {
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
 
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
-test "Response to a request of unknown method, expect error" {
+test "runRequestJson on a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRequest(alloc,
@@ -220,16 +220,47 @@ test "Response to a request of unknown method, expect error" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
+
+test "runRequestJson to a request with anonymous dispatcher struct" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
+        );
+        defer result.deinit();
+
+        const response = try zigjr.runRequest(alloc, try result.request(), struct {
+            pub fn run(_: Allocator, _: RpcRequest) !DispatchResult {
+                return .{ .result = "\"hello back\"" };
+            }
+            pub fn free(_: Allocator, dresult: DispatchResult) void {
+                switch (dresult) {
+                    else => {}
+                }
+            }
+        });
+        const res_json = response orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("response: {s}\n", .{res_json});
+
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        // std.debug.print("res.result: {}\n", .{try parsed_res.response()});
+
+        try testing.expectEqualSlices(u8, (try parsed_res.response()).result.string, "hello back");
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 test "Response to a request of integer add" {
     const alloc = gpa.allocator();
@@ -243,15 +274,15 @@ test "Response to a request of integer add" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "runRequestJson on a request of integer add" {
     const alloc = gpa.allocator();
@@ -262,15 +293,15 @@ test "runRequestJson on a request of integer add" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of integer sub" {
     const alloc = gpa.allocator();
@@ -284,15 +315,15 @@ test "Response to a request of integer sub" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, -1);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of integer multiply" {
     const alloc = gpa.allocator();
@@ -306,15 +337,15 @@ test "Response to a request of integer multiply" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 20);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of integer divide" {
     const alloc = gpa.allocator();
@@ -328,15 +359,15 @@ test "Response to a request of integer divide" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of integer add with missing parameter, expect error" {
     const alloc = gpa.allocator();
@@ -350,16 +381,16 @@ test "Response to a request of integer add with missing parameter, expect error"
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of float add" {
     const alloc = gpa.allocator();
@@ -372,15 +403,15 @@ test "Response to a request of float add" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 3);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of float sub" {
     const alloc = gpa.allocator();
@@ -394,15 +425,15 @@ test "Response to a request of float sub" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, -1.0);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of float multiply" {
     const alloc = gpa.allocator();
@@ -416,15 +447,15 @@ test "Response to a request of float multiply" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 20);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of float divide" {
     const alloc = gpa.allocator();
@@ -438,15 +469,15 @@ test "Response to a request of float divide" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 10.0/3.0);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response using an object based dispatcher." {
     const alloc = gpa.allocator();
@@ -480,9 +511,9 @@ test "Response using an object based dispatcher." {
             const res_json = (try zigjr.runRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseResponse(alloc, res_json);
-            defer res_result.deinit();
-            const res = try res_result.response();
+            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            defer parsed_res.deinit();
+            const res = try parsed_res.response();
             try testing.expectEqual(res.result.integer, 2);
         }
         {
@@ -503,14 +534,14 @@ test "Response using an object based dispatcher." {
             const res_json = (try zigjr.runRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseResponse(alloc, res_json);
-            defer res_result.deinit();
-            const res = try res_result.response();
+            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            defer parsed_res.deinit();
+            const res = try parsed_res.response();
             try testing.expectEqual(res.result.integer, 1);
         }
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Response to a request of integer add with invalid parameter type, expect error" {
     const alloc = gpa.allocator();
@@ -523,16 +554,16 @@ test "Response to a request of integer add with invalid parameter type, expect e
         const res_json = (try zigjr.runRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Construct a normal response message, simple integer result" {
     const alloc = gpa.allocator();
@@ -541,16 +572,16 @@ test "Construct a normal response message, simple integer result" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
  
         try testing.expect(!res.hasErr());
         try testing.expectEqual(res.result.integer, 10);
         try testing.expectEqual(res.id.num, 1);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Construct a normal response message, array result" {
     const alloc = gpa.allocator();
@@ -559,16 +590,16 @@ test "Construct a normal response message, array result" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(!res.hasErr());
         try testing.expectEqualSlices(Value, res.result.array.items, &[_]Value{ .{.integer = 1}, .{.integer = 2}, .{.integer=3} });
         try testing.expectEqualSlices(u8, res.id.str, "2");
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Construct an error response message" {
     const alloc = gpa.allocator();
@@ -577,9 +608,9 @@ test "Construct an error response message" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InternalError));
@@ -587,7 +618,7 @@ test "Construct an error response message" {
         try testing.expect(res.id == .null);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 test "Construct an error response message with data" {
     const alloc = gpa.allocator();
@@ -596,9 +627,9 @@ test "Construct an error response message with data" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var res_result = try zigjr.parseResponse(alloc, res_json);
-        defer res_result.deinit();
-        const res = try res_result.response();
+        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        defer parsed_res.deinit();
+        const res = try parsed_res.response();
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InternalError));
@@ -608,7 +639,7 @@ test "Construct an error response message with data" {
         try testing.expect(res.id == .null);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
+}
 
 
 test "Handle batch requests with the CounterDispatcher" {
@@ -641,9 +672,9 @@ test "Handle batch requests with the CounterDispatcher" {
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
-        defer batch_res_result.deinit();
-        const batch_res = try batch_res_result.batch();
+        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_parsed_res.deinit();
+        const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
 
         try testing.expect(!batch_res[0].hasErr());
@@ -693,9 +724,9 @@ test "runRequestJson on batch JSON requests with the CounterDispatcher" {
         const batch_res_json = try zigjr.runRequestJson(alloc, batch_req_json, &dispatcher) orelse "";
         defer alloc.free(batch_res_json);
 
-        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
-        defer batch_res_result.deinit();
-        const batch_res = try batch_res_result.batch();
+        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_parsed_res.deinit();
+        const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
 
         try testing.expect(!batch_res[0].hasErr());
@@ -741,9 +772,9 @@ test "Handle empty batch response" {
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
-        defer batch_res_result.deinit();
-        const batch_res = try batch_res_result.batch();
+        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        defer batch_parsed_res.deinit();
+        const batch_res = try batch_parsed_res.batch();
         for (batch_res)|res| std.debug.print("response {any}\n", .{res});
 
         try testing.expect(batch_res.len == 0);
@@ -771,9 +802,7 @@ test "Dispatch on the response to a request of float add" {
         });
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}    
-
-
+}
 
 
 
