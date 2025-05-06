@@ -31,6 +31,7 @@ pub const JrErrors = error {
     InvalidParamsType,
     InvalidJsonRpcversion,
     MissingContentLengthHeader,
+    InvalidRpcIdValueType,
 };
 
 

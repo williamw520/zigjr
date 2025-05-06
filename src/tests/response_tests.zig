@@ -804,6 +804,48 @@ test "Dispatch on the response to a request of float add" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+test "Dispatch batch responses on batch JSON requests with the CounterDispatcher" {
+    const alloc = gpa.allocator();
+    {
+        var dispatcher = CounterDispatcher{};
+        const req_jsons = [_][]const u8{
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
+            ,
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
+            ,
+            \\{"jsonrpc": "2.0", "method": "no-method", "id": "abc"}
+            ,
+            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
+            ,
+        };
+        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        defer alloc.free(batch_req_json);
+        // std.debug.print("batch request json {s}\n", .{batch_req_json});
+
+        const batch_res_json = try zigjr.runRequestJson(alloc, batch_req_json, &dispatcher) orelse "";
+        defer alloc.free(batch_res_json);
+
+        const non_exist_id = "xyz";
+
+        try zigjr.runResponseJson(alloc, batch_res_json, struct {
+            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+                // std.debug.print("response: {any}\n", .{res});
+                if (try res.id.eql(2)) {
+                    try testing.expectEqual(res.result.integer, 1);
+                } else if (try res.id.eql("abc")) {
+                    try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
+                } else if (try res.id.eql(non_exist_id)) {
+                    std.debug.print("response: {any}\n", .{res});
+                } else if (try res.id.eql(4)) {
+                    try testing.expectEqual(res.result.integer, 0);
+                }
+            }
+        });
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 
 
