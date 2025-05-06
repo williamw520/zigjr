@@ -215,6 +215,17 @@ pub const RpcId = union(enum) {
     pub fn isValid(self: @This()) bool {
         return self == .num or self == .str;
     }
+
+    pub fn eql(self: @This(), value: anytype) !bool {
+        const TI = @typeInfo(@TypeOf(value));
+        switch (TI) {
+            .comptime_int,
+            .int        => return self == .num and self.num == value,
+            .pointer    => return self == .str and std.mem.eql(u8, self.str, value[0..]),
+            .array      => return self == .str and std.mem.eql(u8, self.str, value[0..]),
+            else        => @compileError("RpcId value can only be integer or string."),
+        }
+    }
 };
 
 pub const ReqError = struct {
