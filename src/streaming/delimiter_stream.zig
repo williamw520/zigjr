@@ -12,7 +12,7 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const bufferedWriter = std.io.bufferedWriter;
 
-const responder = @import("../jsonrpc/responder.zig");
+const runner = @import("../jsonrpc/runner.zig");
 
 
 /// Provides framing level support for JSON-RPC streaming based on frame delimiter.
@@ -39,7 +39,7 @@ pub fn streamByDelimiter(alloc: Allocator, comptime read_delimiter: u8, comptime
             }
         };
 
-        if (try responder.runMessage(alloc, frame.items, dispatcher))|result_json| {
+        if (try runner.runRequestJson(alloc, frame.items, dispatcher))|result_json| {
             try buf_writer.print("{s}{c}", .{result_json, write_delimiter});
             try buffered_writer.flush();
             alloc.free(result_json);

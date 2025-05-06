@@ -187,10 +187,10 @@ test "Response to a request of hello method" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
-test "runMessage on a request of hello method" {
+test "runRequestJson on a request of hello method" {
     const alloc = gpa.allocator();
     {
-        const response = try zigjr.runMessage(alloc,
+        const response = try zigjr.runRequestJson(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         , HelloDispatcher);
         const res_json = response orelse "";
@@ -253,10 +253,10 @@ test "Response to a request of integer add" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }    
 
-test "runMessage on a request of integer add" {
+test "runRequestJson on a request of integer add" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.runMessage(alloc,
+        const res_json = try zigjr.runRequestJson(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
         , IntCalcDispatcher) orelse "";
         defer alloc.free(res_json);
@@ -637,7 +637,7 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        const batch_res_json = try zigjr.runBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.runRequestBatch(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
@@ -670,7 +670,7 @@ test "Handle batch requests with the CounterDispatcher" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "runMessage on batch JSON requests with the CounterDispatcher" {
+test "runRequestJson on batch JSON requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
     {
         var dispatcher = CounterDispatcher{};
@@ -690,7 +690,7 @@ test "runMessage on batch JSON requests with the CounterDispatcher" {
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        const batch_res_json = try zigjr.runMessage(alloc, batch_req_json, &dispatcher) orelse "";
+        const batch_res_json = try zigjr.runRequestJson(alloc, batch_req_json, &dispatcher) orelse "";
         defer alloc.free(batch_res_json);
 
         var batch_res_result = try zigjr.parseResponse(alloc, batch_res_json);
@@ -737,7 +737,7 @@ test "Handle empty batch response" {
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch()).len == 0);
 
-        const batch_res_json = try zigjr.runBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.runRequestBatch(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
@@ -750,6 +750,28 @@ test "Handle empty batch response" {
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
+test "Dispatch on the response to a request of float add" {
+    const alloc = gpa.allocator();
+    {
+        var result = zigjr.parseRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
+        );
+        defer result.deinit();
+        const res_json = (try zigjr.runRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        defer alloc.free(res_json);
+        // std.debug.print("res_json: {s}\n", .{res_json});
+
+        try zigjr.runResponseJson(alloc, res_json, struct {
+            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+                // std.debug.print("response: {any}\n", .{res});
+                try testing.expectEqual(res.result.float, 3);
+                try testing.expectEqual(res.id.num, 1);
+            }
+        });
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}    
 
 
 

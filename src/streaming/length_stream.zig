@@ -15,7 +15,7 @@ const bufferedWriter = std.io.bufferedWriter;
 const zigjr = @import("../zigjr.zig");
 const JrErrors = zigjr.JrErrors;
 
-const responder = @import("../jsonrpc/responder.zig");
+const runner = @import("../jsonrpc/runner.zig");
 const frame = @import("frame.zig");
 
 
@@ -42,7 +42,7 @@ pub fn streamByContentLength(alloc: Allocator, reader: anytype, buffered_writer:
             return err;
         };
         if (msg_len == 0) continue;     // skip empty content frame.
-        if (try responder.runMessage(alloc, msg_buf.items, dispatcher))|result_json| {
+        if (try runner.runRequestJson(alloc, msg_buf.items, dispatcher))|result_json| {
             try frame.writeContentLengthFrame(buf_writer, result_json);
             try buffered_writer.flush();
             alloc.free(result_json);

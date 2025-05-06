@@ -116,10 +116,10 @@ test "streamByContentLength on JSON requests, single param, id" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
+        // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
         const req_frames = try frame.writeContentLengthFrames(alloc, &req_jsons);
         defer req_frames.deinit();
-        std.debug.print("frames: |{s}|\n", .{req_frames.items});
+        // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
         var json_stream = std.io.fixedBufferStream(req_frames.items);
         const reader = json_stream.reader();
@@ -130,7 +130,7 @@ test "streamByContentLength on JSON requests, single param, id" {
         var buf_writer = std.io.bufferedWriter(writer);
 
         try ls.streamByContentLength(alloc, reader, &buf_writer, &dispatcher);
-        std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
+        // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         // try testing.expectEqualSlices(u8, write_buffer.items,
         //     \\{ "jsonrpc": "2.0", "result": "abc", "id": "5a" }
