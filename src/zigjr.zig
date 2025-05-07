@@ -6,27 +6,27 @@
 // MIT License.  See the LICENSE file.
 //
 
-const req_parser = @import("jsonrpc/request_parser.zig");
-const res_parser = @import("jsonrpc/response_parser.zig");
+const request = @import("jsonrpc/request.zig");
+const response = @import("jsonrpc/response.zig");
 const runner = @import("jsonrpc/runner.zig");
 const dispatcher = @import("dispatch/dispatcher.zig");
-const jsonrpc_errors = @import("jsonrpc/jsonrpc_errors.zig");
+const errors = @import("jsonrpc/errors.zig");
 const dispatcher_errors = @import("dispatch/dispatch_erros.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
-pub const parseRequest = req_parser.parseRequest;
-pub const parseRequestReader = req_parser.parseRequestReader;
-pub const RequestResult = res_parser.RequestResult;
-pub const RpcRequestMessage = req_parser.RpcRequestMessage;
-pub const RpcRequest = req_parser.RpcRequest;
-pub const RpcId = req_parser.RpcId;
-pub const ReqError = req_parser.ReqError;
+pub const parseRequest = request.parseRequest;
+pub const parseRequestReader = request.parseRequestReader;
+pub const RequestResult = response.RequestResult;
+pub const RpcRequestMessage = request.RpcRequestMessage;
+pub const RpcRequest = request.RpcRequest;
+pub const RpcId = request.RpcId;
+pub const ReqError = request.ReqError;
 
-pub const parseResponse = res_parser.parseResponse;
-pub const ResponseResult = res_parser.ResponseResult;
-pub const RpcResponseMessage = res_parser.RpcResponseMessage;
-pub const RpcResponse = res_parser.RpcResponse;
-pub const RpcResponseErr = res_parser.RpcResponseErr;
+pub const parseResponse = response.parseResponse;
+pub const ResponseResult = response.ResponseResult;
+pub const RpcResponseMessage = response.RpcResponseMessage;
+pub const RpcResponse = response.RpcResponse;
+pub const RpcResponseErr = response.RpcResponseErr;
 
 pub const runRequest = runner.runRequest;
 pub const runRequestBatch = runner.runRequestBatch;
@@ -36,8 +36,8 @@ pub const DispatchResult = runner.DispatchResult;
 
 pub const Registry = dispatcher.Registry;
 
-pub const ErrorCode = jsonrpc_errors.ErrorCode;
-pub const JrErrors = jsonrpc_errors.JrErrors;
+pub const ErrorCode = errors.ErrorCode;
+pub const JrErrors = errors.JrErrors;
 pub const RegistrationErrors = dispatcher_errors.RegistrationErrors;
 pub const DispatchErrors = dispatcher_errors.DispatchErrors;
 

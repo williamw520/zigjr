@@ -15,12 +15,12 @@ const innerParse = std.json.innerParse;
 const ParseError = std.json.ParseError;
 const Value = std.json.Value;
 
-const req_parser = @import("request_parser.zig");
+const req_parser = @import("request.zig");
 const RpcId = req_parser.RpcId;
 
-const jsonrpc_errors = @import("jsonrpc_errors.zig");
-const ErrorCode = jsonrpc_errors.ErrorCode;
-const JrErrors = jsonrpc_errors.JrErrors;
+const errors = @import("errors.zig");
+const ErrorCode = errors.ErrorCode;
+const JrErrors = errors.JrErrors;
 
 
 pub fn parseResponse(alloc: Allocator, json_str: []const u8) !ResponseResult {

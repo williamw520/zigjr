@@ -15,8 +15,7 @@ const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 const DispatchResult = zigjr.DispatchResult;
 
-const ds = @import("../streaming/delimiter_stream.zig");
-const ls = @import("../streaming/length_stream.zig");
+const stream = @import("../streaming/stream.zig");
 const frame = @import("../streaming/frame.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -68,7 +67,7 @@ const CounterDispatcher = struct {
 };
 
 
-test "streamByDelimiter on JSON requests, single param, id" {
+test "delimiterRequestStream on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
         const req_jsons = 
@@ -86,7 +85,7 @@ test "streamByDelimiter on JSON requests, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try ds.streamByDelimiter(alloc, '\n', '\n', reader, &buf_writer, EchoDispatcher);
+        try stream.delimiterRequestStream(alloc, '\n', '\n', reader, &buf_writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -100,7 +99,7 @@ test "streamByDelimiter on JSON requests, single param, id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "streamByContentLength on JSON requests, single param, id" {
+test "lengthRequestStream on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
         var dispatcher = CounterDispatcher{};
@@ -129,7 +128,7 @@ test "streamByContentLength on JSON requests, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try ls.streamByContentLength(alloc, reader, &buf_writer, &dispatcher);
+        try stream.lengthRequestStream(alloc, reader, &buf_writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         // try testing.expectEqualSlices(u8, write_buffer.items,

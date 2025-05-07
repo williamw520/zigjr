@@ -11,12 +11,12 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
-const parser = @import("request_parser.zig");
+const parser = @import("request.zig");
 const RpcId = parser.RpcId;
 
-const jsonrpc_errors = @import("jsonrpc_errors.zig");
-const ErrorCode = jsonrpc_errors.ErrorCode;
-const JrErrors = jsonrpc_errors.JrErrors;
+const errors = @import("errors.zig");
+const ErrorCode = errors.ErrorCode;
+const JrErrors = errors.JrErrors;
 
 
 /// Build a request message in JSON.

@@ -17,13 +17,13 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
-const parser = @import("../jsonrpc/request_parser.zig");
+const parser = @import("../jsonrpc/request.zig");
 const RpcRequest = parser.RpcRequest;
 const RpcId = parser.RpcId;
 
-const jsonrpc_errors = @import("../jsonrpc/jsonrpc_errors.zig");
-const ErrorCode = jsonrpc_errors.ErrorCode;
-const JrErrors = jsonrpc_errors.JrErrors;
+const errors = @import("../jsonrpc/errors.zig");
+const ErrorCode = errors.ErrorCode;
+const JrErrors = errors.JrErrors;
 
 const dispatcher_errors = @import("dispatch_erros.zig");
 pub const RegistrationErrors = dispatcher_errors.RegistrationErrors;
