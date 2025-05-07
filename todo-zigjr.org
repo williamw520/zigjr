@@ -15,8 +15,8 @@ TODOs
 * DONE Add delimiter based request streaming API.
 * DONE Add Content-Length request header based streaming API.
 * DONE Add running dispatcher on response JSON, on RpcResponse, and on RpcResponse batch.
-* TODO Add delimiter based response streaming API.
-* TODO Add Content-Length header based response streaming API.
+* DONE Add delimiter based response streaming API.
+* DONE Add Content-Length header based response streaming API.
 * TODO Message logging.
 * TODO Add CLI on running request and response and on streaming.
 * TODO Add network server and client example.
