@@ -47,7 +47,7 @@ test "Parsing valid request, single integer param, integer id" {
         try testing.expect(req.arrayParams().?.items.len == 1);
         try testing.expect(req.arrayParams().?.items[0].integer == 42);
         try testing.expect(req.id.isValid());
-        try testing.expect(req.id.num == 1);
+        try testing.expect(req.id.eql(1));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -83,7 +83,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(req.arrayParams().?.items.len == 1);
         try testing.expect(std.mem.eql(u8, req.arrayParams().?.items[0].string, "FUN1"));
         try testing.expect(req.id.isValid());
-        try testing.expect(std.mem.eql(u8, req.id.str, "1"));
+        try testing.expect(req.id.eql("1"));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -121,7 +121,7 @@ test "Parsing valid request, tw0 integer params, integer id" {
         try testing.expect(req.arrayParams().?.items[0].integer == 42);
         try testing.expect(req.arrayParams().?.items[1].integer == 22);
         try testing.expect(req.id.isValid());
-        try testing.expect(req.id.num == 2);
+        try testing.expect(req.id.eql(2));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -157,7 +157,7 @@ test "Parsing valid request, object params, integer id" {
         try testing.expect(std.mem.eql(u8, req.objectParams().?.get("name").?.string, "foobar"));
         try testing.expect(req.objectParams().?.get("weight").?.integer == 150);
         try testing.expect(req.id.isValid());
-        try testing.expect(req.id.num == 3);
+        try testing.expect(req.id.eql(3));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -191,6 +191,7 @@ test "Parse valid request, with 0 params, with no id" {
         try testing.expect(req.objectParams() == null);
         try testing.expect(req.arrayParams().?.items.len == 0);
         try testing.expect(!req.id.isValid());
+        try testing.expect(req.id.isNone());
         try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
@@ -240,6 +241,7 @@ test "Parse valid request, with no params, with null id" {
         const req = try result.request();
         try testing.expect(!req.hasError());
         try testing.expect(!req.id.isValid());
+        try testing.expect(req.id.isNull());
         try testing.expect(req.id == .null);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -255,7 +257,7 @@ test "Parse valid request, with no params, with string id" {
         const req = try result.request();
         try testing.expect(!req.hasError());
         try testing.expect(req.id.isValid());
-        try testing.expect(std.mem.eql(u8, req.id.str, "5a"));
+        try testing.expect(req.id.eql("5a"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -276,8 +278,8 @@ test "Parse valid request batch, with no params, with string id" {
         try testing.expect(!reqs[1].hasError());
         try testing.expect(reqs[0].id.isValid());
         try testing.expect(reqs[1].id.isValid());
-        try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
-        try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
+        try testing.expect(reqs[0].id.eql("5a"));
+        try testing.expect(reqs[1].id.eql("5b"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -332,8 +334,8 @@ test "Parse valid request batch using Reader, with no params, with string id" {
         try testing.expect(!reqs[1].hasError());
         try testing.expect(reqs[0].id.isValid());
         try testing.expect(reqs[1].id.isValid());
-        try testing.expect(std.mem.eql(u8, reqs[0].id.str, "5a"));
-        try testing.expect(std.mem.eql(u8, reqs[1].id.str, "5b"));
+        try testing.expect(reqs[0].id.eql("5a"));
+        try testing.expect(reqs[1].id.eql("5b"));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -575,7 +577,7 @@ test "Parsing valid request with parseRequestReader, single integer param, integ
         try testing.expect(req.arrayParams().?.items.len == 1);
         try testing.expect(req.arrayParams().?.items[0].integer == 42);
         try testing.expect(req.id.isValid());
-        try testing.expect(req.id.num == 1);
+        try testing.expect(req.id.eql(1));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -829,9 +831,9 @@ test "Build batch request json with array params and str Id." {
         var result = zigjr.parseRequest(alloc, batch_json);
         defer result.deinit();
         try testing.expect(result.isBatch());
-        try testing.expect(!(try result.batch())[0].id.isValid());
+        try testing.expect((try result.batch())[0].id.isNone());
         try testing.expectEqualSlices(u8, (try result.batch())[0].method, "foo");
-        try testing.expect((try result.batch())[1].id.num == 2);
+        try testing.expect((try result.batch())[1].id.eql(2));
         try testing.expectEqualSlices(u8, (try result.batch())[1].method, "bar");
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});

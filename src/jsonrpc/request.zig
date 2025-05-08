@@ -216,7 +216,15 @@ pub const RpcId = union(enum) {
         return self == .num or self == .str;
     }
 
-    pub fn eql(self: @This(), value: anytype) !bool {
+    pub fn isNone(self: @This()) bool {
+        return self == .none;
+    }
+
+    pub fn isNull(self: @This()) bool {
+        return self == .null;
+    }
+
+    pub fn eql(self: @This(), value: anytype) bool {
         const TI = @typeInfo(@TypeOf(value));
         switch (TI) {
             .comptime_int,

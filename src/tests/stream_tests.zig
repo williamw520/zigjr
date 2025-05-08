@@ -183,11 +183,11 @@ test "delimiterResponseStream on JSON responses, single param, id" {
         try stream.delimiterResponseStream(alloc, '\n', response_reader, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
-                if (try res.id.eql("5a"))
+                if (res.id.eql("5a"))
                     try testing.expectEqualSlices(u8, res.result.string, "abc");
-                if (try res.id.eql("5b"))
+                if (res.id.eql("5b"))
                     try testing.expectEqualSlices(u8, res.result.string, "xyz");
-                if (try res.id.eql("5c"))
+                if (res.id.eql("5c"))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
             }
         });
@@ -243,11 +243,11 @@ test "lengthResponseStream on JSON responses, single param, id" {
         try stream.lengthResponseStream(alloc, response_reader, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
-                if (try res.id.eql(2))
+                if (res.id.eql(2))
                     try testing.expectEqual(res.result.integer, 1);
-                if (try res.id.eql(4))
+                if (res.id.eql(4))
                     try testing.expectEqual(res.result.integer, 0);
-                if (try res.id.eql(99))
+                if (res.id.eql(99))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
             }
         });

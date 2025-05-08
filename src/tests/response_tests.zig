@@ -182,7 +182,7 @@ test "Response to a request of hello method" {
         // std.debug.print("res.result: {s}\n", .{res.result.string});
 
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -203,7 +203,7 @@ test "runRequestJson on a request of hello method" {
         // std.debug.print("res.result: {s}\n", .{res.result.string});
 
         try testing.expectEqualSlices(u8, res.result.string, "hello back");
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -226,7 +226,7 @@ test "runRequestJson on a request of unknown method, expect error" {
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -279,7 +279,7 @@ test "Response to a request of integer add" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -298,7 +298,7 @@ test "runRequestJson on a request of integer add" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -320,7 +320,7 @@ test "Response to a request of integer sub" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, -1);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -342,7 +342,7 @@ test "Response to a request of integer multiply" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 20);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -364,7 +364,7 @@ test "Response to a request of integer divide" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.integer, 3);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -387,7 +387,7 @@ test "Response to a request of integer add with missing parameter, expect error"
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -408,7 +408,7 @@ test "Response to a request of float add" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 3);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -430,7 +430,7 @@ test "Response to a request of float sub" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, -1.0);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -452,7 +452,7 @@ test "Response to a request of float multiply" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 20);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -474,7 +474,7 @@ test "Response to a request of float divide" {
         const res = try parsed_res.response();
 
         try testing.expectEqual(res.result.float, 10.0/3.0);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -560,7 +560,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
 
         try testing.expect(res.hasErr());
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -578,7 +578,7 @@ test "Construct a normal response message, simple integer result" {
  
         try testing.expect(!res.hasErr());
         try testing.expectEqual(res.result.integer, 10);
-        try testing.expectEqual(res.id.num, 1);
+        try testing.expect(res.id.eql(1));
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -797,7 +797,7 @@ test "Dispatch on the response to a request of float add" {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
                 try testing.expectEqual(res.result.float, 3);
-                try testing.expectEqual(res.id.num, 1);
+                try testing.expect(res.id.eql(1));
             }
         });
     }
@@ -832,13 +832,13 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
         try zigjr.runResponseJson(alloc, batch_res_json, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
-                if (try res.id.eql(2)) {
+                if (res.id.eql(2)) {
                     try testing.expectEqual(res.result.integer, 1);
-                } else if (try res.id.eql("abc")) {
+                } else if (res.id.eql("abc")) {
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
-                } else if (try res.id.eql(non_exist_id)) {
+                } else if (res.id.eql(non_exist_id)) {
                     std.debug.print("response: {any}\n", .{res});
-                } else if (try res.id.eql(4)) {
+                } else if (res.id.eql(4)) {
                     try testing.expectEqual(res.result.integer, 0);
                 }
             }
