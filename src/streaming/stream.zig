@@ -23,8 +23,11 @@ const frame = @import("frame.zig");
 /// The outgoing framed messages are delimitered by the write_delimiter.
 /// A typical JSON-RPC stream is delimitered by '\n' the CR character,
 /// which reqires all message content does not content the character.
-pub fn delimiterRequestStream(alloc: Allocator, comptime read_delimiter: u8, comptime write_delimiter: u8,
-                              reader: anytype, buffered_writer: anytype, dispatcher: anytype) !void {
+pub fn delimiterRequestStream(alloc: Allocator, reader: anytype, buffered_writer: anytype,
+                              dispatcher: anytype, options: struct {
+                                  read_delimiter: u8 = '\n',
+                                  write_delimiter: u8 = '\n',
+                              }) !void {
     var json_frame = std.ArrayList(u8).init(alloc); // one frame is one JSON request.
     defer json_frame.deinit();
     var buffered_reader = std.io.bufferedReader(reader);
@@ -33,7 +36,7 @@ pub fn delimiterRequestStream(alloc: Allocator, comptime read_delimiter: u8, com
 
     while (true) {
         json_frame.clearRetainingCapacity();
-        _ = buf_reader.streamUntilDelimiter(json_frame.writer(), read_delimiter, null) catch |err| {
+        _ = buf_reader.streamUntilDelimiter(json_frame.writer(), options.read_delimiter, null) catch |err| {
             switch (err) {
                 error.EndOfStream => break,
                 else => return err,
@@ -41,7 +44,7 @@ pub fn delimiterRequestStream(alloc: Allocator, comptime read_delimiter: u8, com
         };
 
         if (try runner.runRequestJson(alloc, json_frame.items, dispatcher))|result_json| {
-            try buf_writer.print("{s}{c}", .{result_json, write_delimiter});
+            try buf_writer.print("{s}{c}", .{result_json, options.write_delimiter});
             try buffered_writer.flush();
             alloc.free(result_json);
         }
@@ -87,8 +90,9 @@ pub fn lengthRequestStream(alloc: Allocator, reader: anytype, buffered_writer: a
 /// The incoming framed messages are delimitered by the read_delimiter.
 /// A typical JSON-RPC stream is delimitered by '\n' the CR character,
 /// which reqires all message content does not content the character.
-pub fn delimiterResponseStream(alloc: Allocator, comptime read_delimiter: u8,
-                               reader: anytype, dispatcher: anytype) !void {
+pub fn delimiterResponseStream(alloc: Allocator, reader: anytype, dispatcher: anytype, options: struct {
+                                  read_delimiter: u8 = '\n',
+                              }) !void {
     var json_frame = std.ArrayList(u8).init(alloc); // one frame is one JSON response.
     defer json_frame.deinit();
     var buffered_reader = std.io.bufferedReader(reader);
@@ -96,7 +100,7 @@ pub fn delimiterResponseStream(alloc: Allocator, comptime read_delimiter: u8,
 
     while (true) {
         json_frame.clearRetainingCapacity();
-        _ = buf_reader.streamUntilDelimiter(json_frame.writer(), read_delimiter, null) catch |err| {
+        _ = buf_reader.streamUntilDelimiter(json_frame.writer(), options.read_delimiter, null) catch |err| {
             switch (err) {
                 error.EndOfStream => break,
                 else => return err,

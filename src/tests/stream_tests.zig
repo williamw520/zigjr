@@ -91,7 +91,9 @@ test "delimiterRequestStream on JSON requests, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.delimiterRequestStream(alloc, '\n', '\n', reader, &buf_writer, EchoDispatcher);
+        try stream.delimiterRequestStream(alloc, reader, &buf_writer, EchoDispatcher, .{
+            .read_delimiter = '\n', .write_delimiter = '\n',
+        });
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -168,7 +170,7 @@ test "delimiterResponseStream on JSON responses, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.delimiterRequestStream(alloc, '\n', '\n', reader, &buf_writer, EchoDispatcher);
+        try stream.delimiterRequestStream(alloc, reader, &buf_writer, EchoDispatcher, .{});
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -180,7 +182,7 @@ test "delimiterResponseStream on JSON responses, single param, id" {
 
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
-        try stream.delimiterResponseStream(alloc, '\n', response_reader, struct {
+        try stream.delimiterResponseStream(alloc, response_reader, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql("5a"))
@@ -190,7 +192,7 @@ test "delimiterResponseStream on JSON responses, single param, id" {
                 if (res.id.eql("5c"))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
             }
-        });
+        }, .{});
         
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
