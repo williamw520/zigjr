@@ -73,13 +73,13 @@ const ResponseDispatcher = struct {
 };
 
 
-test "delimiterRequestStream on JSON requests, single param, id" {
+test "DelimiterStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
         const req_jsons = 
-            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
-            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
-            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "id": "5c" }
             \\
         ;
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -91,9 +91,10 @@ test "delimiterRequestStream on JSON requests, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.delimiterRequestStream(alloc, reader, &buf_writer, EchoDispatcher, .{
-            .read_delimiter = '\n', .write_delimiter = '\n',
-        });
+        const streamer = stream.DelimiterStream.init(alloc, .{});
+        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+
+        try streamer.streamRequests(reader, &buf_writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -107,20 +108,20 @@ test "delimiterRequestStream on JSON requests, single param, id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "lengthRequestStream on JSON requests, single param, id" {
+test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{
-            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            \\{ "jsonrpc": "2.0", "method": "inc", "id": 1 }
             ,
-            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
+            \\{ "jsonrpc": "2.0", "method": "get", "id": 2 }
             ,
-            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
+            \\{ "jsonrpc": "2.0", "method": "dec", "id": 3 }
             ,
-            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99}
+            \\{ "jsonrpc": "2.0", "method": "no-method", "id": 99 }
             ,
-            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
+            \\{ "jsonrpc": "2.0", "method": "get", "id": 4 }
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -136,7 +137,9 @@ test "lengthRequestStream on JSON requests, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.lengthRequestStream(alloc, reader, &buf_writer, &dispatcher);
+        const streamer = stream.ContentLengthStream.init(alloc, .{});
+        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
+        try streamer.streamRequests(reader, &buf_writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -152,13 +155,13 @@ test "lengthRequestStream on JSON requests, single param, id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "delimiterResponseStream on JSON responses, single param, id" {
+test "DelimiterStream.streamResponses on JSON responses, single param, id" {
     const alloc = gpa.allocator();
     {
         const req_jsons = 
-            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
-            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
-            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
+            \\{ "jsonrpc": "2.0", "method": "fun0", "id": "5c" }
             \\
         ;
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -170,7 +173,10 @@ test "delimiterResponseStream on JSON responses, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.delimiterRequestStream(alloc, reader, &buf_writer, EchoDispatcher, .{});
+        const streamer = stream.DelimiterStream.init(alloc, .{});
+        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+
+        try streamer.streamRequests(reader, &buf_writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -182,7 +188,7 @@ test "delimiterResponseStream on JSON responses, single param, id" {
 
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
-        try stream.delimiterResponseStream(alloc, response_reader, struct {
+        try streamer.streamResponses(response_reader, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql("5a"))
@@ -192,26 +198,26 @@ test "delimiterResponseStream on JSON responses, single param, id" {
                 if (res.id.eql("5c"))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
             }
-        }, .{});
-        
+        });
+
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-test "lengthResponseStream on JSON responses, single param, id" {
+test "responsesByLength on JSON responses, single param, id" {
     const alloc = gpa.allocator();
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{
-            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+            \\{ "jsonrpc": "2.0", "method": "inc", "id": 1 }
             ,
-            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
+            \\{ "jsonrpc": "2.0", "method": "get", "id": 2 }
             ,
-            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
+            \\{ "jsonrpc": "2.0", "method": "dec", "id": 3 }
             ,
-            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99}
+            \\{ "jsonrpc": "2.0", "method": "no-method", "id": 99 }
             ,
-            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
+            \\{ "jsonrpc": "2.0", "method": "get", "id": 4 }
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -227,7 +233,9 @@ test "lengthResponseStream on JSON responses, single param, id" {
         const writer = write_buffer.writer();
         var buf_writer = std.io.bufferedWriter(writer);
 
-        try stream.lengthRequestStream(alloc, reader, &buf_writer, &dispatcher);
+        const streamer = stream.ContentLengthStream.init(alloc, .{});
+        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
+        try streamer.streamRequests(reader, &buf_writer, &dispatcher);
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -242,7 +250,8 @@ test "lengthResponseStream on JSON responses, single param, id" {
 
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
-        try stream.lengthResponseStream(alloc, response_reader, struct {
+        // try stream.responsesByLength(alloc, response_reader, struct {
+        try streamer.streamResponses(response_reader, struct {
             pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql(2))
