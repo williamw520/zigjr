@@ -48,6 +48,9 @@ const HelloDispatcher = struct {
 
 const IntCalcDispatcher = struct {
     pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
+        if (req.hasError()) {
+            return .fromRequestErr(req);
+        }
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {

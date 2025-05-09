@@ -36,6 +36,16 @@ pub const DispatchResult = union(enum) {
         msg:    []const u8 = "",    // Error text string.
         data:   ?[]const u8 = null, // JSON string for additional error data value.
     },
+
+    pub fn fromRequestErr(req: RpcRequest) @This() {
+        return .{
+            .err = .{
+                .code = req.err().code,
+                .msg = req.err().err_msg,
+            },
+        };
+    }
+
 };
 
 /// Run the dispatcher on the request and generate a response JSON string.
