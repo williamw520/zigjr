@@ -19,7 +19,7 @@ const JrErrors = zigjr.JrErrors;
 /// the Content-Length header for the data.
 pub fn writeContentLengthFrame(writer: anytype, data: []const u8) !void {
     try writer.print("Content-Length: {d}\r\n", .{data.len});
-    try writer.print("\r\n\r\n", .{});
+    try writer.print("\r\n", .{});
     _ = try writer.writeAll(data);
 }
 
@@ -38,28 +38,22 @@ pub fn writeContentLengthFrames(alloc: Allocator, data_frames: []const []const u
 ///     Other-Header: VALUE\r\n
 ///     ...
 ///     \r\n
-///     \r\n
 ///     DATA
 fn readContentLengthHeader(reader: anytype, buf: *ArrayList(u8)) !usize {
-    var empty_line_count: usize = 0;
     var content_length: ?usize = null;
     while (true) {
         buf.clearRetainingCapacity();
         _ = try reader.streamUntilDelimiter(buf.writer(), '\n', null);
         const line = std.mem.trim(u8, buf.items, "\r\n");
         if (line.len == 0) {
-            empty_line_count += 1;
-            if (empty_line_count == 2) break;               // reached \r\n\r\n
-            continue;
-        } else {
-            empty_line_count = 0;                           // reset whenever line has data.
+            break;              // reach the empty line \r\n
         }
-        var parts   = std.mem.splitScalar(u8, line, ':');   // Key: Value
-        const s_key = parts.next() orelse "";
-        const s_val = parts.next() orelse "";
-        const t_val = std.mem.trim(u8, s_val, " ");
-        if (std.mem.eql(u8, s_key, "Content-Length"))       // found the header
-            content_length = try std.fmt.parseInt(usize, t_val, 10);
+        var parts       = std.mem.splitScalar(u8, line, ':');
+        const str_key   = parts.next() orelse "";
+        const str_val   = parts.next() orelse "";
+        const trim_val  = std.mem.trim(u8, str_val, " ");
+        if (std.mem.eql(u8, str_key, "Content-Length"))
+            content_length = try std.fmt.parseInt(usize, trim_val, 10);
     }
 
     return if (content_length)|len| len else JrErrors.MissingContentLengthHeader;

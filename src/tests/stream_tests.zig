@@ -144,11 +144,11 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
 
         try testing.expectEqualSlices(u8, write_buffer.items,
             \\Content-Length: 42
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "result": 1, "id": 2 }Content-Length: 88
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "id": 99, "error": { "code": -32601, "message": "MethodNotFound" } }Content-Length: 42
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "result": 0, "id": 4 }
         );
     }
@@ -240,11 +240,11 @@ test "responsesByLength on JSON responses, single param, id" {
 
         try testing.expectEqualSlices(u8, write_buffer.items,
             \\Content-Length: 42
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "result": 1, "id": 2 }Content-Length: 88
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "id": 99, "error": { "code": -32601, "message": "MethodNotFound" } }Content-Length: 42
-            ++ "\r\n\r\n\r\n" ++
+            ++ "\r\n\r\n" ++
             \\{ "jsonrpc": "2.0", "result": 0, "id": 4 }
         );
 

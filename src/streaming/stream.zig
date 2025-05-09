@@ -110,7 +110,7 @@ pub const DelimiterStream = struct {
 /// Provides frame level support for JSON-RPC streaming based on Content-Length header.
 /// The message frame has the format of:
 ///     Content-Length: MESSAGE_LENGTH\r\n
-///     \r\n\r\n
+///     \r\n
 ///     JSON-RPC message
 /// Each request message frame has a Content-Length header.
 /// Each response message frame has a Content-Length header.
