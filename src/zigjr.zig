@@ -9,9 +9,8 @@
 const request = @import("jsonrpc/request.zig");
 const response = @import("jsonrpc/response.zig");
 const runner = @import("jsonrpc/runner.zig");
-const dispatcher = @import("dispatch/dispatcher.zig");
+const dispatcher = @import("jsonrpc/dispatcher.zig");
 const errors = @import("jsonrpc/errors.zig");
-const dispatcher_errors = @import("dispatch/dispatch_erros.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
 pub const parseRequest = request.parseRequest;
@@ -38,8 +37,8 @@ pub const Registry = dispatcher.Registry;
 
 pub const ErrorCode = errors.ErrorCode;
 pub const JrErrors = errors.JrErrors;
-pub const RegistrationErrors = dispatcher_errors.RegistrationErrors;
-pub const DispatchErrors = dispatcher_errors.DispatchErrors;
+pub const RegistrationErrors = dispatcher.RegistrationErrors;
+pub const DispatchErrors = dispatcher.DispatchErrors;
 
 
 test {
