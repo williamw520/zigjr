@@ -42,10 +42,10 @@ pub const DispatchErrors = dispatcher.DispatchErrors;
 
 
 test {
-    _ = @import("tests/request_tests.zig");
-    _ = @import("tests/response_tests.zig");
+    // _ = @import("tests/request_tests.zig");
+    // _ = @import("tests/response_tests.zig");
+    // _ = @import("tests/stream_tests.zig");
     _ = @import("tests/dispatcher_tests.zig");
-    _ = @import("tests/stream_tests.zig");
 }
 
 

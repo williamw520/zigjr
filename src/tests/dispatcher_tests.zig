@@ -13,11 +13,36 @@ const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
+const DispatchResult = zigjr.DispatchResult;
+const DispatchErrors = zigjr.DispatchErrors;
+
+const reg = @import("../jsonrpc/registry.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 // Test handler registration.
+
+fn fn0(alloc: Allocator) DispatchErrors!DispatchResult {
+    return .{
+        .result = try std.json.stringifyAlloc(alloc, "Hello", .{}),
+    };
+}
+
+fn fn0_with_result(alloc: Allocator) DispatchErrors!DispatchResult {
+    return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, "Hello", .{}));
+}
+
+fn fn0_with_result_lit(alloc: Allocator) DispatchErrors!DispatchResult {
+    _=alloc;
+    return DispatchResult.withResultLit("\"Hello\"");
+}
+
+fn fn0_with_err(_: Allocator) DispatchErrors!DispatchResult {
+    return DispatchResult.withErr(ErrorCode.InternalError, "Hello error");
+}
+
+
 
 fn fun0(alloc: Allocator) anyerror![]const u8 {
     return std.json.stringifyAlloc(alloc, "Hello", .{});
@@ -111,6 +136,71 @@ fn fun_wrong_param_type(alloc: Allocator, _: u8) anyerror![]const u8 {
 fn fun_wrong_param_type2(alloc: Allocator, _: Value, _: u8) anyerror![]const u8 {
     return std.json.stringifyAlloc(alloc, "Hello", .{});
 }
+
+test "Registry. Dispatching to 0-parameter method" {
+    const alloc = gpa.allocator();
+    {
+        var registry = reg.Registry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn0", fn0, .{});
+        try registry.register("fn0_with_result", fn0_with_result, .{});
+        try registry.register("fn0_with_result_lit", fn0_with_result_lit, .{});
+        try testing.expect(registry.has("fn0"));
+        try testing.expect(registry.has("fn0_with_result"));
+        try testing.expect(registry.has("fn0_with_result_lit"));
+        try testing.expect(!registry.has("non-existing"));
+
+        {
+            const res_json = try zigjr.runRequestJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+        }
+        {
+            const res_json = try zigjr.runRequestJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0_with_result", "id": 2}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+        }
+        {
+            const res_json = try zigjr.runRequestJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0_with_result_lit", "id": 3}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+        }
+        
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Registry. Dispatching to 0-parameter method, with error" {
+    const alloc = gpa.allocator();
+    {
+        var registry = reg.Registry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn0", fn0, .{});
+        try registry.register("fn0_with_result", fn0_with_result, .{});
+        try registry.register("fn0_with_result_lit", fn0_with_result_lit, .{});
+        try registry.register("fn0_with_err", fn0_with_err, .{});
+
+        {
+            const res_json = try zigjr.runRequestJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+        }
+        
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
 
 test "Register handlers" {
     const alloc = gpa.allocator();

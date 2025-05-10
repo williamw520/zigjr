@@ -29,15 +29,49 @@ const messages = @import("messages.zig");
 /// For the result JSON and data JSON string, it's best that they're produced by
 /// std.json.stringifyAlloc() to ensure a valid JSON string.
 pub const DispatchResult = union(enum) {
-    none:       void,               // No result, for notification call.
-    result:     []const u8,         // JSON string for the result value.
-    err:        struct {
-        code:   ErrorCode,
-        msg:    []const u8 = "",    // Error text string.
-        data:   ?[]const u8 = null, // JSON string for additional error data value.
+    none:           void,               // No result, for notification call.
+    result:         []const u8,         // JSON string for result value, allocated, needed freeing.
+    result_lit:     []const u8,         // JSON string literal for result, not needed to be freed.
+    err:            struct {
+        code:       ErrorCode,
+        msg:        []const u8 = "",    // Error text string.
+        data:       ?[]const u8 = null, // JSON string for additional error data value, allocated.
+        msg_alloc:  bool = false,       // Indicate the 'msg' field is allocated or not.
     },
 
-    pub fn fromRequestErr(req: RpcRequest) @This() {
+    pub fn asNone() @This() {
+        return .{ .none = {} };
+    }
+
+    pub fn withResult(result: []const u8) @This() {
+        return .{ .result = result };
+    }
+
+    pub fn withResultLit(result_lit: []const u8) @This() {
+        return .{ .result_lit = result_lit };
+    }
+
+    pub fn withErr(code: ErrorCode, msg: []const u8) @This() {
+        return .{
+            .err = .{
+                .code = code,
+                .msg = msg,
+            }
+        };
+    }
+
+    pub fn withErrAlloc(code: ErrorCode, msg: []const u8, data: []const u8) @This() {
+        return .{
+            .err = .{
+                .code = code,
+                .msg = msg,
+                .msg_alloc = true,
+                .data = data,
+            }
+        };
+    }
+
+    pub fn withRequestErr(req: RpcRequest) @This() {
         return .{
             .err = .{
                 .code = req.err().code,
@@ -68,6 +102,9 @@ pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]co
         },
         .result => |json| {
             defer dispatcher.free(alloc, dresult);
+            return try messages.responseJson(alloc, req.id, json);
+        },
+        .result_lit => |json| {
             return try messages.responseJson(alloc, req.id, json);
         },
         .err => |err| {
