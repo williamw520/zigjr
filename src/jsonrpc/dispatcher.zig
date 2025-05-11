@@ -329,7 +329,7 @@ pub const RegistrationErrors = error {
     InvalidParamTypeForRawParams,
 };
 
-pub const DispatchErrors = error {
+const DispatchErrors = error {
     NoHandlerForArrayParam,
     NoHandlerForObjectParam,
     MismatchedParameterCounts,

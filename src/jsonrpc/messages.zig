@@ -10,6 +10,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
+const assert = std.debug.assert;
 
 const parser = @import("request.zig");
 const RpcId = parser.RpcId;
@@ -17,11 +18,12 @@ const RpcId = parser.RpcId;
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
+const AllocError = errors.AllocError;
 
 
 /// Build a request message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: RpcId) ![]const u8 {
+pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: RpcId) JrErrors![]const u8 {
     const pinfo = @typeInfo(@TypeOf(params));
     if (pinfo != .array and pinfo != .@"struct" and pinfo != .null) {
         return JrErrors.InvalidParamsType;
@@ -63,7 +65,7 @@ pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: Rp
 
 /// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) ![]const u8 {
+pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![]const u8 {
     var count: usize = 0;
     var buffer = ArrayList(u8).init(alloc);
     defer buffer.deinit();
@@ -81,22 +83,22 @@ pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) ![]const u
 
 /// Build a normal response message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) ![]const u8 {
-    switch (id) {
-        .num => return allocPrint(alloc,
+pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
+    return switch (id) {
+        .num => try allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
             , .{result_json, id.num}),
-        .str => return allocPrint(alloc,
+        .str => try allocPrint(alloc,
             \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
             , .{result_json, id.str}),
-        .none => return JrErrors.MissingIdForResponse,  // No id for notification.
-        .null => return JrErrors.MissingIdForResponse,  // Notification does not have a response.
-    }
+        .none => null,  // No id for notification.  No response JSON.
+        .null => null,  // Notification does not have a response.  No response JSON.
+    };
 }
 
 /// Build an error response message in JSON.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) ![]const u8 {
+pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) AllocError![]const u8 {
     const code: i32 = @intFromEnum(errCode);
     const msg_txt = if (msg.len == 0) @tagName(errCode) else msg;
     switch (id) {
@@ -118,7 +120,7 @@ pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: [
 /// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn responseErrorDataJson(alloc: Allocator, id: RpcId, errCode: ErrorCode,
-                             msg: []const u8, data: []const u8) ![]const u8 {
+                             msg: []const u8, data: []const u8) AllocError![]const u8 {
     const code: i32 = @intFromEnum(errCode);
     switch (id) {
         .num => return allocPrint(alloc,

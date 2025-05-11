@@ -22,7 +22,8 @@ const RpcRequest = req_parser.RpcRequest;
 const RpcId = req_parser.RpcId;
 
 const runner = @import("runner.zig");
-const DispatchResult = runner.DispatchResult;
+const RunResult = runner.RunResult;
+const RunErrors = runner.RunErrors;
 
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
@@ -62,15 +63,7 @@ pub const Registry = struct {
         return self.handlers.get(method) != null;
     }
 
-    /// Run a handler on the request and generate a Response JSON string.
-    /// Call freeResponse() to free the string.
-    pub fn run(self: *Self, alloc: Allocator, req: RpcRequest) !DispatchResult {
-        return self.dispatch(alloc, req) catch |dispatch_err| {
-            return toResultError(dispatch_err);     // dispatch error returned as error response.
-        };
-    }
-
-    pub fn free(_: *Self, alloc: Allocator, dresult: DispatchResult) void {
+    pub fn free(_: *Self, alloc: Allocator, dresult: RunResult) void {
         switch (dresult) {
             .none => {},
             .result => |json_result| alloc.free(json_result),
@@ -82,36 +75,37 @@ pub const Registry = struct {
         }
     }
 
-    fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        const h_fn = self.handlers.get(req.method) orelse
-            return toResultError(DispatchErrors.MethodNotFound);
+    /// Run a handler on the request and generate a Response JSON string.
+    /// Call freeResponse() to free the string.
+    pub fn run(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!RunResult {
+        const h_fn = self.handlers.get(req.method) orelse return RunErrors.MethodNotFound;
 
         switch (req.params) {
-            .array  => |array|  return dispatchOnArray(alloc, h_fn, array),
+            .array  => |array|  return callOnArray(alloc, h_fn, array),
             .null   => {
                 switch(h_fn) {
                     .fn0    =>  |f| return f(alloc),
-                    else    =>      return toResultError(DispatchErrors.MismatchedParamCounts),
+                    else    =>      return RunErrors.MismatchedParamCounts,
                 }
             },
             .object => |object| {
                 switch (h_fn) {
                     .fnRaw  =>  |f| return f(alloc, req.params),
                     .fnObj  =>  |f| return f(alloc, object),
-                    else    =>      return toResultError(DispatchErrors.NoHandlerForObjectParam),
+                    else    =>      return RunErrors.NoHandlerForObjectParam,
                 }
             },
-            else    => return toResultError(DispatchErrors.InvalidParams),
+            else    => return RunErrors.InvalidParams,
         }
     }
 
-    fn dispatchOnArray(alloc: Allocator, handler_fn: HandlerFn, array: Array) anyerror!DispatchResult {
-        // Dispatch on array based parameter.
+    fn callOnArray(alloc: Allocator, handler_fn: HandlerFn, array: Array) anyerror!RunResult {
+        // Call on array based parameter.
         if (handler_fn == .fnArr) return handler_fn.fnArr(alloc, array);
 
-        // Dispatch on fixed-length based parameters.
+        // Call on fixed-length based parameters.
         const p = array.items;
-        if (paramLen(handler_fn) != p.len) return toResultError(DispatchErrors.MismatchedParamCounts);
+        if (paramLen(handler_fn) != p.len) return RunErrors.MismatchedParamCounts;
         return switch (handler_fn) {
             .fn0 => |f| f(alloc),
             .fn1 => |f| f(alloc, p[0]),
@@ -138,16 +132,16 @@ pub const Registry = struct {
 /// The caller will free it with the allocator after using it in the Response message.
 /// Call std.json.stringifyAlloc() to build the returned JSON will take care of it.
 const HandlerFn = union(enum) {
-    fn0: *const fn(Allocator) anyerror!DispatchResult,
-    fn1: *const fn(Allocator, Value) anyerror!DispatchResult,
-    fn2: *const fn(Allocator, Value, Value) anyerror!DispatchResult,
-    fn3: *const fn(Allocator, Value, Value, Value) anyerror!DispatchResult,
-    fn4: *const fn(Allocator, Value, Value, Value, Value) anyerror!DispatchResult,
-    fn5: *const fn(Allocator, Value, Value, Value, Value, Value) anyerror!DispatchResult,
-    fn6: *const fn(Allocator, Value, Value, Value, Value, Value, Value) anyerror!DispatchResult,
-    fnArr: *const fn(Allocator, Array) anyerror!DispatchResult,
-    fnObj: *const fn(Allocator, ObjectMap) anyerror!DispatchResult,
-    fnRaw: *const fn(Allocator, Value) anyerror!DispatchResult,
+    fn0: *const fn(Allocator) anyerror!RunResult,
+    fn1: *const fn(Allocator, Value) anyerror!RunResult,
+    fn2: *const fn(Allocator, Value, Value) anyerror!RunResult,
+    fn3: *const fn(Allocator, Value, Value, Value) anyerror!RunResult,
+    fn4: *const fn(Allocator, Value, Value, Value, Value) anyerror!RunResult,
+    fn5: *const fn(Allocator, Value, Value, Value, Value, Value) anyerror!RunResult,
+    fn6: *const fn(Allocator, Value, Value, Value, Value, Value, Value) anyerror!RunResult,
+    fnArr: *const fn(Allocator, Array) anyerror!RunResult,
+    fnObj: *const fn(Allocator, ObjectMap) anyerror!RunResult,
+    fnRaw: *const fn(Allocator, Value) anyerror!RunResult,
 };
 
 fn toHandlerFn(handler_fn: anytype, opt: RegisterOptions) !HandlerFn {
@@ -206,20 +200,6 @@ fn paramLen(handler: HandlerFn) ?usize {
     };
 }
 
-fn toResultError(err: anyerror) DispatchResult {
-    return switch (err) {
-        DispatchErrors.MethodNotFound => DispatchResult.withErr(
-            ErrorCode.MethodNotFound, "Method not found."),
-        DispatchErrors.InvalidParams => DispatchResult.withErr(
-            ErrorCode.InvalidParams, "Invalid parameters."),
-        DispatchErrors.NoHandlerForObjectParam => DispatchResult.withErr(
-            ErrorCode.InvalidParams, "Handler expecting an object parameter but got non-object parameters."),
-        DispatchErrors.MismatchedParamCounts => DispatchResult.withErr(
-            ErrorCode.InvalidParams, "The number of parameters of the request does not match the parameter count of the handler."),
-        else => DispatchResult.withErr(ErrorCode.ServerError, @errorName(err)),
-    };
-}
-
 pub const RegistrationErrors = error {
     InvalidMethodName,
     HandlerNotFunction,
@@ -231,14 +211,6 @@ pub const RegistrationErrors = error {
     HandlerTooManyParams,
     MismatchedParameterCountsForRawParams,
     InvalidParamTypeForRawParams,
-};
-
-pub const DispatchErrors = error {
-    MethodNotFound,
-    InvalidParams,
-    NoHandlerForObjectParam,
-    MismatchedParamCounts,
-    OutOfMemory,
 };
 
 

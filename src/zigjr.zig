@@ -9,7 +9,7 @@
 const request = @import("jsonrpc/request.zig");
 const response = @import("jsonrpc/response.zig");
 const runner = @import("jsonrpc/runner.zig");
-const dispatcher = @import("jsonrpc/dispatcher.zig");
+const registry = @import("jsonrpc/registry.zig");
 const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
@@ -31,14 +31,14 @@ pub const runRequest = runner.runRequest;
 pub const runRequestBatch = runner.runRequestBatch;
 pub const runRequestJson = runner.runRequestJson;
 pub const runResponseJson = runner.runResponseJson;
-pub const DispatchResult = runner.DispatchResult;
+pub const RunResult = runner.RunResult;
+pub const RunErrors = runner.RunErrors;
 
-pub const Registry = dispatcher.Registry;
+pub const Registry = registry.Registry;
+pub const RegistrationErrors = registry.RegistrationErrors;
 
 pub const ErrorCode = errors.ErrorCode;
 pub const JrErrors = errors.JrErrors;
-pub const RegistrationErrors = dispatcher.RegistrationErrors;
-pub const DispatchErrors = dispatcher.DispatchErrors;
 
 
 test {

@@ -21,6 +21,7 @@ const RpcResponse = response.RpcResponse;
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
+const AllocError = errors.AllocError;
 
 const messages = @import("messages.zig");
 
@@ -28,7 +29,9 @@ const messages = @import("messages.zig");
 /// Return value from dispatcher.run() expected by respond() below.
 /// For the result JSON and data JSON string, it's best that they're produced by
 /// std.json.stringifyAlloc() to ensure a valid JSON string.
-pub const DispatchResult = union(enum) {
+pub const RunResult = union(enum) {
+    const Self = @This();
+
     none:           void,               // No result, for notification call.
     result:         []const u8,         // JSON string for result value, allocated, needed freeing.
     result_lit:     []const u8,         // JSON string literal for result, not needed to be freed.
@@ -39,19 +42,19 @@ pub const DispatchResult = union(enum) {
         msg_alloc:  bool = false,       // Indicate the 'msg' field is allocated or not.
     },
 
-    pub fn asNone() @This() {
+    pub fn asNone() Self {
         return .{ .none = {} };
     }
 
-    pub fn withResult(result: []const u8) @This() {
+    pub fn withResult(result: []const u8) Self {
         return .{ .result = result };
     }
 
-    pub fn withResultLit(result_lit: []const u8) @This() {
+    pub fn withResultLit(result_lit: []const u8) Self {
         return .{ .result_lit = result_lit };
     }
 
-    pub fn withErr(code: ErrorCode, msg: []const u8) @This() {
+    pub fn withErr(code: ErrorCode, msg: []const u8) Self {
         return .{
             .err = .{
                 .code = code,
@@ -60,7 +63,7 @@ pub const DispatchResult = union(enum) {
         };
     }
 
-    pub fn withErrAlloc(code: ErrorCode, msg: []const u8, data: []const u8) @This() {
+    pub fn withErrAlloc(code: ErrorCode, msg: []const u8, data: []const u8) Self {
         return .{
             .err = .{
                 .code = code,
@@ -71,7 +74,7 @@ pub const DispatchResult = union(enum) {
         };
     }
 
-    pub fn withRequestErr(req: RpcRequest) @This() {
+    pub fn withRequestErr(req: RpcRequest) Self {
         return .{
             .err = .{
                 .code = req.err().code,
@@ -80,35 +83,68 @@ pub const DispatchResult = union(enum) {
         };
     }
 
+    fn withAnyErr(err: anyerror) Self {
+        return switch (err) {
+            RunErrors.MethodNotFound => Self.withErr(
+                ErrorCode.MethodNotFound, "Method not found."),
+            RunErrors.InvalidParams => Self.withErr(
+                ErrorCode.InvalidParams, "Invalid parameters."),
+            RunErrors.NoHandlerForObjectParam => Self.withErr(
+                ErrorCode.InvalidParams, "Handler expecting an object parameter but got non-object parameters."),
+            RunErrors.MismatchedParamCounts => Self.withErr(
+                ErrorCode.InvalidParams, "The number of parameters of the request does not match the parameter count of the handler."),
+            else => Self.withErr(ErrorCode.ServerError, @errorName(err)),
+        };
+    }
+    
 };
+
+pub const RunErrors = error {
+    NoHandlerForArrayParam,
+    NoHandlerForObjectParam,
+    MismatchedParamCounts,
+    MethodNotFound,
+    InvalidParams,
+    WrongRequestParamTypeForRawParams,
+    OutOfMemory,
+};
+
+fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunResult {
+    const rresult: RunResult = dispatcher.run(alloc, req) catch |run_err| {
+        return RunResult.withAnyErr(run_err);   // wrap the dispatching error into a RunResult.err.
+    };
+    return rresult;
+}
+
 
 /// Run the dispatcher on the request and generate a response JSON string.
 /// A 'null' return value signifies the request is a notification.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
-/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]const u8 {
+/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
+pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
         return try messages.responseErrorJson(alloc, req.id, req.err().code, req.err().err_msg);
     }
 
-    const dresult: DispatchResult = try dispatcher.run(alloc, req);
-    switch (dresult) {
+    const rresult = runReqDispatcher(alloc, req, dispatcher);
+
+    switch (rresult) {
         .none => {
             return null;            // notification request has no result.
         },
         .result => |json| {
-            defer dispatcher.free(alloc, dresult);
-            return try messages.responseJson(alloc, req.id, json);
+            defer dispatcher.free(alloc, rresult);
+            return try messages.responseJson(alloc, req.id, json);  // no id, no result
         },
         .result_lit => |json| {
-            return try messages.responseJson(alloc, req.id, json);
+            return try messages.responseJson(alloc, req.id, json);  // no id, no result
         },
         .err => |err| {
-            defer dispatcher.free(alloc, dresult);
+            defer dispatcher.free(alloc, rresult);
             if (err.data)|data_json| {
                 return try messages.responseErrorDataJson(alloc, req.id, err.code, err.msg, data_json);
             } else {
@@ -125,9 +161,9 @@ pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) !?[]co
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
-/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn runRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) ![]const u8 {
+/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
+pub fn runRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) AllocError![]const u8 {
     var count: usize = 0;
     var buffer = ArrayList(u8).init(alloc);
     defer buffer.deinit();
@@ -154,9 +190,9 @@ pub fn runRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: 
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a DispatchResult.
-/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn runRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !?[]const u8 {
+/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
+pub fn runRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
     var parsed_result = request.parseRequest(alloc, request_json);
     defer parsed_result.deinit();
     return switch (parsed_result.request_msg) {
@@ -170,7 +206,7 @@ pub fn runRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: an
 /// The JSON response message can contain a single response or a batch of responses.
 /// Any error coming from the dispatcher is passed back to caller.
 /// The 'anytype' dispatcher needs to have a run() method with !void return type.
-pub fn runResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
+pub fn runResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) AllocError!void {
     var parsed_result = try response.parseResponse(alloc, response_json);
     defer parsed_result.deinit();
     return switch (parsed_result.response_msg) {

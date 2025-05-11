@@ -11,7 +11,7 @@ const stringifyAlloc = std.json.stringifyAlloc;
 const zigjr = @import("../zigjr.zig");
 const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
-const DispatchResult = zigjr.DispatchResult;
+const RunResult = zigjr.RunResult;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 const DispatchErrors = zigjr.DispatchErrors;
@@ -21,7 +21,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 const HelloDispatcher = struct {
-    pub fn run(_: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn run(_: Allocator, req: RpcRequest) !RunResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
@@ -36,7 +36,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn free(_: Allocator, dresult: DispatchResult) void {
+    pub fn free(_: Allocator, dresult: RunResult) void {
         // All result data are constant strings.  Nothing to free.
         switch (dresult) {
             .result => {},
@@ -47,7 +47,7 @@ const HelloDispatcher = struct {
 };
 
 const IntCalcDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn run(alloc: Allocator, req: RpcRequest) !RunResult {
         if (req.hasError()) {
             return .withRequestErr(req);
         }
@@ -80,7 +80,7 @@ const IntCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+    pub fn free(alloc: Allocator, dresult: RunResult) void {
         switch (dresult) {
             .result => alloc.free(dresult.result),
             .err => {},
@@ -95,7 +95,7 @@ const IntCalcDispatcher = struct {
 };
 
 const FloatCalcDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn run(alloc: Allocator, req: RpcRequest) !RunResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
@@ -130,7 +130,7 @@ const FloatCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+    pub fn free(alloc: Allocator, dresult: RunResult) void {
         switch (dresult) {
             .result => alloc.free(dresult.result),
             .err => {},
@@ -143,7 +143,7 @@ const FloatCalcDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn run(self: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn run(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -157,7 +157,7 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
+    pub fn free(_: *@This(), alloc: Allocator, dr: RunResult) void {
         switch (dr) {
             .result => alloc.free(dr.result),
             else => {},
@@ -243,10 +243,10 @@ test "runRequestJson to a request with anonymous dispatcher struct" {
         defer result.deinit();
 
         const response = try zigjr.runRequest(alloc, try result.request(), struct {
-            pub fn run(_: Allocator, _: RpcRequest) !DispatchResult {
+            pub fn run(_: Allocator, _: RpcRequest) !RunResult {
                 return .{ .result = "\"hello back\"" };
             }
-            pub fn free(_: Allocator, dresult: DispatchResult) void {
+            pub fn free(_: Allocator, dresult: RunResult) void {
                 switch (dresult) {
                     else => {}
                 }

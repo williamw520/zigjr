@@ -32,6 +32,10 @@ pub const JrErrors = error {
     InvalidJsonRpcversion,
     MissingContentLengthHeader,
     InvalidRpcIdValueType,
+} || error {
+    OutOfMemory,
 };
+
+pub const AllocError = error{ OutOfMemory };
 
 
