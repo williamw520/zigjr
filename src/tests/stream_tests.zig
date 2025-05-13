@@ -34,9 +34,10 @@ const EchoDispatcher = struct {
 
     pub fn free(alloc: Allocator, dresult: RunResult) void {
         switch (dresult) {
-            .result => |json| alloc.free(json),
-            .err => {},
             .none => {},
+            .result => |json| alloc.free(json),
+            .result_lit => {},
+            .err => {},
         }
     }
 };

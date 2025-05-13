@@ -152,21 +152,21 @@ test "Registry. Dispatching to 0-parameter method" {
         try testing.expect(!registry.has("non-existing"));
 
         {
-            const res_json = try zigjr.runRequestJson(alloc,
+            const res_json = try zigjr.handleRequestJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
         }
         {
-            const res_json = try zigjr.runRequestJson(alloc,
+            const res_json = try zigjr.handleRequestJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_result", "id": 2}
             , &registry) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
         }
         {
-            const res_json = try zigjr.runRequestJson(alloc,
+            const res_json = try zigjr.handleRequestJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_result_lit", "id": 3}
             , &registry) orelse "";
             defer alloc.free(res_json);
@@ -189,7 +189,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
         try registry.register("fn0_with_err", fn0_with_err, .{});
 
         {
-            const res_json = try zigjr.runRequestJson(alloc,
+            const res_json = try zigjr.handleRequestJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);

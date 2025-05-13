@@ -12,10 +12,12 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
 const request = @import("request.zig");
+const parseRequest = request.parseRequest;
 const RpcRequest = request.RpcRequest;
 const RpcId = request.RpcId;
 
 const response = @import("response.zig");
+const parseResponse = request.parseResponse;
 const RpcResponse = response.RpcResponse;
 
 const errors = @import("errors.zig");
@@ -26,7 +28,7 @@ const AllocError = errors.AllocError;
 const messages = @import("messages.zig");
 
 
-/// Return value from dispatcher.run() expected by respond() below.
+/// Return value from dispatcher.run() expected handleRequest() below
 /// For the result JSON and data JSON string, it's best that they're produced by
 /// std.json.stringifyAlloc() to ensure a valid JSON string.
 pub const RunResult = union(enum) {
@@ -109,13 +111,6 @@ pub const RunErrors = error {
     OutOfMemory,
 };
 
-fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunResult {
-    const rresult: RunResult = dispatcher.run(alloc, req) catch |run_err| {
-        return RunResult.withAnyErr(run_err);   // wrap the dispatching error into a RunResult.err.
-    };
-    return rresult;
-}
-
 
 /// Run the dispatcher on the request and generate a response JSON string.
 /// A 'null' return value signifies the request is a notification.
@@ -124,7 +119,7 @@ fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunR
 ///
 /// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
-pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
+pub fn handleRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
         return try messages.responseErrorJson(alloc, req.id, req.err().code, req.err().err_msg);
@@ -163,14 +158,14 @@ pub fn runRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocE
 ///
 /// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
-pub fn runRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) AllocError![]const u8 {
+pub fn handleRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) AllocError![]const u8 {
     var count: usize = 0;
     var buffer = ArrayList(u8).init(alloc);
     defer buffer.deinit();
 
     try buffer.appendSlice("[");
     for (batch) |req| {
-        const response_json = try runRequest(alloc, req, dispatcher);
+        const response_json = try handleRequest(alloc, req, dispatcher);
         if (response_json)|res_json| {
             defer alloc.free(res_json);
             if (count > 0) try buffer.appendSlice(", ");
@@ -192,13 +187,20 @@ pub fn runRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: 
 ///
 /// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
-pub fn runRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
-    var parsed_result = request.parseRequest(alloc, request_json);
+pub fn handleRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
+    var parsed_result = parseRequest(alloc, request_json);
     defer parsed_result.deinit();
     return switch (parsed_result.request_msg) {
-        .request    => |req|  try runRequest(alloc, req, dispatcher),
-        .batch      => |reqs| try runRequestBatch(alloc, reqs, dispatcher),
+        .request    => |req|  try handleRequest(alloc, req, dispatcher),
+        .batch      => |reqs| try handleRequestBatch(alloc, reqs, dispatcher),
     };
+}
+
+fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunResult {
+    const rresult: RunResult = dispatcher.run(alloc, req) catch |run_err| {
+        return RunResult.withAnyErr(run_err);   // wrap the dispatching error into a RunResult.err.
+    };
+    return rresult;
 }
 
 
@@ -206,8 +208,8 @@ pub fn runRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: an
 /// The JSON response message can contain a single response or a batch of responses.
 /// Any error coming from the dispatcher is passed back to caller.
 /// The 'anytype' dispatcher needs to have a run() method with !void return type.
-pub fn runResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) AllocError!void {
-    var parsed_result = try response.parseResponse(alloc, response_json);
+pub fn handleResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
+    var parsed_result = try parseResponse(alloc, response_json);
     defer parsed_result.deinit();
     return switch (parsed_result.response_msg) {
         .response   => |res|   try dispatcher.run(alloc, res),

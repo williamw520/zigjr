@@ -27,10 +27,10 @@ pub const RpcResponseMessage = response.RpcResponseMessage;
 pub const RpcResponse = response.RpcResponse;
 pub const RpcResponseErr = response.RpcResponseErr;
 
-pub const runRequest = runner.runRequest;
-pub const runRequestBatch = runner.runRequestBatch;
-pub const runRequestJson = runner.runRequestJson;
-pub const runResponseJson = runner.runResponseJson;
+pub const handleRequest = runner.handleRequest;
+pub const handleRequestBatch = runner.handleRequestBatch;
+pub const handleRequestJson = runner.handleRequestJson;
+pub const handleResponseJson = runner.handleResponseJson;
 pub const RunResult = runner.RunResult;
 pub const RunErrors = runner.RunErrors;
 
@@ -42,9 +42,9 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
-    // _ = @import("tests/response_tests.zig");
-    // _ = @import("tests/stream_tests.zig");
+    _ = @import("tests/request_tests.zig");
+    _ = @import("tests/response_tests.zig");
+    _ = @import("tests/stream_tests.zig");
     _ = @import("tests/dispatcher_tests.zig");
 }
 
