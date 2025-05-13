@@ -78,9 +78,9 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
         const req_jsons = 
-            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
-            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
-            \\{ "jsonrpc": "2.0", "method": "fun0", "id": "5c" }
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b"}
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c"}
             \\
         ;
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -99,9 +99,9 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
-            \\{ "jsonrpc": "2.0", "result": "abc", "id": "5a" }
-            \\{ "jsonrpc": "2.0", "result": "xyz", "id": "5b" }
-            \\{ "jsonrpc": "2.0", "id": "5c", "error": { "code": -32602, "message": "InvalidParams" } }
+            \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
+            \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+            \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
             \\
         );
         
@@ -114,15 +114,15 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{
-            \\{ "jsonrpc": "2.0", "method": "inc", "id": 1 }
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
             ,
-            \\{ "jsonrpc": "2.0", "method": "get", "id": 2 }
+            \\{"jsonrpc": "2.0", "method": "get", "id": 2}
             ,
-            \\{ "jsonrpc": "2.0", "method": "dec", "id": 3 }
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 3}
             ,
-            \\{ "jsonrpc": "2.0", "method": "no-method", "id": 99 }
+            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99}
             ,
-            \\{ "jsonrpc": "2.0", "method": "get", "id": 4 }
+            \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -144,13 +144,13 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
-            \\Content-Length: 42
+            \\Content-Length: 40
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "result": 1, "id": 2 }Content-Length: 88
+            \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "id": 99, "error": { "code": -32601, "message": "MethodNotFound" } }Content-Length: 42
+            \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "result": 0, "id": 4 }
+            \\{"jsonrpc": "2.0", "result": 0, "id": 4}
         );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -160,9 +160,9 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
     const alloc = gpa.allocator();
     {
         const req_jsons = 
-            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
-            \\{ "jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
-            \\{ "jsonrpc": "2.0", "method": "fun0", "id": "5c" }
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c" }
             \\
         ;
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -181,9 +181,9 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
-            \\{ "jsonrpc": "2.0", "result": "abc", "id": "5a" }
-            \\{ "jsonrpc": "2.0", "result": "xyz", "id": "5b" }
-            \\{ "jsonrpc": "2.0", "id": "5c", "error": { "code": -32602, "message": "InvalidParams" } }
+            \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
+            \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+            \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
             \\
         );
 
@@ -210,15 +210,15 @@ test "responsesByLength on JSON responses, single param, id" {
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{
-            \\{ "jsonrpc": "2.0", "method": "inc", "id": 1 }
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1 }
             ,
-            \\{ "jsonrpc": "2.0", "method": "get", "id": 2 }
+            \\{"jsonrpc": "2.0", "method": "get", "id": 2 }
             ,
-            \\{ "jsonrpc": "2.0", "method": "dec", "id": 3 }
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 3 }
             ,
-            \\{ "jsonrpc": "2.0", "method": "no-method", "id": 99 }
+            \\{"jsonrpc": "2.0", "method": "no-method", "id": 99 }
             ,
-            \\{ "jsonrpc": "2.0", "method": "get", "id": 4 }
+            \\{"jsonrpc": "2.0", "method": "get", "id": 4 }
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
@@ -240,13 +240,13 @@ test "responsesByLength on JSON responses, single param, id" {
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
-            \\Content-Length: 42
+            \\Content-Length: 40
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "result": 1, "id": 2 }Content-Length: 88
+            \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "id": 99, "error": { "code": -32601, "message": "MethodNotFound" } }Content-Length: 42
+            \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
             ++ "\r\n\r\n" ++
-            \\{ "jsonrpc": "2.0", "result": 0, "id": 4 }
+            \\{"jsonrpc": "2.0", "result": 0, "id": 4}
         );
 
         var response_stream = std.io.fixedBufferStream(write_buffer.items);

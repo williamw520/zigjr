@@ -688,7 +688,7 @@ test "Build request json with no params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar" }
+                                      \\{"jsonrpc": "2.0", "method": "foobar"}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -701,7 +701,7 @@ test "Build request json with no params and null Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "id": null }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": null}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -714,7 +714,7 @@ test "Build request json with no params and integer Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "id": 1 }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": 1}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -727,7 +727,7 @@ test "Build request json with no params and string Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "id": "1" }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": "1"}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -740,7 +740,7 @@ test "Build request json with array params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "params": [1,2] }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2]}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -758,7 +758,7 @@ test "Build request json with object params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "params": {"a":1,"b":2} }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": {"a":1,"b":2}}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -771,7 +771,7 @@ test "Build request json with array params and null Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": null }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": null}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -784,7 +784,7 @@ test "Build request json with array params and num Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": 123 }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": 123}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -797,7 +797,7 @@ test "Build request json with array params and str Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{ "jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": "10" }
+                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": "10"}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -825,7 +825,7 @@ test "Build batch request json with array params and str Id." {
         defer alloc.free(batch_json);
         // std.debug.print("req_json {s}\n", .{batch_json.items});
         try testing.expectEqualSlices(u8, batch_json,
-            \\[{ "jsonrpc": "2.0", "method": "foo", "params": [1,2] }, { "jsonrpc": "2.0", "method": "bar", "params": {"a":1,"b":2}, "id": 2 }]
+            \\[{"jsonrpc": "2.0", "method": "foo", "params": [1,2]}, {"jsonrpc": "2.0", "method": "bar", "params": {"a":1,"b":2}, "id": 2}]
         );
 
         var result = zigjr.parseRequest(alloc, batch_json);

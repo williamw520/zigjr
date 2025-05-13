@@ -33,31 +33,31 @@ pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: Rp
         defer alloc.free(params_json);
         switch (id) {
             .num => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": {} }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": {}}}
                 , .{method, params_json, id.num}),
             .str => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": "{s}" }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": "{s}"}}
                 , .{method, params_json, id.str}),
             .null => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": null }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": null}}
                 , .{method, params_json}),
             .none => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "params": {s} }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}}}
                 , .{method, params_json}),
         }
     } else {
         switch (id) {
             .num => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "id": {} }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": {}}}
                 , .{method, id.num}),
             .str => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "id": "{s}" }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": "{s}"}}
                 , .{method, id.str}),
             .null => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}", "id": null }}
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": null}}
                 , .{method}),
             .none => return allocPrint(alloc,
-                \\{{ "jsonrpc": "2.0", "method": "{s}" }}
+                \\{{"jsonrpc": "2.0", "method": "{s}"}}
                 , .{method}),
         }
     }
@@ -86,10 +86,10 @@ pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![
 pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
     return switch (id) {
         .num => try allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "result": {s}, "id": {} }}
+            \\{{"jsonrpc": "2.0", "result": {s}, "id": {}}}
             , .{result_json, id.num}),
         .str => try allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "result": {s}, "id": "{s}" }}
+            \\{{"jsonrpc": "2.0", "result": {s}, "id": "{s}"}}
             , .{result_json, id.str}),
         .none => null,  // No id for notification.  No response JSON.
         .null => null,  // Notification does not have a response.  No response JSON.
@@ -103,16 +103,16 @@ pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: [
     const msg_txt = if (msg.len == 0) @tagName(errCode) else msg;
     switch (id) {
         .num => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}" }} }}
+            \\{{"jsonrpc": "2.0", "id": {}, "error": {{"code": {}, "message": "{s}"}}}}
             , .{id.num, code, msg_txt}),
         .str => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}" }} }}
+            \\{{"jsonrpc": "2.0", "id": "{s}", "error": {{"code": {}, "message": "{s}"}}}}
             , .{id.str, code, msg_txt}),
         .none => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}"}}}}
             , .{code, msg_txt}),
         .null => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}" }} }}
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}"}}}}
             , .{code, msg_txt}),
     }
 }
@@ -124,16 +124,16 @@ pub fn responseErrorDataJson(alloc: Allocator, id: RpcId, errCode: ErrorCode,
     const code: i32 = @intFromEnum(errCode);
     switch (id) {
         .num => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": {}, "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            \\{{"jsonrpc": "2.0", "id": {}, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
             , .{id.num, code, msg, data}),
         .str => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": "{s}", "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            \\{{"jsonrpc": "2.0", "id": "{s}", "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
             , .{id.str, code, msg, data}),
         .none => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
             , .{code, msg, data}),
         .null => return allocPrint(alloc,
-            \\{{ "jsonrpc": "2.0", "id": null, "error": {{ "code": {}, "message": "{s}", "data": {s} }} }}
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
             , .{code, msg, data}),
     }
 }
