@@ -77,7 +77,7 @@ pub const Registry = struct {
 
     /// Run a handler on the request and generate a Response JSON string.
     /// Call freeResponse() to free the string.
-    pub fn run(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!RunResult {
+    pub fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!RunResult {
         const h_fn = self.handlers.get(req.method) orelse return RunErrors.MethodNotFound;
 
         switch (req.params) {

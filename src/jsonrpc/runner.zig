@@ -17,7 +17,7 @@ const RpcRequest = request.RpcRequest;
 const RpcId = request.RpcId;
 
 const response = @import("response.zig");
-const parseResponse = request.parseResponse;
+const parseResponse = response.parseResponse;
 const RpcResponse = response.RpcResponse;
 
 const errors = @import("errors.zig");
@@ -28,7 +28,7 @@ const AllocError = errors.AllocError;
 const messages = @import("messages.zig");
 
 
-/// Return value from dispatcher.run() expected handleRequest() below
+/// Return value from dispatcher.dispatch() expected handleRequest() below
 /// For the result JSON and data JSON string, it's best that they're produced by
 /// std.json.stringifyAlloc() to ensure a valid JSON string.
 pub const RunResult = union(enum) {
@@ -117,7 +117,7 @@ pub const RunErrors = error {
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a dispatch() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
 pub fn handleRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
     if (req.hasError()) {
@@ -156,7 +156,7 @@ pub fn handleRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) All
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a dispatch() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
 pub fn handleRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) AllocError![]const u8 {
     var count: usize = 0;
@@ -185,7 +185,7 @@ pub fn handleRequestBatch(alloc: Allocator, batch: []const RpcRequest, dispatche
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// Any error coming from the dispatcher is passed back to caller.
 ///
-/// The 'anytype' dispatcher needs to have a run() method returning a RunResult.
+/// The 'anytype' dispatcher needs to have a dispatch() method returning a RunResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the RunResult.
 pub fn handleRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
     var parsed_result = parseRequest(alloc, request_json);
@@ -197,7 +197,7 @@ pub fn handleRequestJson(alloc: Allocator, request_json: []const u8, dispatcher:
 }
 
 fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunResult {
-    const rresult: RunResult = dispatcher.run(alloc, req) catch |run_err| {
+    const rresult: RunResult = dispatcher.dispatch(alloc, req) catch |run_err| {
         return RunResult.withAnyErr(run_err);   // wrap the dispatching error into a RunResult.err.
     };
     return rresult;
@@ -207,13 +207,13 @@ fn runReqDispatcher(alloc: Allocator, req: RpcRequest, dispatcher: anytype) RunR
 /// Parse the JSON response message, run the dispatcher on response(s), 
 /// The JSON response message can contain a single response or a batch of responses.
 /// Any error coming from the dispatcher is passed back to caller.
-/// The 'anytype' dispatcher needs to have a run() method with !void return type.
+/// The 'anytype' dispatcher needs to have a dispatch() method with !void return type.
 pub fn handleResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
     var parsed_result = try parseResponse(alloc, response_json);
     defer parsed_result.deinit();
     return switch (parsed_result.response_msg) {
-        .response   => |res|   try dispatcher.run(alloc, res),
-        .batch      => |batch| for (batch)|res| try dispatcher.run(alloc, res),
+        .response   => |res|   try dispatcher.dispatch(alloc, res),
+        .batch      => |batch| for (batch)|res| try dispatcher.dispatch(alloc, res),
     };
 }
 

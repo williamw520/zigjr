@@ -21,7 +21,7 @@ const frame = @import("../streaming/frame.zig");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const EchoDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 1 or params.items[0] != .string) {
@@ -45,7 +45,7 @@ const EchoDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn run(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -68,7 +68,7 @@ const CounterDispatcher = struct {
 };
 
 const ResponseDispatcher = struct {
-    pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+    pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
         std.debug.print("RpcResponse: {any}\n", .{res});
     }
 };
@@ -190,7 +190,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
         try streamer.streamResponses(response_reader, struct {
-            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql("5a"))
                     try testing.expectEqualSlices(u8, res.result.string, "abc");
@@ -253,7 +253,7 @@ test "responsesByLength on JSON responses, single param, id" {
         const response_reader = response_stream.reader();
         // try stream.responsesByLength(alloc, response_reader, struct {
         try streamer.streamResponses(response_reader, struct {
-            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql(2))
                     try testing.expectEqual(res.result.integer, 1);

@@ -18,7 +18,7 @@ TODOs
 * DONE Add delimiter based response streaming API.
 * DONE Add Content-Length header based response streaming API.
 * DONE Message logging.
-* TODO Rename run() to dispatch() on dispatcher.
+* DONE Rename run() to dispatch() on dispatcher.
 * TODO Compact JSON output.
 * TODO Add dispatching registry.
 * TODO Add CLI on running request and response and on streaming.

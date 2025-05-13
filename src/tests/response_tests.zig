@@ -21,7 +21,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 const HelloDispatcher = struct {
-    pub fn run(_: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(_: Allocator, req: RpcRequest) !RunResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
@@ -48,7 +48,7 @@ const HelloDispatcher = struct {
 };
 
 const IntCalcDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
         if (req.hasError()) {
             return .withRequestErr(req);
         }
@@ -97,7 +97,7 @@ const IntCalcDispatcher = struct {
 };
 
 const FloatCalcDispatcher = struct {
-    pub fn run(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
@@ -145,7 +145,7 @@ const FloatCalcDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn run(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -245,7 +245,7 @@ test "handleRequestJson to a request with anonymous dispatcher struct" {
         defer result.deinit();
 
         const response = try zigjr.handleRequest(alloc, try result.request(), struct {
-            pub fn run(_: Allocator, _: RpcRequest) !RunResult {
+            pub fn dispatch(_: Allocator, _: RpcRequest) !RunResult {
                 return .{ .result = "\"hello back\"" };
             }
             pub fn free(_: Allocator, dresult: RunResult) void {
@@ -803,7 +803,7 @@ test "Dispatch on the response to a request of float add" {
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         try zigjr.handleResponseJson(alloc, res_json, struct {
-            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
                 try testing.expectEqual(res.result.float, 3);
                 try testing.expect(res.id.eql(1));
@@ -839,7 +839,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
         const non_exist_id = "xyz";
 
         try zigjr.handleResponseJson(alloc, batch_res_json, struct {
-            pub fn run(_: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
                 if (res.id.eql(2)) {
                     try testing.expectEqual(res.result.integer, 1);
