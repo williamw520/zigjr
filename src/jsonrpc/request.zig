@@ -42,54 +42,6 @@ pub fn parseRequest(alloc: Allocator, json_str: []const u8) RequestResult {
     };
 }
 
-pub fn parseRequestReader(alloc: Allocator, json_reader: anytype) RequestResult {
-    var rp = ReaderParser(@TypeOf(json_reader)).init(alloc, json_reader);
-    defer rp.deinit();
-    // NOTE: Stream parsing of JSON's via Reader is impossible.
-    // The assert() in std.json.parseFromTokenSourceLeaky() expects the end of input
-    // after parsing just one JSON.
-    //      assert(.end_of_document == try scanner_or_reader.next())
-    // NOTE: Streaming support needs to be done at a higher level, at the framing protocol level.
-    // E.g. Add '\n' between each JSON, or use "content-length: N\r\n\r\n" header.
-    const parsed = rp.next() catch |parse_err| {
-        var empty_req = RpcRequest{};
-        empty_req.setParseErr(parse_err);
-        return .{
-            .alloc = alloc,
-            .parsed = null,
-            .request_msg = RpcRequestMessage { .request = empty_req },
-        };
-    };
-    return .{
-        .alloc = alloc,
-        .parsed = parsed,
-        .request_msg = parsed.value,
-    };
-}
-
-fn ReaderParser(comptime JsonReaderType: type) type {
-    return struct {
-        const Self = @This();
-        const ScannerReader = std.json.Reader(std.json.default_buffer_size, JsonReaderType);
-
-        alloc:      Allocator,
-        jreader:    ScannerReader,
-
-        pub fn init(alloc: Allocator, json_reader: JsonReaderType) Self {
-            // ScannerReader bridging the json_reader and a Scanner.
-            return .{ .alloc = alloc,  .jreader = ScannerReader.init(alloc, json_reader) };
-        }
-
-        pub fn deinit(self: *Self) void {
-            self.jreader.deinit();
-        }
-
-        pub fn next(self: *Self) !Parsed(RpcRequestMessage) {
-            return try std.json.parseFromTokenSource(RpcRequestMessage, self.alloc, &self.jreader, .{});
-        }
-    };
-}
-
 pub const RequestResult = struct {
     const Self = @This();
     alloc:          Allocator,

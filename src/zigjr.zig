@@ -14,7 +14,6 @@ const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
 pub const parseRequest = request.parseRequest;
-pub const parseRequestReader = request.parseRequestReader;
 pub const RequestResult = response.RequestResult;
 pub const RpcRequestMessage = request.RpcRequestMessage;
 pub const RpcRequest = request.RpcRequest;
