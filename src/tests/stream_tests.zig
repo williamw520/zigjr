@@ -90,12 +90,11 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
         // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
-        try streamer.streamRequests(reader, &buf_writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -136,11 +135,10 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
         // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
-        try streamer.streamRequests(reader, &buf_writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -156,6 +154,7 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+
 test "DelimiterStream.streamRequests on JSON requests, recover from error" {
     const alloc = gpa.allocator();
     {
@@ -163,7 +162,7 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
             \\garbage abc
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b"}
-            \\
+            \\ 
             \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c"}
             \\
         ;
@@ -174,12 +173,47 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
         // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
-        try streamer.streamRequests(reader, &buf_writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, EchoDispatcher);
+        // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
+
+        try testing.expectEqualSlices(u8, write_buffer.items,
+            \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
+            \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "SyntaxError"}}
+            \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+            \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
+            \\
+        );
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, recover from error" {
+    const alloc = gpa.allocator();
+    {
+        const req_jsons = 
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
+            \\garbage abc
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b"}
+            \\ 
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5c"}
+            \\
+        ;
+        // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
+        var json_stream = std.io.fixedBufferStream(req_jsons);
+        const reader = json_stream.reader();
+
+        var write_buffer = ArrayList(u8).init(alloc);
+        defer write_buffer.deinit();
+        const writer = write_buffer.writer();
+
+        const streamer = stream.DelimiterStream.init(alloc, .{ .skip_blank_message = false });
+        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+
+        try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -242,11 +276,10 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
         // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
-        try streamer.streamRequests(reader, &buf_writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -279,12 +312,11 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
         // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
-        try streamer.streamRequests(reader, &buf_writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -339,11 +371,10 @@ test "responsesByLength on JSON responses, single param, id" {
         var write_buffer = ArrayList(u8).init(alloc);
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
-        var buf_writer = std.io.bufferedWriter(writer);
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
         // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
-        try streamer.streamRequests(reader, &buf_writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,

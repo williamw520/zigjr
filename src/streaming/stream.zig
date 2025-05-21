@@ -17,27 +17,19 @@ const frame = @import("frame.zig");
 const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
-pub fn nopLogger(_: []const u8, _: []const u8) void {
-}
-
-pub fn debugLogger(operation: []const u8, message: []const u8) void {
-    std.debug.print("{s}: {s}\n", .{operation, message});
-}
-
-
 /// Provides frame level support for JSON-RPC streaming based on frame delimiters.
-/// The framed request messages are delimited by the request_delimiter.
-/// The framed response messages are delimited by the response_delimiter.
-/// A typical JSON-RPC stream is delimited by '\n' (the CR character),
-/// which reqires all message content not containing the character.
+/// The framed request messages are delimited by the options.request_delimiter.
+/// The framed response messages will be delimited by the options.response_delimiter.
+/// All messages should not contain the delimiter character.
+/// A typical JSON-RPC stream is delimited by '\n' (the CR character).
 pub const DelimiterStream = struct {
     const Self = @This();
 
-    alloc:              Allocator,
-    options:            DelimiterStreamOptions,
+    alloc:      Allocator,
+    options:    DelimiterStreamOptions,
 
     /// Initialize a stream struct.
-    /// The logger param takes in a callback function to log the incoming and outgoing messages.
+    /// The logger option takes in a callback function to log the incoming and outgoing messages.
     pub fn init(alloc: Allocator, options: DelimiterStreamOptions) Self {
         return .{
             .alloc = alloc,
@@ -46,31 +38,33 @@ pub const DelimiterStream = struct {
     }
 
     /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
-    /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
-    pub fn streamRequests(self: Self, reader: anytype, buf_writer: anytype, dispatcher: anytype) !void {
-        var json_frame = std.ArrayList(u8).init(self.alloc);    // one frame is one JSON request.
-        defer json_frame.deinit();
-        var buf_reader = std.io.bufferedReader(reader);
-        var json_reader = buf_reader.reader();
-        var json_writer = buf_writer.writer();
+    /// handle each one with the dispatcher, and write the JSON responses to the writer.
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
+        var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON request is a frame.
+        defer frame_buf.deinit();
+        const frame_writer = frame_buf.writer();
+        var buffered_writer = std.io.bufferedWriter(writer);
+        const stream_writer = buffered_writer.writer();
 
         while (true) {
-            json_frame.clearRetainingCapacity();
-            _ = json_reader.streamUntilDelimiter(json_frame.writer(),
-                                                 self.options.request_delimiter, null) catch |err| {
-                switch (err) {
+            frame_buf.clearRetainingCapacity();
+            reader.streamUntilDelimiter(frame_writer, self.options.request_delimiter, null) catch |e| {
+                switch (e) {
                     error.EndOfStream => break,
-                    else => return err, // unrecoverable error while reading from reader.
+                    else => return e,   // unrecoverable error while reading from reader.
                 }
             };
 
-            self.options.logger("receive request", json_frame.items);
-            if (try handler.handleRequestJson(self.alloc, json_frame.items, dispatcher))|result_json| {
-                try json_writer.writeAll(result_json);
-                try json_writer.writeByte(self.options.response_delimiter);
-                try buf_writer.flush();
-                self.options.logger("return response", result_json);
-                self.alloc.free(result_json);
+            const request_json = std.mem.trim(u8, frame_buf.items, " \t");
+            if (self.options.skip_blank_message and request_json.len == 0) continue;
+
+            self.options.logger("receive request", request_json);
+            if (try handler.handleRequestJson(self.alloc, request_json, dispatcher))|response_json| {
+                try stream_writer.writeAll(response_json);
+                try stream_writer.writeByte(self.options.response_delimiter);
+                try buffered_writer.flush();
+                self.options.logger("return response", response_json);
+                self.alloc.free(response_json);
             }
         }
     }
@@ -78,23 +72,25 @@ pub const DelimiterStream = struct {
     /// Runs a loop to read a stream of JSON response messages (frames) from the reader,
     /// and handle each one with the dispatcher.
     pub fn streamResponses(self: Self, reader: anytype, dispatcher: anytype) !void {
-        var json_frame = std.ArrayList(u8).init(self.alloc);    // one frame is one JSON response.
-        defer json_frame.deinit();
-        var buf_reader = std.io.bufferedReader(reader);
-        var json_reader = buf_reader.reader();
+        var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON response is one frame.
+        defer frame_buf.deinit();
+        const frame_writer = frame_buf.writer();
 
         while (true) {
-            json_frame.clearRetainingCapacity();
-            _ = json_reader.streamUntilDelimiter(json_frame.writer(),
-                                                 self.options.response_delimiter, null) catch |err| {
-                switch (err) {
+            frame_buf.clearRetainingCapacity();
+            reader.streamUntilDelimiter(frame_writer, self.options.response_delimiter, null) catch |e| {
+                switch (e) {
                     error.EndOfStream => break,
-                    else => return err,
+                    else => return e,   // unrecoverable error while reading from reader.
                 }
             };
 
-            self.options.logger("receive response", json_frame.items);
-            try handler.handleResponseJson(self.alloc, json_frame.items, dispatcher);
+            const response_json = std.mem.trim(u8, frame_buf.items, " \t");
+            if (self.options.skip_blank_message and response_json.len == 0) continue;
+
+            self.options.logger("receive response", frame_buf.items);
+            // TODO: check for recoverable errors.
+            try handler.handleResponseJson(self.alloc, frame_buf.items, dispatcher);
         }
     }
 
@@ -103,8 +99,18 @@ pub const DelimiterStream = struct {
 const DelimiterStreamOptions = struct {
     request_delimiter: u8 = '\n',
     response_delimiter: u8 = '\n',
+    skip_blank_message: bool = true,
     logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
 };
+
+/// A do-nothing logger that can be passed to the stream options.logger.
+pub fn nopLogger(_: []const u8, _: []const u8) void {
+}
+
+/// A logger that logs to the std.debug.  It can be passed to the stream options.logger.
+pub fn debugLogger(operation: []const u8, message: []const u8) void {
+    std.debug.print("{s}: {s}\n", .{operation, message});
+}
 
 
 /// Provides frame level support for JSON-RPC streaming based on Content-Length header.
@@ -131,34 +137,36 @@ pub const ContentLengthStream = struct {
 
     /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
     /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
-    pub fn streamRequests(self: Self, reader: anytype, buf_writer: anytype, dispatcher: anytype) !void {
-        var msg_buf = std.ArrayList(u8).init(self.alloc);
-        defer msg_buf.deinit();
-        var buf_reader = std.io.bufferedReader(reader);
-        const json_reader = buf_reader.reader();
-        const json_writer = buf_writer.writer();
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
+        var frame_buf = std.ArrayList(u8).init(self.alloc);
+        defer frame_buf.deinit();
+        var buffered_writer = std.io.bufferedWriter(writer);
+        const stream_writer = buffered_writer.writer();
 
         while (true) {
-            const msg_len = frame.readContentLengthFrame(json_reader, &msg_buf) catch |err| {
+            frame.readContentLengthFrame(reader, &frame_buf) catch |err| {
                 switch (err) {
                     error.EndOfStream => return,
                     JrErrors.MissingContentLengthHeader => {
                         if (self.options.recover_on_missing_header) {
                             continue;
                         } else {
-                            return err;
+                            return err; // treat it as a unrecoverable error.
                         }
                     },
                     else => return err, // unrecoverable error while reading from reader.
                 }
             };
-            self.options.logger("receive request", msg_buf.items);
-            if (msg_len == 0) continue;     // skip empty content frame.
-            if (try handler.handleRequestJson(self.alloc, msg_buf.items, dispatcher))|result_json| {
-                try frame.writeContentLengthFrame(json_writer, result_json);
-                try buf_writer.flush();
-                self.options.logger("return response", result_json);
-                self.alloc.free(result_json);
+
+            const request_json = std.mem.trim(u8, frame_buf.items, " \t");
+            if (self.options.skip_blank_message and request_json.len == 0) continue;
+
+            self.options.logger("receive request", request_json);
+            if (try handler.handleRequestJson(self.alloc, request_json, dispatcher))|response_json| {
+                try frame.writeContentLengthFrame(stream_writer, response_json);
+                try buffered_writer.flush();
+                self.options.logger("return response", response_json);
+                self.alloc.free(response_json);
             }
         }
     }
@@ -166,20 +174,23 @@ pub const ContentLengthStream = struct {
     /// Runs a loop to read a stream of JSON response messages (frames) from the reader,
     /// and handle each one with the dispatcher.
     pub fn streamResponses(self: Self, reader: anytype, dispatcher: anytype) !void {
-        var msg_buf = std.ArrayList(u8).init(self.alloc);
-        defer msg_buf.deinit();
-        var buf_reader = std.io.bufferedReader(reader);
-        const json_reader = buf_reader.reader();
+        var frame_buf = std.ArrayList(u8).init(self.alloc);
+        defer frame_buf.deinit();
 
         while (true) {
-            const msg_len = frame.readContentLengthFrame(json_reader, &msg_buf) catch |err| {
-                if (err == error.EndOfStream)
-                    break;
-                return err;
+            frame.readContentLengthFrame(reader, &frame_buf) catch |e| {
+                switch (e) {
+                    error.EndOfStream => break,
+                    else => return e,   // unrecoverable error while reading from reader.
+                }
             };
-            self.options.logger("receive response", msg_buf.items);
-            if (msg_len == 0) continue;     // skip empty content frame.
-            try handler.handleResponseJson(self.alloc, msg_buf.items, dispatcher);
+
+            const response_json = std.mem.trim(u8, frame_buf.items, " \t");
+            if (self.options.skip_blank_message and response_json.len == 0) continue;
+
+            self.options.logger("receive response", response_json);
+            // TODO: check for recoverable errors.
+            try handler.handleResponseJson(self.alloc, response_json, dispatcher);
         }
     }
 
@@ -187,6 +198,7 @@ pub const ContentLengthStream = struct {
 
 pub const ContentLengthStreamOptions = struct {
     recover_on_missing_header: bool = true,
+    skip_blank_message: bool = true,
     logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
 };
 

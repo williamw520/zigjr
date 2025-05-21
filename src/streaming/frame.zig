@@ -16,10 +16,10 @@ const JrErrors = @import("../zigjr.zig").JrErrors;
 
 /// Write a data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
-pub fn writeContentLengthFrame(writer: anytype, data: []const u8) !void {
-    try writer.print("Content-Length: {d}\r\n", .{data.len});
+pub fn writeContentLengthFrame(writer: anytype, content: []const u8) !void {
+    try writer.print("Content-Length: {d}\r\n", .{content.len});
     try writer.print("\r\n", .{});
-    _ = try writer.writeAll(data);
+    try writer.writeAll(content);
 }
 
 /// Build a sequence of data frames into a byte buffer, with a header section
@@ -38,12 +38,12 @@ pub fn writeContentLengthFrames(alloc: Allocator, data_frames: []const []const u
 ///     ...
 ///     \r\n
 ///     DATA
-fn readContentLengthHeader(reader: anytype, buf: *ArrayList(u8)) !usize {
+fn readContentLengthHeader(reader: anytype, frame_buf: *ArrayList(u8)) !usize {
     var content_length: ?usize = null;
     while (true) {
-        buf.clearRetainingCapacity();
-        _ = try reader.streamUntilDelimiter(buf.writer(), '\n', null);
-        const line = std.mem.trim(u8, buf.items, "\r\n");
+        frame_buf.clearRetainingCapacity();
+        try reader.streamUntilDelimiter(frame_buf.writer(), '\n', null);
+        const line = std.mem.trim(u8, frame_buf.items, "\r\n");
         if (line.len == 0) {
             break;              // reach the empty line \r\n
         }
@@ -59,22 +59,21 @@ fn readContentLengthHeader(reader: anytype, buf: *ArrayList(u8)) !usize {
 }
 
 /// Read a data frame, that has a Content-Length header, into data_buffer.
-/// The content data is written to the output data_buffer, which is expanded as needed.
-/// The content length is returned. If Content-Length header is not found, return null.
-pub fn readContentLengthFrame(reader: anytype, data_buffer: *ArrayList(u8)) !usize {
+/// The content data is written to the output frame_buffer, which is expanded as needed.
+/// Check the length of the frame_buffer for the content length.
+pub fn readContentLengthFrame(reader: anytype, frame_buffer: *ArrayList(u8)) !void {
     // Use data_buffer as a temp buffer to read the headers.
-    const content_length = try readContentLengthHeader(reader, data_buffer);
-    data_buffer.clearRetainingCapacity();
-    try data_buffer.ensureTotalCapacity(content_length);
+    const content_length = try readContentLengthHeader(reader, frame_buffer);
+    frame_buffer.clearRetainingCapacity();
+    try frame_buffer.ensureTotalCapacity(content_length);
     var read_total: usize = 0;
     while (read_total < content_length) {
         const to_read = content_length - read_total;
-        const chunk = try data_buffer.addManyAsSlice(@min(to_read, 4096));
+        const chunk = try frame_buffer.addManyAsSlice(@min(to_read, 4096));
         const read_len = try reader.read(chunk);
         if (read_len == 0) return error.UnexpectedEof;
         read_total += read_len;
     }
-    return content_length;
 }
 
 
