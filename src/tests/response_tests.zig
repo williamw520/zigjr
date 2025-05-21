@@ -11,7 +11,7 @@ const stringifyAlloc = std.json.stringifyAlloc;
 const zigjr = @import("../zigjr.zig");
 const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
-const RunResult = zigjr.RunResult;
+const DispatchResult = zigjr.DispatchResult;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 const DispatchErrors = zigjr.DispatchErrors;
@@ -21,7 +21,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 
 const HelloDispatcher = struct {
-    pub fn dispatch(_: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(_: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
@@ -36,7 +36,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn free(_: Allocator, dresult: RunResult) void {
+    pub fn free(_: Allocator, dresult: DispatchResult) void {
         // All result data are constant strings.  Nothing to free.
         switch (dresult) {
             .none => {},
@@ -48,7 +48,7 @@ const HelloDispatcher = struct {
 };
 
 const IntCalcDispatcher = struct {
-    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (req.hasError()) {
             return .withRequestErr(req);
         }
@@ -81,7 +81,7 @@ const IntCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: RunResult) void {
+    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => alloc.free(dresult.result),
@@ -97,7 +97,7 @@ const IntCalcDispatcher = struct {
 };
 
 const FloatCalcDispatcher = struct {
-    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
@@ -132,7 +132,7 @@ const FloatCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: RunResult) void {
+    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
         switch (dresult) {
             .result => alloc.free(dresult.result),
             .err => {},
@@ -145,7 +145,7 @@ const FloatCalcDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -159,7 +159,7 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn free(_: *@This(), alloc: Allocator, dr: RunResult) void {
+    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
         switch (dr) {
             .result => alloc.free(dr.result),
             else => {},
@@ -245,10 +245,10 @@ test "handleRequestJson to a request with anonymous dispatcher struct" {
         defer result.deinit();
 
         const response = try zigjr.handleRequest(alloc, try result.request(), struct {
-            pub fn dispatch(_: Allocator, _: RpcRequest) !RunResult {
+            pub fn dispatch(_: Allocator, _: RpcRequest) !DispatchResult {
                 return .{ .result = "\"hello back\"" };
             }
-            pub fn free(_: Allocator, dresult: RunResult) void {
+            pub fn free(_: Allocator, dresult: DispatchResult) void {
                 switch (dresult) {
                     else => {}
                 }
@@ -677,7 +677,7 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        const batch_res_json = try zigjr.handleRequestBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.handleBatchRequest(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
@@ -777,7 +777,7 @@ test "Handle empty batch response" {
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch()).len == 0);
 
-        const batch_res_json = try zigjr.handleRequestBatch(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.handleBatchRequest(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 

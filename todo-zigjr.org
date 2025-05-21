@@ -1,12 +1,12 @@
 
 TODOs
-* DONE Add dispatcher.free() to free on the RunResult. Let the dispatcher handle freeing memory.
+* DONE Add dispatcher.free() to free on the DispatchResult. Let the dispatcher handle freeing memory.
 * DONE Add inc(), dec(), and get() to CounterDispatcher test.
 * DONE Add notification testing.  Just use CounterDispatcher.
 * DONE Test on float number in request and response messages.
 * DONE Add check for notification request.
 * DONE Add batch response message builder.
-* DONE Add batch dispatching in runner.
+* DONE Add batch dispatching in handler.
 * DONE Add parsing batch result.
 * DONE Rename RpcMessage to RpcRequestMessage.
 * DONE Add test on parsing empty batch request.

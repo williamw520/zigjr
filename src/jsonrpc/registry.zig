@@ -21,9 +21,9 @@ const req_parser = @import("request.zig");
 const RpcRequest = req_parser.RpcRequest;
 const RpcId = req_parser.RpcId;
 
-const runner = @import("runner.zig");
-const RunResult = runner.RunResult;
-const RunErrors = runner.RunErrors;
+const handler = @import("handler.zig");
+const DispatchResult = handler.DispatchResult;
+const DispatchErrors = handler.DispatchErrors;
 
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
@@ -63,7 +63,7 @@ pub const Registry = struct {
         return self.handlers.get(method) != null;
     }
 
-    pub fn free(_: *Self, alloc: Allocator, dresult: RunResult) void {
+    pub fn free(_: *Self, alloc: Allocator, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => |json_result| alloc.free(json_result),
@@ -77,35 +77,35 @@ pub const Registry = struct {
 
     /// Run a handler on the request and generate a Response JSON string.
     /// Call freeResponse() to free the string.
-    pub fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!RunResult {
-        const h_fn = self.handlers.get(req.method) orelse return RunErrors.MethodNotFound;
+    pub fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        const h_fn = self.handlers.get(req.method) orelse return DispatchErrors.MethodNotFound;
 
         switch (req.params) {
             .array  => |array|  return callOnArray(alloc, h_fn, array),
             .null   => {
                 switch(h_fn) {
                     .fn0    =>  |f| return f(alloc),
-                    else    =>      return RunErrors.MismatchedParamCounts,
+                    else    =>      return DispatchErrors.MismatchedParamCounts,
                 }
             },
             .object => |object| {
                 switch (h_fn) {
                     .fnRaw  =>  |f| return f(alloc, req.params),
                     .fnObj  =>  |f| return f(alloc, object),
-                    else    =>      return RunErrors.NoHandlerForObjectParam,
+                    else    =>      return DispatchErrors.NoHandlerForObjectParam,
                 }
             },
-            else    => return RunErrors.InvalidParams,
+            else    => return DispatchErrors.InvalidParams,
         }
     }
 
-    fn callOnArray(alloc: Allocator, handler_fn: HandlerFn, array: Array) anyerror!RunResult {
+    fn callOnArray(alloc: Allocator, handler_fn: HandlerFn, array: Array) anyerror!DispatchResult {
         // Call on array based parameter.
         if (handler_fn == .fnArr) return handler_fn.fnArr(alloc, array);
 
         // Call on fixed-length based parameters.
         const p = array.items;
-        if (paramLen(handler_fn) != p.len) return RunErrors.MismatchedParamCounts;
+        if (paramLen(handler_fn) != p.len) return DispatchErrors.MismatchedParamCounts;
         return switch (handler_fn) {
             .fn0 => |f| f(alloc),
             .fn1 => |f| f(alloc, p[0]),
@@ -132,16 +132,16 @@ pub const Registry = struct {
 /// The caller will free it with the allocator after using it in the Response message.
 /// Call std.json.stringifyAlloc() to build the returned JSON will take care of it.
 const HandlerFn = union(enum) {
-    fn0: *const fn(Allocator) anyerror!RunResult,
-    fn1: *const fn(Allocator, Value) anyerror!RunResult,
-    fn2: *const fn(Allocator, Value, Value) anyerror!RunResult,
-    fn3: *const fn(Allocator, Value, Value, Value) anyerror!RunResult,
-    fn4: *const fn(Allocator, Value, Value, Value, Value) anyerror!RunResult,
-    fn5: *const fn(Allocator, Value, Value, Value, Value, Value) anyerror!RunResult,
-    fn6: *const fn(Allocator, Value, Value, Value, Value, Value, Value) anyerror!RunResult,
-    fnArr: *const fn(Allocator, Array) anyerror!RunResult,
-    fnObj: *const fn(Allocator, ObjectMap) anyerror!RunResult,
-    fnRaw: *const fn(Allocator, Value) anyerror!RunResult,
+    fn0: *const fn(Allocator) anyerror!DispatchResult,
+    fn1: *const fn(Allocator, Value) anyerror!DispatchResult,
+    fn2: *const fn(Allocator, Value, Value) anyerror!DispatchResult,
+    fn3: *const fn(Allocator, Value, Value, Value) anyerror!DispatchResult,
+    fn4: *const fn(Allocator, Value, Value, Value, Value) anyerror!DispatchResult,
+    fn5: *const fn(Allocator, Value, Value, Value, Value, Value) anyerror!DispatchResult,
+    fn6: *const fn(Allocator, Value, Value, Value, Value, Value, Value) anyerror!DispatchResult,
+    fnArr: *const fn(Allocator, Array) anyerror!DispatchResult,
+    fnObj: *const fn(Allocator, ObjectMap) anyerror!DispatchResult,
+    fnRaw: *const fn(Allocator, Value) anyerror!DispatchResult,
 };
 
 fn toHandlerFn(handler_fn: anytype, opt: RegisterOptions) !HandlerFn {
@@ -187,8 +187,8 @@ fn toHandlerFn(handler_fn: anytype, opt: RegisterOptions) !HandlerFn {
     }
 }
 
-fn paramLen(handler: HandlerFn) ?usize {
-    return switch (handler) {
+fn paramLen(h_fn: HandlerFn) ?usize {
+    return switch (h_fn) {
         .fn0 => 0,
         .fn1 => 1,
         .fn2 => 2,

@@ -12,7 +12,7 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const bufferedWriter = std.io.bufferedWriter;
 
-const runner = @import("../jsonrpc/runner.zig");
+const handler = @import("../jsonrpc/handler.zig");
 const frame = @import("frame.zig");
 
 
@@ -71,7 +71,7 @@ pub const DelimiterStream = struct {
             };
 
             self.logger("receive request", json_frame.items);
-            if (try runner.handleRequestJson(self.alloc, json_frame.items, dispatcher))|result_json| {
+            if (try handler.handleRequestJson(self.alloc, json_frame.items, dispatcher))|result_json| {
                 try json_writer.writeAll(result_json);
                 try json_writer.writeByte(self.response_delimiter);
                 try buf_writer.flush();
@@ -100,7 +100,7 @@ pub const DelimiterStream = struct {
             };
 
             self.logger("receive response", json_frame.items);
-            try runner.handleResponseJson(self.alloc, json_frame.items, dispatcher);
+            try handler.handleResponseJson(self.alloc, json_frame.items, dispatcher);
         }
     }
 
@@ -148,7 +148,7 @@ pub const ContentLengthStream = struct {
             };
             self.logger("receive request", msg_buf.items);
             if (msg_len == 0) continue;     // skip empty content frame.
-            if (try runner.handleRequestJson(self.alloc, msg_buf.items, dispatcher))|result_json| {
+            if (try handler.handleRequestJson(self.alloc, msg_buf.items, dispatcher))|result_json| {
                 try frame.writeContentLengthFrame(json_writer, result_json);
                 try buf_writer.flush();
                 self.logger("return response", result_json);
@@ -173,7 +173,7 @@ pub const ContentLengthStream = struct {
             };
             self.logger("receive response", msg_buf.items);
             if (msg_len == 0) continue;     // skip empty content frame.
-            try runner.handleResponseJson(self.alloc, msg_buf.items, dispatcher);
+            try handler.handleResponseJson(self.alloc, msg_buf.items, dispatcher);
         }
     }
 

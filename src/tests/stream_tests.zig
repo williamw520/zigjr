@@ -13,7 +13,7 @@ const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
-const RunResult = zigjr.RunResult;
+const DispatchResult = zigjr.DispatchResult;
 
 const stream = @import("../streaming/stream.zig");
 const frame = @import("../streaming/frame.zig");
@@ -21,7 +21,7 @@ const frame = @import("../streaming/frame.zig");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const EchoDispatcher = struct {
-    pub fn dispatch(alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(alloc: Allocator, req: RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 1 or params.items[0] != .string) {
@@ -32,7 +32,7 @@ const EchoDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: RunResult) void {
+    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => |json| alloc.free(json),
@@ -45,7 +45,7 @@ const EchoDispatcher = struct {
 const CounterDispatcher = struct {
     count:  isize = 0,
     
-    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !RunResult {
+    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -59,7 +59,7 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn free(_: *@This(), alloc: Allocator, dr: RunResult) void {
+    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
         switch (dr) {
             .result => alloc.free(dr.result),
             else => {},

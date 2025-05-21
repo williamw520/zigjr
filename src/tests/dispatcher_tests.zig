@@ -13,8 +13,8 @@ const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
-const RunResult = zigjr.RunResult;
-const RunErrors = zigjr.RunErrors;
+const DispatchResult = zigjr.DispatchResult;
+const DispatchErrors = zigjr.DispatchErrors;
 
 const reg = @import("../jsonrpc/registry.zig");
 
@@ -23,23 +23,23 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 // Test handler registration.
 
-fn fn0(alloc: Allocator) anyerror!RunResult {
+fn fn0(alloc: Allocator) anyerror!DispatchResult {
     return .{
         .result = try std.json.stringifyAlloc(alloc, "Hello", .{}),
     };
 }
 
-fn fn0_with_result(alloc: Allocator) anyerror!RunResult {
-    return RunResult.withResult(try std.json.stringifyAlloc(alloc, "Hello", .{}));
+fn fn0_with_result(alloc: Allocator) anyerror!DispatchResult {
+    return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, "Hello", .{}));
 }
 
-fn fn0_with_result_lit(alloc: Allocator) anyerror!RunResult {
+fn fn0_with_result_lit(alloc: Allocator) anyerror!DispatchResult {
     _=alloc;
-    return RunResult.withResultLit("\"Hello\"");
+    return DispatchResult.withResultLit("\"Hello\"");
 }
 
-fn fn0_with_err(_: Allocator) anyerror!RunResult {
-    return RunResult.withErr(ErrorCode.InternalError, "Hello error");
+fn fn0_with_err(_: Allocator) anyerror!DispatchResult {
+    return DispatchResult.withErr(ErrorCode.InternalError, "Hello error");
 }
 
 
