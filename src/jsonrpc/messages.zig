@@ -21,121 +21,170 @@ const JrErrors = errors.JrErrors;
 const AllocError = errors.AllocError;
 
 
-/// Build a request message in JSON.
+/// Write a request message in JSON string to the writer.
+pub fn writeRequestJson(method: []const u8, params_json: ?[]const u8,
+                        id: RpcId, writer: anytype) JrErrors!void {
+    if (params_json) |params| {
+        switch (id) {
+            .num => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": {}}}
+                    , .{method, params, id.num}),
+            .str => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": "{s}"}}
+                    , .{method, params, id.str}),
+            .null => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": null}}
+                    , .{method, params}),
+            .none => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}}}
+                    , .{method, params}),
+        }
+    } else {
+        switch (id) {
+            .num => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": {}}}
+                    , .{method, id.num}),
+            .str => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": "{s}"}}
+                    , .{method, id.str}),
+            .null => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}", "id": null}}
+                    , .{method}),
+            .none => try writer.print(
+                \\{{"jsonrpc": "2.0", "method": "{s}"}}
+                    , .{method}),
+        }
+    }
+}
+
+/// Build a request message in JSON string.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn requestJson(alloc: Allocator, method: []const u8, params: anytype, id: RpcId) JrErrors![]const u8 {
+pub fn toRequestJson(alloc: Allocator, method: []const u8, params: anytype,
+                     id: RpcId) JrErrors![]const u8 {
     const pinfo = @typeInfo(@TypeOf(params));
     if (pinfo != .array and pinfo != .@"struct" and pinfo != .null) {
         return JrErrors.InvalidParamsType;
     }
+
+    var output_buf = std.ArrayList(u8).init(alloc);
     if (pinfo != .null) {
         const params_json = try std.json.stringifyAlloc(alloc, params, .{});
         defer alloc.free(params_json);
-        switch (id) {
-            .num => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": {}}}
-                , .{method, params_json, id.num}),
-            .str => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": "{s}"}}
-                , .{method, params_json, id.str}),
-            .null => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}, "id": null}}
-                , .{method, params_json}),
-            .none => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "params": {s}}}
-                , .{method, params_json}),
-        }
+        try writeRequestJson(method, params_json, id, output_buf.writer());
     } else {
-        switch (id) {
-            .num => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "id": {}}}
-                , .{method, id.num}),
-            .str => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "id": "{s}"}}
-                , .{method, id.str}),
-            .null => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}", "id": null}}
-                , .{method}),
-            .none => return allocPrint(alloc,
-                \\{{"jsonrpc": "2.0", "method": "{s}"}}
-                , .{method}),
-        }
+        try writeRequestJson(method, null, id, output_buf.writer());
     }
+    return try output_buf.toOwnedSlice();
+}
+
+/// Write a batch message of request JSONS to the writer.
+pub fn writeRequestBatchJson(request_jsons: []const []const u8, writer: anytype) AllocError!void {
+    var count: usize = 0;
+    try writer.writeAll("[");
+    for (request_jsons) |json| {
+        if (count > 0) try writer.writeAll(", ");
+        try writer.writeAll(json);
+        count += 1;
+    }
+    try writer.writeAll("]");
 }
 
 /// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn batchJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![]const u8 {
-    var count: usize = 0;
-    var buffer = ArrayList(u8).init(alloc);
-    defer buffer.deinit();
-
-    try buffer.appendSlice("[");
-    for (request_jsons) |json| {
-        if (count > 0) try buffer.appendSlice(", ");
-        try buffer.appendSlice(json);
-        count += 1;
-    }
-    try buffer.appendSlice("]");
-
-    return try alloc.dupe(u8, buffer.items);
+pub fn toRequestBatchJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![]const u8 {
+    var output_buf = std.ArrayList(u8).init(alloc);
+    try writeRequestBatchJson(request_jsons, output_buf.writer());
+    return try output_buf.toOwnedSlice();
 }
 
-/// Build a normal response message in JSON.
-/// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn responseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
-    return switch (id) {
-        .num => try allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "result": {s}, "id": {}}}
-            , .{result_json, id.num}),
-        .str => try allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "result": {s}, "id": "{s}"}}
-            , .{result_json, id.str}),
-        .none => null,  // No id for notification.  No response JSON.
-        .null => null,  // Notification does not have a response.  No response JSON.
-    };
-}
 
-/// Build an error response message in JSON.
-/// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn responseErrorJson(alloc: Allocator, id: RpcId, errCode: ErrorCode, msg: []const u8) AllocError![]const u8 {
-    const code: i32 = @intFromEnum(errCode);
-    const msg_txt = if (msg.len == 0) @tagName(errCode) else msg;
+/// Write a normal response message in JSON to the writer.
+/// Return true for valid response.  For message id that shouldn't have a response, false is returned.
+pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) AllocError!bool {
+    if (id == .none) return false;  // No id for notification.  No response JSON.
+    if (id == .null) return false;  // Notification does not have a response.  No response JSON.
     switch (id) {
-        .num => return allocPrint(alloc,
+        .num => try writer.print(
+            \\{{"jsonrpc": "2.0", "result": {s}, "id": {}}}
+                , .{result_json, id.num}),
+        .str => try writer.print(
+            \\{{"jsonrpc": "2.0", "result": {s}, "id": "{s}"}}
+                , .{result_json, id.str}),
+        else => {},
+    }
+    return true;
+}
+
+/// Build a normal response message in JSON string.
+/// For message id that shouldn't have a response, null is returned.
+/// Caller needs to call alloc.free() on the returned message to free the memory.
+pub fn toResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
+    var output_buf = std.ArrayList(u8).init(alloc);
+    if (try writeResponseJson(id, result_json, output_buf.writer())) {
+        return try output_buf.toOwnedSlice();
+    } else {
+        return null;
+    }
+}
+
+/// Writer an error response message in JSON to the writer.
+pub fn writeErrorResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
+                              writer: anytype) AllocError!void {
+    const code: i32 = @intFromEnum(err_code);
+    const err_msg = if (msg.len == 0) @tagName(err_code) else msg;
+    switch (id) {
+        .num => try writer.print(
             \\{{"jsonrpc": "2.0", "id": {}, "error": {{"code": {}, "message": "{s}"}}}}
-            , .{id.num, code, msg_txt}),
-        .str => return allocPrint(alloc,
+                , .{id.num, code, err_msg}),
+        .str => try writer.print(
             \\{{"jsonrpc": "2.0", "id": "{s}", "error": {{"code": {}, "message": "{s}"}}}}
-            , .{id.str, code, msg_txt}),
-        .none => return allocPrint(alloc,
+                , .{id.str, code, err_msg}),
+        .none => try writer.print(
             \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}"}}}}
-            , .{code, msg_txt}),
-        .null => return allocPrint(alloc,
+                , .{code, err_msg}),
+        .null => try writer.print(
             \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}"}}}}
-            , .{code, msg_txt}),
+                , .{code, err_msg}),
+    }
+}
+
+/// Build an error response message in JSON string.
+/// Caller needs to call alloc.free() on the returned message to free the memory.
+pub fn toErrorResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
+                           msg: []const u8) AllocError![]const u8 {
+    var output_buf = std.ArrayList(u8).init(alloc);
+    try writeErrorResponseJson(id, err_code, msg, output_buf.writer());
+    return try output_buf.toOwnedSlice();
+}
+
+/// Build an error response message in JSON, with the error data field set.
+/// Caller needs to call alloc.free() on the returned message to free the memory.
+pub fn writeErrorDataResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
+                                  data: []const u8, writer: anytype) AllocError!void {
+    const code: i32 = @intFromEnum(err_code);
+    switch (id) {
+        .num => try writer.print(
+            \\{{"jsonrpc": "2.0", "id": {}, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
+                , .{id.num, code, msg, data}),
+        .str => try writer.print(
+            \\{{"jsonrpc": "2.0", "id": "{s}", "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
+                , .{id.str, code, msg, data}),
+        .none => try writer.print(
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
+                , .{code, msg, data}),
+        .null => try writer.print(
+            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
+                , .{code, msg, data}),
     }
 }
 
 /// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn responseErrorDataJson(alloc: Allocator, id: RpcId, errCode: ErrorCode,
-                             msg: []const u8, data: []const u8) AllocError![]const u8 {
-    const code: i32 = @intFromEnum(errCode);
-    switch (id) {
-        .num => return allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "id": {}, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
-            , .{id.num, code, msg, data}),
-        .str => return allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "id": "{s}", "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
-            , .{id.str, code, msg, data}),
-        .none => return allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
-            , .{code, msg, data}),
-        .null => return allocPrint(alloc,
-            \\{{"jsonrpc": "2.0", "id": null, "error": {{"code": {}, "message": "{s}", "data": {s}}}}}
-            , .{code, msg, data}),
-    }
+pub fn toErrorDataResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
+                               msg: []const u8, data: []const u8) AllocError![]const u8 {
+    var output_buf = std.ArrayList(u8).init(alloc);
+    try writeErrorDataResponseJson(id, err_code, msg, data, output_buf.writer());
+    return try output_buf.toOwnedSlice();
 }
 
 

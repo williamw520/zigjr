@@ -122,7 +122,7 @@ pub const DispatchErrors = error {
 pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
-        return try messages.responseErrorJson(alloc, req.id, req.err().code, req.err().err_msg);
+        return try messages.toErrorResponseJson(alloc, req.id, req.err().code, req.err().err_msg);
     }
 
     const dresult: DispatchResult = call: {
@@ -137,17 +137,17 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) 
         },
         .result => |json| {
             defer dispatcher.free(alloc, dresult);
-            return try messages.responseJson(alloc, req.id, json);  // no id, no result
+            return try messages.toResponseJson(alloc, req.id, json);  // no id, no result
         },
         .result_lit => |json| {
-            return try messages.responseJson(alloc, req.id, json);  // no id, no result
+            return try messages.toResponseJson(alloc, req.id, json);  // no id, no result
         },
         .err => |err| {
             defer dispatcher.free(alloc, dresult);
             if (err.data)|data_json| {
-                return try messages.responseErrorDataJson(alloc, req.id, err.code, err.msg, data_json);
+                return try messages.toErrorDataResponseJson(alloc, req.id, err.code, err.msg, data_json);
             } else {
-                return try messages.responseErrorJson(alloc, req.id, err.code, err.msg);
+                return try messages.toErrorResponseJson(alloc, req.id, err.code, err.msg);
             }
         },
     }

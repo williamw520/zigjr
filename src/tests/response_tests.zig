@@ -573,7 +573,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
 test "Construct a normal response message, simple integer result" {
     const alloc = gpa.allocator();
     {
-        const response_json = try zigjr.messages.responseJson(alloc, .{ .num = 1 }, "10");
+        const response_json = try zigjr.messages.toResponseJson(alloc, .{ .num = 1 }, "10");
         if (response_json)|res_json| {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
@@ -593,7 +593,7 @@ test "Construct a normal response message, simple integer result" {
 test "Construct a normal response message, array result" {
     const alloc = gpa.allocator();
     {
-        const response_json = try zigjr.messages.responseJson(alloc, .{ .str = "2" }, "[1, 2, 3]");
+        const response_json = try zigjr.messages.toResponseJson(alloc, .{ .str = "2" }, "[1, 2, 3]");
         if (response_json)|res_json| {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
@@ -613,7 +613,7 @@ test "Construct a normal response message, array result" {
 test "Construct an error response message" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.messages.responseErrorJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
+        const res_json = try zigjr.messages.toErrorResponseJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -632,7 +632,7 @@ test "Construct an error response message" {
 test "Construct an error response message with data" {
     const alloc = gpa.allocator();
     {
-        const res_json = try zigjr.messages.responseErrorDataJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
+        const res_json = try zigjr.messages.toErrorDataResponseJson(alloc, .{ .none = {} }, ErrorCode.InternalError, "Internal Error", "123");
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -667,7 +667,7 @@ test "Handle batch requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.toRequestBatchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -726,7 +726,7 @@ test "handleRequestJson on batch JSON requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.toRequestBatchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -768,7 +768,7 @@ test "Handle empty batch response" {
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{};
-        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.toRequestBatchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -829,7 +829,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.messages.toRequestBatchJson(alloc, &req_jsons);
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 

@@ -537,7 +537,7 @@ test "Parse valid request batch and get as a request, expect error." {
 test "Build request json with no params and none Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", null, zigjr.RpcId.none);
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", null, zigjr.RpcId.none);
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -550,7 +550,7 @@ test "Build request json with no params and none Id." {
 test "Build request json with no params and null Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", null, zigjr.RpcId.null);
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", null, zigjr.RpcId.null);
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -563,7 +563,7 @@ test "Build request json with no params and null Id." {
 test "Build request json with no params and integer Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", null, .{ .num = 1 });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", null, .{ .num = 1 });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -576,7 +576,7 @@ test "Build request json with no params and integer Id." {
 test "Build request json with no params and string Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", null, .{ .str = "1" });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", null, .{ .str = "1" });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -589,7 +589,7 @@ test "Build request json with no params and string Id." {
 test "Build request json with array params and none Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", [_]i64{1, 2}, .{ .none = {} });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .none = {} });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -607,7 +607,7 @@ const  ParamsTest = struct {
 test "Build request json with object params and none Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", ParamsTest{}, .{ .none = {} });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", ParamsTest{}, .{ .none = {} });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -620,7 +620,7 @@ test "Build request json with object params and none Id." {
 test "Build request json with array params and null Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", [_]i64{1, 2}, .{ .null = {} });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .null = {} });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -633,7 +633,7 @@ test "Build request json with array params and null Id." {
 test "Build request json with array params and num Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", [_]i64{1, 2}, .{ .num = 123 });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .num = 123 });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -646,7 +646,7 @@ test "Build request json with array params and num Id." {
 test "Build request json with array params and str Id." {
     const alloc = gpa.allocator();
     {
-        const req_json = try zigjr.messages.requestJson(alloc, "foobar", [_]i64{1, 2}, .{ .str = "10" });
+        const req_json = try zigjr.messages.toRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .str = "10" });
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
@@ -659,7 +659,7 @@ test "Build request json with array params and str Id." {
 test "Build request json with invalid params type and none Id, expect error." {
     const alloc = gpa.allocator();
     {
-        try testing.expectEqual(zigjr.messages.requestJson(alloc, "foobar", 123, .{ .str = "10" }), JrErrors.InvalidParamsType);
+        try testing.expectEqual(zigjr.messages.toRequestJson(alloc, "foobar", 123, .{ .str = "10" }), JrErrors.InvalidParamsType);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -669,12 +669,12 @@ test "Build batch request json with array params and str Id." {
     const alloc = gpa.allocator();
     {
         const req_jsons = [_][]const u8{
-            try zigjr.messages.requestJson(alloc, "foo", [_]i64{1, 2}, .{ .none = {} }),
-            try zigjr.messages.requestJson(alloc, "bar", ParamsTest{}, .{ .num = 2 }),
+            try zigjr.messages.toRequestJson(alloc, "foo", [_]i64{1, 2}, .{ .none = {} }),
+            try zigjr.messages.toRequestJson(alloc, "bar", ParamsTest{}, .{ .num = 2 }),
         };
         defer for (req_jsons)|json| alloc.free(json);
 
-        const batch_json = try zigjr.messages.batchJson(alloc, &req_jsons);
+        const batch_json = try zigjr.messages.toRequestBatchJson(alloc, &req_jsons);
         defer alloc.free(batch_json);
         // std.debug.print("req_json {s}\n", .{batch_json.items});
         try testing.expectEqualSlices(u8, batch_json,
