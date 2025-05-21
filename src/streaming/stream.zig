@@ -14,6 +14,7 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const handler = @import("../jsonrpc/handler.zig");
 const frame = @import("frame.zig");
+const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
 pub fn nopLogger(_: []const u8, _: []const u8) void {
@@ -33,22 +34,14 @@ pub const DelimiterStream = struct {
     const Self = @This();
 
     alloc:              Allocator,
-    request_delimiter:  u8,
-    response_delimiter: u8,
-    logger:             *const fn(operation: []const u8, message: []const u8) void,
+    options:            DelimiterStreamOptions,
 
     /// Initialize a stream struct.
     /// The logger param takes in a callback function to log the incoming and outgoing messages.
-    pub fn init(alloc: Allocator, options: struct {
-        request_delimiter: u8 = '\n',
-        response_delimiter: u8 = '\n',
-        logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
-    }) Self {
+    pub fn init(alloc: Allocator, options: DelimiterStreamOptions) Self {
         return .{
             .alloc = alloc,
-            .request_delimiter = options.request_delimiter,
-            .response_delimiter = options.response_delimiter,
-            .logger = options.logger,
+            .options = options,
         };
     }
 
@@ -63,19 +56,20 @@ pub const DelimiterStream = struct {
 
         while (true) {
             json_frame.clearRetainingCapacity();
-            _ = json_reader.streamUntilDelimiter(json_frame.writer(), self.request_delimiter, null) catch |err| {
+            _ = json_reader.streamUntilDelimiter(json_frame.writer(),
+                                                 self.options.request_delimiter, null) catch |err| {
                 switch (err) {
                     error.EndOfStream => break,
-                    else => return err,
+                    else => return err, // unrecoverable error while reading from reader.
                 }
             };
 
-            self.logger("receive request", json_frame.items);
+            self.options.logger("receive request", json_frame.items);
             if (try handler.handleRequestJson(self.alloc, json_frame.items, dispatcher))|result_json| {
                 try json_writer.writeAll(result_json);
-                try json_writer.writeByte(self.response_delimiter);
+                try json_writer.writeByte(self.options.response_delimiter);
                 try buf_writer.flush();
-                self.logger("return response", result_json);
+                self.options.logger("return response", result_json);
                 self.alloc.free(result_json);
             }
         }
@@ -92,18 +86,24 @@ pub const DelimiterStream = struct {
         while (true) {
             json_frame.clearRetainingCapacity();
             _ = json_reader.streamUntilDelimiter(json_frame.writer(),
-                                                 self.response_delimiter, null) catch |err| {
+                                                 self.options.response_delimiter, null) catch |err| {
                 switch (err) {
                     error.EndOfStream => break,
                     else => return err,
                 }
             };
 
-            self.logger("receive response", json_frame.items);
+            self.options.logger("receive response", json_frame.items);
             try handler.handleResponseJson(self.alloc, json_frame.items, dispatcher);
         }
     }
 
+};
+
+const DelimiterStreamOptions = struct {
+    request_delimiter: u8 = '\n',
+    response_delimiter: u8 = '\n',
+    logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
 };
 
 
@@ -118,16 +118,14 @@ pub const ContentLengthStream = struct {
     const Self = @This();
 
     alloc:      Allocator,
-    logger:     *const fn(operation: []const u8, message: []const u8) void,
+    options:    ContentLengthStreamOptions,
 
     /// Initialize a stream struct.
     /// The logger param takes in a callback function to log the incoming and outgoing messages.
-    pub fn init(alloc: Allocator, options: struct {
-        logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
-    }) Self {
+    pub fn init(alloc: Allocator, options: ContentLengthStreamOptions) Self {
         return .{
             .alloc = alloc,
-            .logger = options.logger,
+            .options = options,
         };
     }
 
@@ -142,16 +140,24 @@ pub const ContentLengthStream = struct {
 
         while (true) {
             const msg_len = frame.readContentLengthFrame(json_reader, &msg_buf) catch |err| {
-                if (err == error.EndOfStream)
-                    break;
-                return err;
+                switch (err) {
+                    error.EndOfStream => return,
+                    JrErrors.MissingContentLengthHeader => {
+                        if (self.options.recover_on_missing_header) {
+                            continue;
+                        } else {
+                            return err;
+                        }
+                    },
+                    else => return err, // unrecoverable error while reading from reader.
+                }
             };
-            self.logger("receive request", msg_buf.items);
+            self.options.logger("receive request", msg_buf.items);
             if (msg_len == 0) continue;     // skip empty content frame.
             if (try handler.handleRequestJson(self.alloc, msg_buf.items, dispatcher))|result_json| {
                 try frame.writeContentLengthFrame(json_writer, result_json);
                 try buf_writer.flush();
-                self.logger("return response", result_json);
+                self.options.logger("return response", result_json);
                 self.alloc.free(result_json);
             }
         }
@@ -171,11 +177,17 @@ pub const ContentLengthStream = struct {
                     break;
                 return err;
             };
-            self.logger("receive response", msg_buf.items);
+            self.options.logger("receive response", msg_buf.items);
             if (msg_len == 0) continue;     // skip empty content frame.
             try handler.handleResponseJson(self.alloc, msg_buf.items, dispatcher);
         }
     }
 
 };
+
+pub const ContentLengthStreamOptions = struct {
+    recover_on_missing_header: bool = true,
+    logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
+};
+
 
