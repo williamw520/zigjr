@@ -308,7 +308,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "fun0", "id": 1}
 //         );
 //         defer result.deinit();
@@ -333,7 +333,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "subtract", "params": [42, 22], "id": 1}
 //         );
 //         defer result.deinit();
@@ -358,7 +358,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": 1}
 //         );
 //         defer result.deinit();
@@ -380,7 +380,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "sum3", "params": [1, 2, 3], "id": 1}
 //         );
 //         defer result.deinit();
@@ -402,7 +402,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "sum9", "params": [1, 2, 3, 4, 5, 6, 7, 8, 9], "id": 1}
 //         );
 //         defer result.deinit();
@@ -424,7 +424,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "addArray", "params": [1, 2, 3, 4, 5, 6, 7, 8, 9], "id": 1}
 //         );
 //         defer result.deinit();
@@ -446,7 +446,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "funObj", "params": {"name": "abc"}, "id": 1}
 //         );
 //         defer result.deinit();
@@ -481,7 +481,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //             \\{{"jsonrpc": "2.0", "method": "funCat", "params": {s}, "id": 1}}
 //             , .{cat_json});
 //         defer alloc.free(req_json);
-//         var result = zigjr.parseRequest(alloc, req_json);
+//         var result = zigjr.parseRpcRequest(alloc, req_json);
 //         defer result.deinit();
 
 //         const response = try registry.run(try result.request());
@@ -507,7 +507,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "funObj", "params": {"no-name": "abc"}, "id": 1}
 //         );
 //         defer result.deinit();
@@ -531,7 +531,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "no-method"}
 //         );
 //         defer result.deinit();
@@ -556,7 +556,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "fun0", "params": [1], "id": 1}
 //         );
 //         defer result.deinit();
@@ -581,7 +581,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //         var registry = try registerFunctions(alloc);
 //         defer registry.deinit();
 
-//         var result = zigjr.parseRequest(alloc,
+//         var result = zigjr.parseRpcRequest(alloc,
 //             \\{"jsonrpc": "2.0", "method": "fun0", "params": [], "id": 1}
 //         );
 //         defer result.deinit();
@@ -622,7 +622,7 @@ test "Registry. Dispatching to 0-parameter method, with error" {
 //             // std.debug.print("req_json: {s}\n", .{req_json});
 //             defer alloc.free(req_json);
 
-//             var result = zigjr.parseRequest(alloc, req_json);
+//             var result = zigjr.parseRpcRequest(alloc, req_json);
 //             defer result.deinit();
 
 //             const response = try registry.run(try result.request());

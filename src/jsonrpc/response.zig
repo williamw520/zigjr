@@ -23,7 +23,7 @@ const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
 
 
-pub fn parseResponse(alloc: Allocator, json_str: []const u8) !ResponseResult {
+pub fn parseRpcResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResult {
     // Parse error is passed back to the caller directly.
     const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
     return .{
@@ -33,7 +33,7 @@ pub fn parseResponse(alloc: Allocator, json_str: []const u8) !ResponseResult {
     };
 }
 
-pub const ResponseResult = struct {
+pub const RpcResponseResult = struct {
     const Self = @This();
     alloc:          Allocator,
     parsed:         ?std.json.Parsed(RpcResponseMessage) = null,
@@ -82,9 +82,9 @@ pub const RpcResponse = struct {
     jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
     id:         RpcId = .{ .null = {} },    // default for optional field.
     result:     Value = .{ .null = {} },    // default for optional field.
-    @"error":   RpcResponseErr = .{},       // parse error and validation error.
+    @"error":   RpcResponseError = .{},     // parse error and validation error.
 
-    pub fn err(self: Self) RpcResponseErr {
+    pub fn err(self: Self) RpcResponseError {
         return self.@"error";
     }
 
@@ -105,7 +105,7 @@ pub const RpcResponse = struct {
     
 };
 
-pub const RpcResponseErr = struct {
+pub const RpcResponseError = struct {
     code:       i32 = 0,
     message:    []const u8 = "",
     data:       ?Value = null,

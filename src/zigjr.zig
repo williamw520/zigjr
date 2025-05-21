@@ -13,23 +13,23 @@ const registry = @import("jsonrpc/registry.zig");
 const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
-pub const parseRequest = request.parseRequest;
-pub const RequestResult = response.RequestResult;
+pub const parseRpcRequest = request.parseRpcRequest;
+pub const RpcRequestResult = request.RpcRequestResult;
 pub const RpcRequestMessage = request.RpcRequestMessage;
 pub const RpcRequest = request.RpcRequest;
 pub const RpcId = request.RpcId;
-pub const ReqError = request.ReqError;
+pub const RpcRequestError = request.RpcRequestError;
 
-pub const parseResponse = response.parseResponse;
-pub const ResponseResult = response.ResponseResult;
+pub const parseRpcResponse = response.parseRpcResponse;
+pub const RpcResponseResult = response.RpcResponseResult;
 pub const RpcResponseMessage = response.RpcResponseMessage;
 pub const RpcResponse = response.RpcResponse;
-pub const RpcResponseErr = response.RpcResponseErr;
+pub const RpcResponseError = response.RpcResponseError;
 
-pub const handleRequest = handler.handleRequest;
-pub const handleBatchRequest = handler.handleBatchRequest;
 pub const handleRequestJson = handler.handleRequestJson;
 pub const handleResponseJson = handler.handleResponseJson;
+pub const handleRpcRequest = handler.handleRpcRequest;
+pub const handleRpcRequests = handler.handleRpcRequests;
 pub const DispatchResult = handler.DispatchResult;
 pub const DispatchErrors = handler.DispatchErrors;
 

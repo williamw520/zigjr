@@ -43,7 +43,7 @@ pub fn main() !void {
         };
         defer g_allocator.free(data);
 
-        var req_result = zigjr.parseRequest(g_allocator, data);
+        var req_result = zigjr.parseRpcRequest(g_allocator, data);
         defer req_result.deinit();
         std.debug.print("req: {any}\n", .{req_result.request()});
 

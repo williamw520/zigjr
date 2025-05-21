@@ -24,7 +24,7 @@ const JrErrors = errors.JrErrors;
 
 
 
-pub fn parseRequest(alloc: Allocator, json_str: []const u8) RequestResult {
+pub fn parseRpcRequest(alloc: Allocator, json_str: []const u8) RpcRequestResult {
     const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error set so callers can have uniform request handling.
         var empty_req = RpcRequest{};
@@ -42,7 +42,7 @@ pub fn parseRequest(alloc: Allocator, json_str: []const u8) RequestResult {
     };
 }
 
-pub const RequestResult = struct {
+pub const RpcRequestResult = struct {
     const Self = @This();
     alloc:          Allocator,
     parsed:         ?std.json.Parsed(RpcRequestMessage) = null,
@@ -101,17 +101,17 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .none = {} },    // default for optional field.
-    _err:       ReqError = .{},             // attach parsing error and validation error here.
+    _err:       RpcRequestError = .{},         // attach parsing error and validation error here.
 
     fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
-        self._err = ReqError.fromParseError(parse_err);
+        self._err = RpcRequestError.fromParseError(parse_err);
     }
 
     fn validate(self: *Self) void {
-        self._err = ReqError.validateRequest(self) orelse .{};
+        self._err = RpcRequestError.validateRequest(self) orelse .{};
     }
 
-    pub fn err(self: Self) ReqError {
+    pub fn err(self: Self) RpcRequestError {
         return self._err;
     }
 
@@ -188,7 +188,7 @@ pub const RpcId = union(enum) {
     }
 };
 
-pub const ReqError = struct {
+pub const RpcRequestError = struct {
     const Self = @This();
 
     code:       ErrorCode = ErrorCode.None,
@@ -229,7 +229,7 @@ pub const ReqError = struct {
                 .req_id = body.id,
             };
         }
-        return null;    // return null ReqError for validation passed.
+        return null;    // return null RpcRequestError for validation passed.
     }
     
 };

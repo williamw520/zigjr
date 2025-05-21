@@ -171,17 +171,17 @@ const CounterDispatcher = struct {
 test "Response to a request of hello method" {
     const alloc = gpa.allocator();
     {
-        var req_result = zigjr.parseRequest(alloc,
+        var req_result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
         defer req_result.deinit();
 
-        const response = try zigjr.handleRequest(alloc, try req_result.request(), HelloDispatcher);
+        const response = try zigjr.handleRpcRequest(alloc, try req_result.request(), HelloDispatcher);
         const res_json = response orelse "";
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -202,7 +202,7 @@ test "handleRequestJson on a request of hello method" {
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -216,16 +216,16 @@ test "handleRequestJson on a request of hello method" {
 test "handleRequestJson on a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), HelloDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), HelloDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -239,12 +239,12 @@ test "handleRequestJson on a request of unknown method, expect error" {
 test "handleRequestJson to a request with anonymous dispatcher struct" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
         defer result.deinit();
 
-        const response = try zigjr.handleRequest(alloc, try result.request(), struct {
+        const response = try zigjr.handleRpcRequest(alloc, try result.request(), struct {
             pub fn dispatch(_: Allocator, _: RpcRequest) !DispatchResult {
                 return .{ .result = "\"hello back\"" };
             }
@@ -258,7 +258,7 @@ test "handleRequestJson to a request with anonymous dispatcher struct" {
         defer alloc.free(res_json);
         // std.debug.print("response: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         // std.debug.print("res.result: {}\n", .{try parsed_res.response()});
 
@@ -270,16 +270,16 @@ test "handleRequestJson to a request with anonymous dispatcher struct" {
 test "Response to a request of integer add" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -298,7 +298,7 @@ test "handleRequestJson on a request of integer add" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -311,16 +311,16 @@ test "handleRequestJson on a request of integer add" {
 test "Response to a request of integer sub" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -333,16 +333,16 @@ test "Response to a request of integer sub" {
 test "Response to a request of integer multiply" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -355,16 +355,16 @@ test "Response to a request of integer multiply" {
 test "Response to a request of integer divide" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -377,16 +377,16 @@ test "Response to a request of integer divide" {
 test "Response to a request of integer add with missing parameter, expect error" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -400,15 +400,15 @@ test "Response to a request of integer add with missing parameter, expect error"
 test "Response to a request of float add" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
         );
         defer result.deinit();
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -421,16 +421,16 @@ test "Response to a request of float add" {
 test "Response to a request of float sub" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -443,16 +443,16 @@ test "Response to a request of float sub" {
 test "Response to a request of float multiply" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -465,16 +465,16 @@ test "Response to a request of float multiply" {
 test "Response to a request of float divide" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -489,57 +489,57 @@ test "Response using an object based dispatcher." {
     {
         var dispatcher = CounterDispatcher{};
         {
-            var result = zigjr.parseRequest(alloc,
+            var result = zigjr.parseRpcRequest(alloc,
                 \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
             );
             defer result.deinit();
 
-            const res = try zigjr.handleRequest(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.handleRpcRequest(alloc, try result.request(), &dispatcher);
             // std.debug.print("res_json: {any}\n", .{res});
             try testing.expectEqual(res, null);
         }
         {
-            var result = zigjr.parseRequest(alloc,
+            var result = zigjr.parseRpcRequest(alloc,
                 \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
             );
             defer result.deinit();
 
-            const res = try zigjr.handleRequest(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.handleRpcRequest(alloc, try result.request(), &dispatcher);
             try testing.expectEqual(res, null);
         }
         {
-            var result = zigjr.parseRequest(alloc,
+            var result = zigjr.parseRpcRequest(alloc,
                 \\{"jsonrpc": "2.0", "method": "get", "id": 1}
             );
             defer result.deinit();
 
-            const res_json = (try zigjr.handleRequest(alloc, try result.request(), &dispatcher)) orelse "";
+            const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
-            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             try testing.expectEqual(res.result.integer, 2);
         }
         {
-            var result = zigjr.parseRequest(alloc,
+            var result = zigjr.parseRpcRequest(alloc,
                 \\{"jsonrpc": "2.0", "method": "dec", "id": 1}
             );
             defer result.deinit();
 
-            const res = try zigjr.handleRequest(alloc, try result.request(), &dispatcher);
+            const res = try zigjr.handleRpcRequest(alloc, try result.request(), &dispatcher);
             try testing.expectEqual(res, null);
         }
         {
-            var result = zigjr.parseRequest(alloc,
+            var result = zigjr.parseRpcRequest(alloc,
                 \\{"jsonrpc": "2.0", "method": "get", "id": 1}
             );
             defer result.deinit();
 
-            const res_json = (try zigjr.handleRequest(alloc, try result.request(), &dispatcher)) orelse "";
+            const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), &dispatcher)) orelse "";
             defer alloc.free(res_json);
 
-            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             try testing.expectEqual(res.result.integer, 1);
@@ -551,15 +551,15 @@ test "Response using an object based dispatcher." {
 test "Response to a request of integer add with invalid parameter type, expect error" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": ["1", "2"], "id": 1}
         );
         defer result.deinit();
 
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), IntCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -578,7 +578,7 @@ test "Construct a normal response message, simple integer result" {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             
@@ -598,7 +598,7 @@ test "Construct a normal response message, array result" {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = try zigjr.parseResponse(alloc, res_json);
+            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
 
@@ -617,7 +617,7 @@ test "Construct an error response message" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -636,7 +636,7 @@ test "Construct an error response message with data" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseResponse(alloc, res_json);
+        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -671,17 +671,17 @@ test "Handle batch requests with the CounterDispatcher" {
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json);
+        var batch_req_result = zigjr.parseRpcRequest(alloc, batch_req_json);
         defer batch_req_result.deinit();
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        const batch_res_json = try zigjr.handleBatchRequest(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.handleRpcRequests(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
@@ -733,7 +733,7 @@ test "handleRequestJson on batch JSON requests with the CounterDispatcher" {
         const batch_res_json = try zigjr.handleRequestJson(alloc, batch_req_json, &dispatcher) orelse "";
         defer alloc.free(batch_res_json);
 
-        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
@@ -772,16 +772,16 @@ test "Handle empty batch response" {
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        var batch_req_result = zigjr.parseRequest(alloc, batch_req_json);
+        var batch_req_result = zigjr.parseRpcRequest(alloc, batch_req_json);
         defer batch_req_result.deinit();
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch()).len == 0);
 
-        const batch_res_json = try zigjr.handleBatchRequest(alloc, try batch_req_result.batch(), &dispatcher);
+        const batch_res_json = try zigjr.handleRpcRequests(alloc, try batch_req_result.batch(), &dispatcher);
         defer alloc.free(batch_res_json);
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_parsed_res = try zigjr.parseResponse(alloc, batch_res_json);
+        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         for (batch_res)|res| std.debug.print("response {any}\n", .{res});
@@ -794,11 +794,11 @@ test "Handle empty batch response" {
 test "Dispatch on the response to a request of float add" {
     const alloc = gpa.allocator();
     {
-        var result = zigjr.parseRequest(alloc,
+        var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
         );
         defer result.deinit();
-        const res_json = (try zigjr.handleRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
+        const res_json = (try zigjr.handleRpcRequest(alloc, try result.request(), FloatCalcDispatcher)) orelse "";
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
