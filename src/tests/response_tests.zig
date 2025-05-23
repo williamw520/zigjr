@@ -396,7 +396,7 @@ test "Response to a request of float add" {
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
             , response_buf.writer(), FloatCalcDispatcher);
         const res_json = response_buf.items;
-        std.debug.print("res_json: {s}\n", .{res_json});
+        // std.debug.print("res_json: {s}\n", .{res_json});
 
         var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
@@ -661,7 +661,7 @@ test "Handle batch requests with the CounterDispatcher" {
         defer response_buf.deinit();
         _ = try zigjr.handleRpcRequests(alloc, try batch_req_result.batch(), &dispatcher, response_buf.writer());
         const batch_res_json = response_buf.items;
-        std.debug.print("batch response json {s}\n", .{batch_res_json});
+        // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();

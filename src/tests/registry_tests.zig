@@ -156,7 +156,13 @@ test "Registry. Dispatching to 0-parameter method" {
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var parsed_json_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer parsed_json_result.deinit();
+            const rpc_res = try parsed_json_result.response();
+            try testing.expectEqualSlices(u8, rpc_res.result.string, "Hello");
+            try testing.expect(rpc_res.id.eql(1));
         }
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
