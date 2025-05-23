@@ -19,6 +19,8 @@ const RpcId = request.RpcId;
 const response = @import("response.zig");
 const parseRpcResponse = response.parseRpcResponse;
 const RpcResponse = response.RpcResponse;
+const RpcResponseResult = response.RpcResponseResult;
+const RpcResponseMessage = response.RpcResponseMessage;
 
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
@@ -112,17 +114,81 @@ pub const DispatchErrors = error {
 };
 
 
-/// Run the dispatcher on the request and generate a response JSON string.
-/// A 'null' return value signifies the request is a notification.
-/// Caller needs to call alloc.free() on the returned message to free the memory.
-/// Any error coming from the dispatcher is passed back to caller.
+/// Parse the JSON-RPC request message, run the dispatcher on request(s), 
+/// and write the JSON-RPC response(s) to the writer.
+/// The JSON request message can contain a single request or a batch of requests.
+/// Error is turned into a JSON-RPC error response message.
+/// The function returns a boolean flag indicating whether any responses have been written,
+/// as notification requests have no response.
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) AllocError!?[]const u8 {
+pub fn handleRequest(alloc: Allocator, request_json: []const u8, writer: anytype,
+                     dispatcher: anytype) AllocError!bool {
+    var parsed_result = parseRpcRequest(alloc, request_json);
+    defer parsed_result.deinit();
+    switch (parsed_result.request_msg) {
+        .request    => |req| {
+            return try handleRpcRequest(alloc, req, writer, "", "", dispatcher);
+        },
+        .batch      => |reqs| {
+            try handleRpcRequests(alloc, reqs, dispatcher, writer);
+            return true;
+        },
+    }
+}
+
+/// Parse the JSON-RPC request message, run the dispatcher on request(s), 
+/// and return the JSON-RPC response(s) as a JSON string.
+/// The JSON request message can contain a single request or a batch of requests.
+/// Error is turned into a JSON-RPC error response message.
+/// The function can return null, as notification requests have no response.
+///
+/// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
+pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
+    var buffer = ArrayList(u8).init(alloc);
+    if (try handleRequest(alloc, request_json, buffer.writer(), dispatcher)) {
+        return try buffer.toOwnedSlice();
+    } else {
+        buffer.deinit();
+        return null;
+    }
+}
+
+
+/// Parse the JSON response message, run the dispatcher on response(s), 
+/// The JSON response message can contain a single response or a batch of responses.
+/// Any error coming from the dispatcher is passed back to caller.
+/// The 'anytype' dispatcher needs to have a dispatch() method with !void return type.
+pub fn handleResponse(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
+    var parsed_result: RpcResponseResult = try parseRpcResponse(alloc, response_json);
+    defer parsed_result.deinit();
+    const response_msg: RpcResponseMessage = parsed_result.response_msg;
+    return switch (response_msg) {
+        .response   => |rpc_response|  try dispatcher.dispatch(alloc, rpc_response),
+        .batch      => |rpc_responses| for (rpc_responses)|rpc_response| {
+            try dispatcher.dispatch(alloc, rpc_response);
+        },
+    };
+}
+
+
+/// Run the dispatcher on the RpcRequest and write the response JSON to the writer.
+/// Returns true if a response message is written, false for not as notification has no response.
+/// Any error coming from the dispatcher is passed back to caller.
+///
+/// The prefix and suffix are written to the writer before and after the response message
+/// if it's written.  Prefix and suffix would not be written for a notification request.
+///
+/// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
+/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
+pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
+                        prefix: []const u8, suffix: []const u8, dispatcher: anytype) AllocError!bool {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
-        return try messages.toErrorResponseJson(alloc, req.id, req.err().code, req.err().err_msg);
+        try messages.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
+        return true;
     }
 
     const dresult: DispatchResult = call: {
@@ -133,22 +199,37 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) 
 
     switch (dresult) {
         .none => {
-            return null;            // notification request has no result.
+            return false;   // notification request has no result.
         },
         .result => |json| {
             defer dispatcher.free(alloc, dresult);
-            return try messages.toResponseJson(alloc, req.id, json);  // no id, no result
+            if (req.id.isNotification()) {
+                return false;
+            }
+            try writer.writeAll(prefix);
+            try messages.writeResponseJson(req.id, json, writer);
+            try writer.writeAll(suffix);
+            return true;
         },
         .result_lit => |json| {
-            return try messages.toResponseJson(alloc, req.id, json);  // no id, no result
+            if (req.id.isNotification()) {
+                return false;
+            }
+            try writer.writeAll(prefix);
+            try messages.writeResponseJson(req.id, json, writer);
+            try writer.writeAll(suffix);
+            return true;
         },
         .err => |err| {
             defer dispatcher.free(alloc, dresult);
+            try writer.writeAll(prefix);
             if (err.data)|data_json| {
-                return try messages.toErrorDataResponseJson(alloc, req.id, err.code, err.msg, data_json);
+                try messages.writeErrorDataResponseJson(req.id, err.code, err.msg, data_json, writer);
             } else {
-                return try messages.toErrorResponseJson(alloc, req.id, err.code, err.msg);
+                try messages.writeErrorResponseJson(req.id, err.code, err.msg, writer);
             }
+            try writer.writeAll(suffix);
+            return true;
         },
     }
 }
@@ -162,56 +243,17 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, dispatcher: anytype) 
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRpcRequests(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype) AllocError![]const u8 {
+pub fn handleRpcRequests(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype,
+                         writer: anytype) AllocError!void {
     var count: usize = 0;
-    var buffer = ArrayList(u8).init(alloc);
-    defer buffer.deinit();
-
-    try buffer.appendSlice("[");
+    try writer.writeAll("[");
     for (batch) |req| {
-        const response_json = try handleRpcRequest(alloc, req, dispatcher);
-        if (response_json)|res_json| {
-            defer alloc.free(res_json);
-            if (count > 0) try buffer.appendSlice(", ");
-            try buffer.appendSlice(res_json);
+        const delimiter = if (count > 0) ", " else "";
+        if (try handleRpcRequest(alloc, req, writer, delimiter, "", dispatcher)) {
             count += 1;
         }
     }
-    try buffer.appendSlice("]");
-
-    return try alloc.dupe(u8, buffer.items);
-}
-
-/// Parse the JSON request message, run the dispatcher on request(s), 
-/// returns the response in one JSON string.
-/// The JSON request message can contain a single request or a batch of requests.
-/// Errors are returned as array items in the JSON.
-/// Caller needs to call alloc.free() on the returned message to free the memory.
-/// Any error coming from the dispatcher is passed back to caller.
-///
-/// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
-/// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRequestJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
-    var parsed_result = parseRpcRequest(alloc, request_json);
-    defer parsed_result.deinit();
-    return switch (parsed_result.request_msg) {
-        .request    => |req|  try handleRpcRequest(alloc, req, dispatcher),
-        .batch      => |reqs| try handleRpcRequests(alloc, reqs, dispatcher),
-    };
-}
-
-
-/// Parse the JSON response message, run the dispatcher on response(s), 
-/// The JSON response message can contain a single response or a batch of responses.
-/// Any error coming from the dispatcher is passed back to caller.
-/// The 'anytype' dispatcher needs to have a dispatch() method with !void return type.
-pub fn handleResponseJson(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
-    var parsed_result = try parseRpcResponse(alloc, response_json);
-    defer parsed_result.deinit();
-    return switch (parsed_result.response_msg) {
-        .response   => |res|   try dispatcher.dispatch(alloc, res),
-        .batch      => |batch| for (batch)|res| try dispatcher.dispatch(alloc, res),
-    };
+    try writer.writeAll("]");
 }
 
 

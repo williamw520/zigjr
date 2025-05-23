@@ -123,10 +123,6 @@ pub const RpcRequest = struct {
         return self.err().code == code;
     }
 
-    pub fn isNotification(self: Self) bool {
-        return !self.id.isValid();
-    }
-
     pub fn hasParams(self: Self) bool {
         return self.params != .null;
     }
@@ -166,6 +162,10 @@ pub const RpcId = union(enum) {
 
     pub fn isValid(self: @This()) bool {
         return self == .num or self == .str;
+    }
+
+    pub fn isNotification(self: @This()) bool {
+        return !self.isValid();
     }
 
     pub fn isNone(self: @This()) bool {

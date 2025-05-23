@@ -20,7 +20,6 @@ TODOs
 * DONE Message logging.
 * DONE Rename run() to dispatch() on dispatcher.
 * DONE Compact JSON output.
-* TODO Pass in an ArrayList(u8) to dispatcher for result.
 * TODO Check the possible usage of ArrayList.toOwnedSlice().
 * TODO Add dispatching registry.
 * TODO Add CLI on running request and response and on streaming.

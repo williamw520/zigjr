@@ -100,9 +100,7 @@ pub fn toRequestBatchJson(alloc: Allocator, request_jsons: []const []const u8) J
 
 /// Write a normal response message in JSON to the writer.
 /// Return true for valid response.  For message id that shouldn't have a response, false is returned.
-pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) AllocError!bool {
-    if (id == .none) return false;  // No id for notification.  No response JSON.
-    if (id == .null) return false;  // Notification does not have a response.  No response JSON.
+pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) AllocError!void {
     switch (id) {
         .num => try writer.print(
             \\{{"jsonrpc": "2.0", "result": {s}, "id": {}}}
@@ -110,21 +108,19 @@ pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) Al
         .str => try writer.print(
             \\{{"jsonrpc": "2.0", "result": {s}, "id": "{s}"}}
                 , .{result_json, id.str}),
-        else => {},
+        else => unreachable,        // Response must have an ID.
     }
-    return true;
 }
 
 /// Build a normal response message in JSON string.
 /// For message id that shouldn't have a response, null is returned.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn toResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
-    var output_buf = std.ArrayList(u8).init(alloc);
-    if (try writeResponseJson(id, result_json, output_buf.writer())) {
-        return try output_buf.toOwnedSlice();
-    } else {
+    if (id.isNotification())
         return null;
-    }
+    var output_buf = std.ArrayList(u8).init(alloc);
+    try writeResponseJson(id, result_json, output_buf.writer());
+    return try output_buf.toOwnedSlice();
 }
 
 /// Writer an error response message in JSON to the writer.

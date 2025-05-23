@@ -26,8 +26,9 @@ pub const RpcResponseMessage = response.RpcResponseMessage;
 pub const RpcResponse = response.RpcResponse;
 pub const RpcResponseError = response.RpcResponseError;
 
-pub const handleRequestJson = handler.handleRequestJson;
-pub const handleResponseJson = handler.handleResponseJson;
+pub const handleRequest = handler.handleRequest;
+pub const handleRequestToJson = handler.handleRequestToJson;
+pub const handleResponse = handler.handleResponse;
 pub const handleRpcRequest = handler.handleRpcRequest;
 pub const handleRpcRequests = handler.handleRpcRequests;
 pub const DispatchResult = handler.DispatchResult;

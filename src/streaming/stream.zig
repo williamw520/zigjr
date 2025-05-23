@@ -43,8 +43,11 @@ pub const DelimiterStream = struct {
         var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON request is a frame.
         defer frame_buf.deinit();
         const frame_writer = frame_buf.writer();
+        var response_buf = std.ArrayList(u8).init(self.alloc);
+        defer response_buf.deinit();
+        const response_writer = response_buf.writer();
         var buffered_writer = std.io.bufferedWriter(writer);
-        const stream_writer = buffered_writer.writer();
+        const output_writer = buffered_writer.writer();
 
         while (true) {
             frame_buf.clearRetainingCapacity();
@@ -59,12 +62,12 @@ pub const DelimiterStream = struct {
             if (self.options.skip_blank_message and request_json.len == 0) continue;
 
             self.options.logger("receive request", request_json);
-            if (try handler.handleRequestJson(self.alloc, request_json, dispatcher))|response_json| {
-                try stream_writer.writeAll(response_json);
-                try stream_writer.writeByte(self.options.response_delimiter);
+            response_buf.clearRetainingCapacity();
+            if (try handler.handleRequest(self.alloc, request_json, response_writer, dispatcher)) {
+                try output_writer.writeAll(response_buf.items);
+                try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
-                self.options.logger("return response", response_json);
-                self.alloc.free(response_json);
+                self.options.logger("return response", response_buf.items);
             }
         }
     }
@@ -90,7 +93,7 @@ pub const DelimiterStream = struct {
 
             self.options.logger("receive response", frame_buf.items);
             // TODO: check for recoverable errors.
-            try handler.handleResponseJson(self.alloc, frame_buf.items, dispatcher);
+            try handler.handleResponse(self.alloc, frame_buf.items, dispatcher);
         }
     }
 
@@ -140,8 +143,11 @@ pub const ContentLengthStream = struct {
     pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc);
         defer frame_buf.deinit();
+        var response_buf = std.ArrayList(u8).init(self.alloc);
+        defer response_buf.deinit();
+        const response_writer = response_buf.writer();
         var buffered_writer = std.io.bufferedWriter(writer);
-        const stream_writer = buffered_writer.writer();
+        const output_writer = buffered_writer.writer();
 
         while (true) {
             frame.readContentLengthFrame(reader, &frame_buf) catch |err| {
@@ -162,11 +168,11 @@ pub const ContentLengthStream = struct {
             if (self.options.skip_blank_message and request_json.len == 0) continue;
 
             self.options.logger("receive request", request_json);
-            if (try handler.handleRequestJson(self.alloc, request_json, dispatcher))|response_json| {
-                try frame.writeContentLengthFrame(stream_writer, response_json);
+            response_buf.clearRetainingCapacity();
+            if (try handler.handleRequest(self.alloc, request_json, response_writer, dispatcher)) {
+                try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
-                self.options.logger("return response", response_json);
-                self.alloc.free(response_json);
+                self.options.logger("return response", response_buf.items);
             }
         }
     }
@@ -190,7 +196,7 @@ pub const ContentLengthStream = struct {
 
             self.options.logger("receive response", response_json);
             // TODO: check for recoverable errors.
-            try handler.handleResponseJson(self.alloc, response_json, dispatcher);
+            try handler.handleResponse(self.alloc, response_json, dispatcher);
         }
     }
 
