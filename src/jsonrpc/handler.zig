@@ -157,10 +157,12 @@ pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatche
 }
 
 
-/// Parse the JSON response message, run the dispatcher on response(s), 
+/// Parse the JSON response message and run the dispatcher on RpcResponse(s).
 /// The JSON response message can contain a single response or a batch of responses.
-/// Any error coming from the dispatcher is passed back to caller.
 /// The 'anytype' dispatcher needs to have a dispatch() method with !void return type.
+/// Any parse error is returned to the caller and the dispatcher is not called.
+/// Any error coming from the dispatcher is passed back to caller.
+/// For batch responses, the first error from the dispatcher stops the processing.
 pub fn handleResponse(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
     var parsed_result: RpcResponseResult = try parseRpcResponse(alloc, response_json);
     defer parsed_result.deinit();

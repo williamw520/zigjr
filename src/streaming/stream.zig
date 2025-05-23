@@ -91,9 +91,10 @@ pub const DelimiterStream = struct {
             const response_json = std.mem.trim(u8, frame_buf.items, " \t");
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
-            self.options.logger("receive response", frame_buf.items);
-            // TODO: check for recoverable errors.
-            try handler.handleResponse(self.alloc, frame_buf.items, dispatcher);
+            self.options.logger("receive response", response_json);
+            handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
+                std.debug.print("Error in handleResponse(). {any}", .{err});
+            };
         }
     }
 
@@ -195,8 +196,9 @@ pub const ContentLengthStream = struct {
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger("receive response", response_json);
-            // TODO: check for recoverable errors.
-            try handler.handleResponse(self.alloc, response_json, dispatcher);
+            handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
+                std.debug.print("Error in handleResponse(). {any}", .{err});
+            };
         }
     }
 
