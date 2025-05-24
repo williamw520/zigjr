@@ -93,7 +93,8 @@ pub const DelimiterStream = struct {
 
             self.options.logger("receive response", response_json);
             handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
-                std.debug.print("Error in handleResponse(). {any}", .{err});
+                const stderr = std.io.getStdErr().writer();
+                stderr.print("Error in handleResponse(). {any}", .{err}) catch {};
             };
         }
     }
@@ -197,7 +198,8 @@ pub const ContentLengthStream = struct {
 
             self.options.logger("receive response", response_json);
             handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
-                std.debug.print("Error in handleResponse(). {any}", .{err});
+                const stderr = std.io.getStdErr().writer();
+                stderr.print("Error in handleResponse(). {any}", .{err}) catch {};
             };
         }
     }

@@ -26,27 +26,24 @@ const JrErrors = errors.JrErrors;
 
 pub fn parseRpcRequest(alloc: Allocator, json_str: []const u8) RpcRequestResult {
     const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
-        // Create an empty request with the error set so callers can have uniform request handling.
+        // Create an empty request with the error so callers can have a uniform request handling.
         var empty_req = RpcRequest{};
         empty_req.setParseErr(parse_err);
         return .{
-            .alloc = alloc,
-            .parsed = null,
             .request_msg = RpcRequestMessage { .request = empty_req },
+            .parsed = null,
         };
     };
     return .{
-        .alloc = alloc,
-        .parsed = parsed,
         .request_msg = parsed.value,
+        .parsed = parsed,
     };
 }
 
 pub const RpcRequestResult = struct {
     const Self = @This();
-    alloc:          Allocator,
-    parsed:         ?std.json.Parsed(RpcRequestMessage) = null,
     request_msg:    RpcRequestMessage,
+    parsed:         ?std.json.Parsed(RpcRequestMessage) = null,
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
@@ -177,15 +174,23 @@ pub const RpcId = union(enum) {
     }
 
     pub fn eql(self: @This(), value: anytype) bool {
-        const TI = @typeInfo(@TypeOf(value));
-        switch (TI) {
+        const value_info = @typeInfo(@TypeOf(value));
+        switch (value_info) {
             .comptime_int,
             .int        => return self == .num and self.num == value,
-            .pointer    => return self == .str and std.mem.eql(u8, self.str, value[0..]),
-            .array      => return self == .str and std.mem.eql(u8, self.str, value[0..]),
+            .pointer    => {
+                const element_info = @typeInfo(value_info.pointer.child);
+                return element_info == .array and element_info.array.child == u8 and
+                        self == .str and std.mem.eql(u8, self.str, value);
+            },
+            .array      => {
+                return value_info.array.child == u8 and
+                        self == .str and std.mem.eql(u8, self.str, &value);
+            },
             else        => @compileError("RpcId value can only be integer or string."),
         }
     }
+
 };
 
 pub const RpcRequestError = struct {

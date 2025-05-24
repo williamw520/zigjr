@@ -84,6 +84,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(std.mem.eql(u8, req.arrayParams().?.items[0].string, "FUN1"));
         try testing.expect(req.id.isValid());
         try testing.expect(req.id.eql("1"));
+        try testing.expect(req.id.eql([_]u8{'1'}));
         try testing.expect(req.hasError() == false);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});

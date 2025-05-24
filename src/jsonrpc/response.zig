@@ -27,7 +27,6 @@ pub fn parseRpcResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResu
     // Parse error is passed back to the caller directly.
     const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
     return .{
-        .alloc = alloc,
         .parsed = parsed,
         .response_msg = parsed.value,
     };
@@ -35,7 +34,6 @@ pub fn parseRpcResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResu
 
 pub const RpcResponseResult = struct {
     const Self = @This();
-    alloc:          Allocator,
     parsed:         ?std.json.Parsed(RpcResponseMessage) = null,
     response_msg:   RpcResponseMessage,
 
@@ -102,7 +100,11 @@ pub const RpcResponse = struct {
         }
         return true;
     }
-    
+
+    pub fn resultEql(self: Self, value: anytype) bool {
+        return jsonValueEql(self.result, value);
+    }
+
 };
 
 pub const RpcResponseError = struct {
@@ -111,5 +113,59 @@ pub const RpcResponseError = struct {
     data:       ?Value = null,
 };
 
+/// Best effort comparison against the JSON Value.
+pub fn jsonValueEql(json_value: Value, value: anytype) bool {
+    const value_info = @typeInfo(@TypeOf(value));
+    switch (value_info) {
+        .null       => {
+            switch (json_value) {
+                .null       => return true,
+                else        => return false,
+            }
+        },
+        .bool       => {
+            switch (json_value) {
+                .bool       => return json_value.bool == value,
+                else        => return false,
+            }
+        },
+        .comptime_int,
+        .int        => {
+            switch (json_value) {
+                .integer    => return json_value.integer == value,
+                .float      => return json_value.float == @as(f64, @floatFromInt(value)),
+                else        => return false,
+            }
+        },
+        .comptime_float,
+        .float      => {
+            switch (json_value) {
+                .integer    => return @as(f64, @floatFromInt(json_value.integer)) == value,
+                .float      => return json_value.float == value,
+                else        => return false,
+            }
+        },
+        .pointer    => {
+            const elem_info = @typeInfo(value_info.pointer.child);
+            switch (json_value) {
+                .string     => return elem_info == .array and elem_info.array.child == u8 and
+                                        std.mem.eql(u8, json_value.string, value),
+                else        => return false,
+            }
+        },
+        .array      => {
+            switch (json_value) {
+                .string     => return value_info.array.child == u8 and
+                                        std.mem.eql(u8, json_value.string, &value),
+                else        => return false,
+            }
+        },
+        else        => {
+            // std.debug.print("value type info: {any}\n", .{value_info});
+            // return false;
+            @compileError("Only simple value can only be compared.");
+        },
+    }
+}
 
 
