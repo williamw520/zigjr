@@ -158,25 +158,32 @@ test "Registry. Dispatching to 0-parameter method" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var parsed_json_result = try zigjr.parseRpcResponse(alloc, res_json);
-            defer parsed_json_result.deinit();
-            const rpc_res = try parsed_json_result.response();
-            try testing.expectEqualSlices(u8, rpc_res.result.string, "Hello");
-            try testing.expect(rpc_res.id.eql(1));
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+            try testing.expect((try res_result.response()).id.eql(1));
         }
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_result", "id": 2}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+            try testing.expect((try res_result.response()).id.eql(2));
         }
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_result_lit", "id": 3}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+            try testing.expect((try res_result.response()).id.eql(3));
         }
         
     }
@@ -199,7 +206,13 @@ test "Registry. Dispatching to 0-parameter method, with error" {
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expectEqual((try res_result.response()).err().code, @intFromEnum(ErrorCode.InternalError));
+            try testing.expectEqualSlices(u8, (try res_result.response()).err().message, "Hello error");
+            try testing.expect((try res_result.response()).id.eql(1));
         }
         
     }
