@@ -28,6 +28,7 @@ pub const RpcResponseError = response.RpcResponseError;
 
 pub const handleRequest = handler.handleRequest;
 pub const handleRequestToJson = handler.handleRequestToJson;
+pub const handleRequestToResponse = handler.handleRequestToResponse;
 pub const handleResponse = handler.handleResponse;
 pub const handleRpcRequest = handler.handleRpcRequest;
 pub const handleRpcRequests = handler.handleRpcRequests;

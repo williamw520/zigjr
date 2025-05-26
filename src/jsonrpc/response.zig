@@ -23,19 +23,26 @@ const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
 
 
-pub fn parseRpcResponse(alloc: Allocator, json_str: []const u8) !RpcResponseResult {
-    // Parse error is passed back to the caller directly.
-    const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json_str, .{});
+pub fn parseRpcResponse(alloc: Allocator, json_str: ?[]const u8) !RpcResponseResult {
+    const json = std.mem.trim(u8, json_str orelse "", " ");
+    if (json.len > 0) {
+        // Parse error is passed back to the caller directly.
+        const parsed = try std.json.parseFromSlice(RpcResponseMessage, alloc, json, .{});
+        return .{
+            .parsed = parsed,
+            .response_msg = parsed.value,
+        };
+    }
     return .{
-        .parsed = parsed,
-        .response_msg = parsed.value,
+        .parsed = null,
+        .response_msg = .{ .none = {} },
     };
 }
 
 pub const RpcResponseResult = struct {
     const Self = @This();
     parsed:         ?std.json.Parsed(RpcResponseMessage) = null,
-    response_msg:   RpcResponseMessage,
+    response_msg:   RpcResponseMessage = .{ .none = {} },
 
     pub fn deinit(self: *Self) void {
         if (self.parsed) |parsed| parsed.deinit();
@@ -47,6 +54,10 @@ pub const RpcResponseResult = struct {
 
     pub fn isBatch(self: Self) bool {
         return self.response_msg == .batch;
+    }
+
+    pub fn isNone(self: Self) bool {
+        return self.response_msg == .none;
     }
 
     /// Shortcut to access the inner tagged union invariant response.
@@ -62,8 +73,9 @@ pub const RpcResponseResult = struct {
 };
 
 pub const RpcResponseMessage = union(enum) {
-    response:   RpcResponse,                // JSON-RPC's single response
+    response:   RpcResponse,                // JSON-RPC's single response.
     batch:      []RpcResponse,              // JSON-RPC's batch of responses.
+    none:       void,                       // signifies no response, i.e. notification.
 
     // Custom parsing when the JSON parser encounters a field of this type.
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcResponseMessage {

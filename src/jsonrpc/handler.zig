@@ -147,13 +147,20 @@ pub fn handleRequest(alloc: Allocator, request_json: []const u8, writer: anytype
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
 pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
-    var buffer = ArrayList(u8).init(alloc);
-    if (try handleRequest(alloc, request_json, buffer.writer(), dispatcher)) {
-        return try buffer.toOwnedSlice();
+    var response_buf = ArrayList(u8).init(alloc);
+    if (try handleRequest(alloc, request_json, response_buf.writer(), dispatcher)) {
+        return try response_buf.toOwnedSlice();
     } else {
-        buffer.deinit();
+        response_buf.deinit();
         return null;
     }
+}
+
+pub fn handleRequestToResponse(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !RpcResponseResult {
+    var response_buf = ArrayList(u8).init(alloc);
+    defer response_buf.deinit();
+    _ = try handleRequest(alloc, request_json, response_buf.writer(), dispatcher);
+    return try parseRpcResponse(alloc, response_buf.items);
 }
 
 
@@ -163,7 +170,7 @@ pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatche
 /// Any parse error is returned to the caller and the dispatcher is not called.
 /// Any error coming from the dispatcher is passed back to caller.
 /// For batch responses, the first error from the dispatcher stops the processing.
-pub fn handleResponse(alloc: Allocator, response_json: []const u8, dispatcher: anytype) !void {
+pub fn handleResponse(alloc: Allocator, response_json: ?[]const u8, dispatcher: anytype) !void {
     var parsed_result: RpcResponseResult = try parseRpcResponse(alloc, response_json);
     defer parsed_result.deinit();
     const response_msg: RpcResponseMessage = parsed_result.response_msg;
@@ -172,6 +179,7 @@ pub fn handleResponse(alloc: Allocator, response_json: []const u8, dispatcher: a
         .batch      => |rpc_responses| for (rpc_responses)|rpc_response| {
             try dispatcher.dispatch(alloc, rpc_response);
         },
+        .none       => {},
     };
 }
 
