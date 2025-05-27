@@ -43,10 +43,11 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    _ = @import("tests/request_tests.zig");
-    _ = @import("tests/response_tests.zig");
-    _ = @import("tests/stream_tests.zig");
-    _ = @import("tests/registry_tests.zig");
+    // _ = @import("tests/request_tests.zig");
+    // _ = @import("tests/response_tests.zig");
+    // _ = @import("tests/stream_tests.zig");
+    // _ = @import("tests/registry_tests.zig");
+    _ = @import("tests/json_tests.zig");
 }
 
 

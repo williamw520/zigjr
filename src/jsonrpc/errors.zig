@@ -29,9 +29,16 @@ pub const JrErrors = error {
     NotErrResponse,
     InvalidResponse,
     InvalidParamsType,
+    InvalidParamType,
+    InvalidJsonValueType,
     InvalidJsonRpcversion,
     MissingContentLengthHeader,
     InvalidRpcIdValueType,
+    UnsupportedParamType,
+    RequiredI64Integer,
+    RequiredF64Float,
+    RequiredU8SliceForString,
+    RequiredU8ArrayForString,
 } || error {
     OutOfMemory,
 };
