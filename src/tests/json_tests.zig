@@ -74,3 +74,59 @@ test "Test JSON value conversion with alloc." {
 }
 
 
+fn foo(a: i64, b: bool) void { std.debug.print("foo: a={}, b={}\n", .{a, b}); }
+fn bar(a: f64) void { std.debug.print("bar: a={}\n", .{a}); }
+fn baz(a: []const u8, b: i64, c: bool) void { std.debug.print("baz: a={s}, b={}, c={}\n", .{a, b, c}); }
+
+test "Test calling function with with JSON Values." {
+    const alloc = gpa.allocator();
+    {
+        const param_tt = jsonutil.ParamTupleType(foo);
+        var args = Array.init(alloc);
+        defer args.deinit();
+        try args.append(.{ .integer = 1 });
+        try args.append(.{ .bool = true });
+        const param_tuple = try jsonutil.valuesToTuple(param_tt, args);
+        @call(.auto, foo, param_tuple);
+    }
+    {
+        const param_tt = jsonutil.ParamTupleType(bar);
+        var args = Array.init(alloc);
+        defer args.deinit();
+        try args.append(.{ .float = 1.11 });
+        const param_tuple = try jsonutil.valuesToTuple(param_tt, args);
+        @call(.auto, bar, param_tuple);
+    }
+    {
+        const param_tt = jsonutil.ParamTupleType(baz);
+        var args = Array.init(alloc);
+        defer args.deinit();
+        try args.append(.{ .string = "hello" });
+        try args.append(.{ .integer = 4 });
+        try args.append(.{ .bool = true });
+        const param_tuple = try jsonutil.valuesToTuple(param_tt, args);
+        @call(.auto, baz, param_tuple);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+
+
+test "Test calling function with 2 params." {
+    const alloc = gpa.allocator();
+    {
+        _=alloc;
+        const result = try jsonutil.Fn2(f64, bool, struct {
+            pub fn run(p1: f64, p2: bool) ![]const u8 {
+                std.debug.print("p1={}, p2={}\n", .{p1, p2});
+                return "done";
+            }
+        }).callWith(.{ .float = 10 }, .{ .bool = true });
+        std.debug.print("result={s}\n", .{result});
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+

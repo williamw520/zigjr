@@ -90,3 +90,65 @@ pub fn ValueAs(comptime V: type) type {
 
 }
 
+/// Make a tuple type from the parameters of the function.
+/// Each parameter becomes a field of the tuple.
+pub fn ParamTupleType(comptime func: anytype) type {
+    const fn_info = @typeInfo(@TypeOf(func)).@"fn";
+
+    comptime var fields: [fn_info.params.len]std.builtin.Type.StructField = undefined;
+    inline for (fn_info.params, 0..)|param, i| {
+        fields[i] = .{
+            .name = std.fmt.comptimePrint("{d}", .{i}),
+            .type = param.type orelse null,
+            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
+            .default_value_ptr = null,
+            .alignment = 0,
+        };
+    }
+
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = fields[0..],
+            .decls = &.{},
+            .is_tuple = true,
+        },
+    });
+}
+
+pub fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
+    const tt_info = @typeInfo(tuple_type).@"struct";
+    var tuple: tuple_type = undefined;
+    inline for (tt_info.fields, 0..)|field, i| {
+        const value = values.items[i];
+        // std.debug.print("@\"{d}\"| field: {any} | arg: {any}\n", .{i, field, value});
+        @field(tuple, field.name) = try ValueAs(field.type).from(value);
+    }
+    return tuple;
+}
+
+pub fn Fn2(comptime P1: type, comptime P2: type, callback: anytype) type {
+    return struct {
+        pub fn callWith(v1: Value, v2: Value) ![]const u8 {
+            const x1 = try ValueAs(P1).from(v1);
+            const x2 = try ValueAs(P2).from(v2);
+            return try callback.run(x1, x2);
+        }
+    };
+}
+
+pub fn Fn3(comptime P1: type, comptime P2: type, comptime P3: type, callback: anytype) type {
+    return struct {
+        pub fn callWith(v1: Value, v2: Value, v3: Value) ![]const u8 {
+            const x1 = try ValueAs(P1).from(v1);
+            const x2 = try ValueAs(P2).from(v2);
+            const x3 = try ValueAs(P3).from(v3);
+            return try callback.run(x1, x2, x3);
+        }
+    };
+}
+
+// TODO: get P1 and P2 from function parameter type.
+
+
+
