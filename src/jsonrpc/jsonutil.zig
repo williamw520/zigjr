@@ -148,7 +148,37 @@ pub fn Fn3(comptime P1: type, comptime P2: type, comptime P3: type, callback: an
     };
 }
 
-// TODO: get P1 and P2 from function parameter type.
+// Uniform callback object that can be stored in the hash map.
+// makeCallable will deal with the parameter unpacking of specific function at comptime.
+pub const Callable = struct {
+    context: *anyopaque,
+    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror![]const u8,
 
+    pub fn invoke(self: Callable, alloc: Allocator, json_args: Value) anyerror![]const u8 {
+        return self.call(self.context, alloc, json_args);
+    }
+
+    pub fn deinit(self: Callable, allocator: Allocator) void {
+        _=self;
+        _=allocator;
+    }
+};
+
+pub fn makeCallable(comptime F: anytype) Callable {
+    const param_ttype = ParamTupleType(F);
+
+    return .{
+        .context = "",
+        .call = &struct {
+            // This is the actual runtime wrapper that gets called.
+            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror![]const u8 {
+                _ = context;
+                _ = alloc;
+                const args_tuple = try valuesToTuple(param_ttype, json_args.array);
+                return @call(.auto, F, args_tuple);
+            }
+        }.call_wrapper,
+    };
+}
 
 

@@ -98,7 +98,7 @@ pub const RpcRequest = struct {
     method:     []u8 = "",
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .none = {} },    // default for optional field.
-    _err:       RpcRequestError = .{},         // attach parsing error and validation error here.
+    _err:       RpcRequestError = .{},      // attach parsing error and validation error here.
 
     fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
         self._err = RpcRequestError.fromParseError(parse_err);

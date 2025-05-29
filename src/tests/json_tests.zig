@@ -3,6 +3,7 @@ const Type = std.builtin.Type;
 const testing = std.testing;
 const allocPrint = std.fmt.allocPrint;
 const Allocator = std.mem.Allocator;
+const StringHashMap = std.hash_map.StringHashMap;
 const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
@@ -110,20 +111,44 @@ test "Test calling function with with JSON Values." {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+fn foo_c1(a: i64, b: bool) []const u8 {
+    std.debug.print("foo_c1: a={}, b={}\n", .{a, b});
+    return "return for foo_c1";
+}
+fn bar_c1(a: f64) []const u8 {
+    std.debug.print("bar_c1: a={}\n", .{a});
+    return "return for bar_c1";
+}
 
-
-
-test "Test calling function with 2 params." {
+test "Using Callable" {
     const alloc = gpa.allocator();
     {
-        _=alloc;
-        const result = try jsonutil.Fn2(f64, bool, struct {
-            pub fn run(p1: f64, p2: bool) ![]const u8 {
-                std.debug.print("p1={}, p2={}\n", .{p1, p2});
-                return "done";
-            }
-        }).callWith(.{ .float = 10 }, .{ .bool = true });
-        std.debug.print("result={s}\n", .{result});
+        // _=alloc;
+        var handlers = StringHashMap(jsonutil.Callable).init(alloc);
+        defer handlers.deinit();
+
+        const fc1 = jsonutil.makeCallable(foo_c1);
+        const bc1 = jsonutil.makeCallable(bar_c1);
+        
+        try handlers.put("foo", fc1);
+        try handlers.put("bar", bc1);
+
+        var args = Array.init(alloc);
+        defer args.deinit();
+        try args.append(.{ .integer = 1 });
+        try args.append(.{ .bool = true });
+        _ = try fc1.invoke(alloc, .{ .array = args });
+
+        if (handlers.get("foo"))|c| {
+            _ = try c.invoke(alloc, .{ .array = args });
+        }
+        if (handlers.get("bar"))|c| {
+            var bar_args = Array.init(alloc);
+            defer bar_args.deinit();
+            try bar_args.append(.{ .float = 1.11 });
+            _ = try c.invoke(alloc, .{ .array = bar_args });
+        }
+            
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
