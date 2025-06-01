@@ -93,10 +93,10 @@ pub fn ValueAs(comptime V: type) type {
 /// Make a tuple type from the parameters of the function.
 /// Each parameter becomes a field of the tuple.
 pub fn ParamTupleType(comptime func: anytype) type {
-    const fn_info = @typeInfo(@TypeOf(func)).@"fn";
+    const f_info = @typeInfo(@TypeOf(func)).@"fn";
 
-    comptime var fields: [fn_info.params.len]std.builtin.Type.StructField = undefined;
-    inline for (fn_info.params, 0..)|param, i| {
+    comptime var fields: [f_info.params.len]std.builtin.Type.StructField = undefined;
+    inline for (f_info.params, 0..)|param, i| {
         fields[i] = .{
             .name = std.fmt.comptimePrint("{d}", .{i}),
             .type = param.type orelse null,
@@ -119,9 +119,9 @@ pub fn ParamTupleType(comptime func: anytype) type {
 /// Make a tuple type from the parameters of the function.
 /// Each parameter becomes a field of the tuple.
 pub fn ParamTupleType2(comptime func: anytype) type {
-    const fn_info = @typeInfo(@TypeOf(func)).@"fn";
+    const f_info = @typeInfo(@TypeOf(func)).@"fn";
 
-    comptime var fields: [1 + fn_info.params.len]std.builtin.Type.StructField = undefined;
+    comptime var fields: [1 + f_info.params.len]std.builtin.Type.StructField = undefined;
 
     fields[0] = .{
         .name = "0",
@@ -131,7 +131,7 @@ pub fn ParamTupleType2(comptime func: anytype) type {
         .alignment = 0,
     };
     
-    inline for (fn_info.params, 0..)|param, i| {
+    inline for (f_info.params, 0..)|param, i| {
         fields[i+1] = .{
             .name = std.fmt.comptimePrint("{d}", .{i+1}),
             .type = param.type orelse null,
@@ -200,7 +200,7 @@ pub fn Fn3(comptime P1: type, comptime P2: type, comptime P3: type, callback: an
 // makeCallable will deal with the parameter unpacking of specific function at comptime.
 pub const Callable = struct {
     context: *anyopaque,
-    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror![]const u8,
+    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value, result_ptr: *anyopaque) anyerror![]const u8,
 
     pub fn invoke(self: Callable, alloc: Allocator, json_args: Value) anyerror![]const u8 {
         return self.call(self.context, alloc, json_args);
@@ -213,18 +213,33 @@ pub const Callable = struct {
 };
 
 pub fn makeCallable(comptime F: anytype) Callable {
+    const f_info = @typeInfo(@TypeOf(F)).@"fn";
     // const param_ttype = ParamTupleType(F);
     const param_ttype = ParamTupleType(F);
+    const return_type = f_info.return_type;
 
     return .{
         .context = "",
         .call = &struct {
             // This is the actual runtime wrapper that gets called.
-            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror![]const u8 {
+            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value, result_ptr: *anyopaque) anyerror![]const u8 {
                 _ = context;
                 // _ = alloc;
+
+                // Pack the JSON values as the parameters for the function.
                 const args_tuple = try valuesToTuple2(param_ttype, alloc, json_args.array);
-                return @call(.auto, F, args_tuple);
+
+                // Call the original function
+                if (return_type == void or return_type == null) {
+                    @call(.auto, F, args_tuple);
+                } else if (@typeInfo(return_type) == .ErrorSet) {
+                    const result: *return_type = @ptrCast(result_ptr);
+                    result.* = @call(.auto, F, args_tuple) catch |err| return err;
+                } else {
+                    const result: *return_type = @ptrCast(result_ptr);
+                    result.* = @call(.auto, F, args_tuple) catch |err| return err;
+                }
+                
             }
         }.call_wrapper,
     };
