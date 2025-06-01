@@ -116,11 +116,59 @@ pub fn ParamTupleType(comptime func: anytype) type {
     });
 }
 
+/// Make a tuple type from the parameters of the function.
+/// Each parameter becomes a field of the tuple.
+pub fn ParamTupleType2(comptime func: anytype) type {
+    const fn_info = @typeInfo(@TypeOf(func)).@"fn";
+
+    comptime var fields: [1 + fn_info.params.len]std.builtin.Type.StructField = undefined;
+
+    fields[0] = .{
+        .name = "0",
+        .type = Allocator,
+        .is_comptime = false,
+        .default_value_ptr = null,
+        .alignment = 0,
+    };
+    
+    inline for (fn_info.params, 0..)|param, i| {
+        fields[i+1] = .{
+            .name = std.fmt.comptimePrint("{d}", .{i+1}),
+            .type = param.type orelse null,
+            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
+            .default_value_ptr = null,
+            .alignment = 0,
+        };
+    }
+
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = fields[0..],
+            .decls = &.{},
+            .is_tuple = true,
+        },
+    });
+}
+
 pub fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
     const tt_info = @typeInfo(tuple_type).@"struct";
     var tuple: tuple_type = undefined;
     inline for (tt_info.fields, 0..)|field, i| {
         const value = values.items[i];
+        // std.debug.print("@\"{d}\"| field: {any} | arg: {any}\n", .{i, field, value});
+        @field(tuple, field.name) = try ValueAs(field.type).from(value);
+    }
+    return tuple;
+}
+
+pub fn valuesToTuple2(comptime tuple_type: type, alloc: Allocator, values: Array) !tuple_type {
+    const tt_info = @typeInfo(tuple_type).@"struct";
+    var tuple: tuple_type = undefined;
+    @field(tuple, "0") = alloc;
+    inline for (1..tt_info.fields.len)|i| {
+        const field = tt_info.fields[i];
+        const value = values.items[i-1];
         // std.debug.print("@\"{d}\"| field: {any} | arg: {any}\n", .{i, field, value});
         @field(tuple, field.name) = try ValueAs(field.type).from(value);
     }
@@ -165,6 +213,7 @@ pub const Callable = struct {
 };
 
 pub fn makeCallable(comptime F: anytype) Callable {
+    // const param_ttype = ParamTupleType(F);
     const param_ttype = ParamTupleType(F);
 
     return .{
@@ -173,8 +222,8 @@ pub fn makeCallable(comptime F: anytype) Callable {
             // This is the actual runtime wrapper that gets called.
             fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror![]const u8 {
                 _ = context;
-                _ = alloc;
-                const args_tuple = try valuesToTuple(param_ttype, json_args.array);
+                // _ = alloc;
+                const args_tuple = try valuesToTuple2(param_ttype, alloc, json_args.array);
                 return @call(.auto, F, args_tuple);
             }
         }.call_wrapper,

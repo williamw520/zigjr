@@ -119,6 +119,27 @@ fn bar_c1(a: f64) []const u8 {
     std.debug.print("bar_c1: a={}\n", .{a});
     return "return for bar_c1";
 }
+fn foo_c2(_: Allocator, a: i64, b: bool) []const u8 {
+    std.debug.print("foo_c2: a={}, b={}\n", .{a, b});
+    return "return for foo_c2";
+}
+fn bar_c2(_: Allocator, a: f64) []const u8 {
+    std.debug.print("bar_c2: a={}\n", .{a});
+    return "return for bar_c2";
+}
+const FooObj = struct {
+    foo_field: i64 = 1,
+    
+    fn foo_struct(a: i64, b: bool) [] const u8 {
+        std.debug.print("foo_struct: a={}, b={}\n", .{a, b});
+        return "return for foo_struct";
+    }
+    fn foo_obj(self: *@This(), a: i64, b: bool) [] const u8 {
+        std.debug.print("foo_obj: a={}, b={}, foo_field={}\n", .{a, b, self.foo_field});
+        self.foo_field += 1;
+        return "return for foo_obj";
+    }
+};
 
 test "Using Callable" {
     const alloc = gpa.allocator();
@@ -127,11 +148,18 @@ test "Using Callable" {
         var handlers = StringHashMap(jsonutil.Callable).init(alloc);
         defer handlers.deinit();
 
-        const fc1 = jsonutil.makeCallable(foo_c1);
-        const bc1 = jsonutil.makeCallable(bar_c1);
-        
+        const fc1 = jsonutil.makeCallable(foo_c2);
+        const bc1 = jsonutil.makeCallable(bar_c2);
+        // const fc1 = jsonutil.makeCallable(foo_c1);
+        // const bc1 = jsonutil.makeCallable(bar_c1);
+        // const fos1 = jsonutil.makeCallable(FooObj.foo_struct);
+        // var fobj1: FooObj = .{ .foo_field = 11 };
+        // const fo1 = jsonutil.makeCallable(&fobj1.foo_obj);
+
         try handlers.put("foo", fc1);
         try handlers.put("bar", bc1);
+        // try handlers.put("foo_struct", fos1);
+        // try handlers.put("foo_obj", fo1);
 
         var args = Array.init(alloc);
         defer args.deinit();
@@ -147,6 +175,10 @@ test "Using Callable" {
             defer bar_args.deinit();
             try bar_args.append(.{ .float = 1.11 });
             _ = try c.invoke(alloc, .{ .array = bar_args });
+        }
+
+        if (handlers.get("foo_struct"))|c| {
+            _ = try c.invoke(alloc, .{ .array = args });
         }
             
     }

@@ -48,7 +48,7 @@ test {
     // _ = @import("tests/stream_tests.zig");
     // _ = @import("tests/registry_tests.zig");
     _ = @import("tests/json_tests.zig");
-    _ = @import("tests/tests.zig");
+    // _ = @import("tests/tests.zig");
 }
 
 

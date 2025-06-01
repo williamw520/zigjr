@@ -20,6 +20,11 @@ TODOs
 * DONE Message logging.
 * DONE Rename run() to dispatch() on dispatcher.
 * DONE Compact JSON output.
+* TODO Registration of function with arbitrary parameters.
+* TODO Invoke function with arbitrary parameters.
+* TODO Registration of function with arbitrary return type.
+* TODO Capture the function return value and convert to JSON result.
+* TODO Convert JSON to native values.
 * TODO Check the possible usage of ArrayList.toOwnedSlice().
 * TODO Add dispatching registry.
 * TODO Add CLI on running request and response and on streaming.
