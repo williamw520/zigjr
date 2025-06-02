@@ -20,6 +20,7 @@ TODOs
 * DONE Message logging.
 * DONE Rename run() to dispatch() on dispatcher.
 * DONE Compact JSON output.
+* TODO Return DispatchResult for the Callable.invocation.
 * TODO Registration of function with arbitrary parameters.
 * TODO Invoke function with arbitrary parameters.
 * TODO Registration of function with arbitrary return type.

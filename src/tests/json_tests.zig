@@ -165,20 +165,40 @@ test "Using Callable" {
         defer args.deinit();
         try args.append(.{ .integer = 1 });
         try args.append(.{ .bool = true });
-        _ = try fc1.invoke(alloc, .{ .array = args });
+        const dresult1 = try fc1.invoke(alloc, .{ .array = args });
+        std.debug.print("result1={s}\n", .{dresult1.result});
+        switch (dresult1) {
+            .result => alloc.free(dresult1.result),
+            else => {},
+        }
 
         if (handlers.get("foo"))|c| {
-            _ = try c.invoke(alloc, .{ .array = args });
+            const dresult = try c.invoke(alloc, .{ .array = args });
+            std.debug.print("result2={s}\n", .{dresult.result});
+            switch (dresult) {
+                .result => alloc.free(dresult.result),
+                else => {},
+            }
         }
         if (handlers.get("bar"))|c| {
             var bar_args = Array.init(alloc);
             defer bar_args.deinit();
             try bar_args.append(.{ .float = 1.11 });
-            _ = try c.invoke(alloc, .{ .array = bar_args });
+            const dresult = try c.invoke(alloc, .{ .array = bar_args });
+            std.debug.print("result3={s}\n", .{dresult.result});
+            switch (dresult) {
+                .result => alloc.free(dresult.result),
+                else => {},
+            }
         }
 
         if (handlers.get("foo_struct"))|c| {
-            _ = try c.invoke(alloc, .{ .array = args });
+            const dresult = try c.invoke(alloc, .{ .array = args });
+            std.debug.print("result4={s}\n", .{dresult.result});
+            switch (dresult) {
+                .result => alloc.free(dresult.result),
+                else => {},
+            }
         }
             
     }

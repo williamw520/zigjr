@@ -20,6 +20,10 @@ const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
 
+const handler = @import("handler.zig");
+const DispatchResult = handler.DispatchResult;
+const DispatchErrors = handler.DispatchErrors;
+
 
 pub fn ValueAs(comptime V: type) type {
     const vinfo = @typeInfo(V);
@@ -200,9 +204,9 @@ pub fn Fn3(comptime P1: type, comptime P2: type, comptime P3: type, callback: an
 // makeCallable will deal with the parameter unpacking of specific function at comptime.
 pub const Callable = struct {
     context: *anyopaque,
-    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value, result_ptr: *anyopaque) anyerror![]const u8,
+    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult,
 
-    pub fn invoke(self: Callable, alloc: Allocator, json_args: Value) anyerror![]const u8 {
+    pub fn invoke(self: Callable, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
         return self.call(self.context, alloc, json_args);
     }
 
@@ -213,6 +217,27 @@ pub const Callable = struct {
 };
 
 pub fn makeCallable(comptime F: anytype) Callable {
+    const param_ttype = ParamTupleType(F);
+
+    return .{
+        .context = "",
+        .call = &struct {
+            // This is the actual runtime wrapper that gets called.
+            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
+                _ = context;
+                // _ = alloc;
+
+                // Pack the JSON values as the parameters for the function.
+                const args_tuple = try valuesToTuple2(param_ttype, alloc, json_args.array);
+                const result =  @call(.auto, F, args_tuple);
+                return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
+            }
+        }.call_wrapper,
+    };
+}
+
+
+pub fn makeCallable2(comptime F: anytype) Callable {
     const f_info = @typeInfo(@TypeOf(F)).@"fn";
     // const param_ttype = ParamTupleType(F);
     const param_ttype = ParamTupleType(F);
