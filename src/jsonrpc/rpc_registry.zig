@@ -73,24 +73,10 @@ pub const RpcRegistry = struct {
     /// Call free() to free the DispatchResult.
     pub fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
         const h = self.handlers.get(req.method) orelse return DispatchErrors.MethodNotFound;
-
-        switch (req.params) {
-            // .array  => |array|  return callOnArray(alloc, h, array),
-            .null   => {
-                if (h.nparams != 0) return DispatchErrors.MismatchedParamCounts;
-                return h.invoke(alloc, req.params);
-            },
-            // .object => |object| {
-            //     switch (h) {
-            //         .fnRaw  =>  |f| return f(alloc, req.params),
-            //         .fnObj  =>  |f| return f(alloc, object),
-            //         else    =>      return DispatchErrors.NoHandlerForObjectParam,
-            //     }
-            // },
-            else    => return DispatchErrors.InvalidParams,
-        }
+        return h.invoke(alloc, req.params);
     }
 
+    // TODO: rename free() to freeResult()
     pub fn free(_: *Self, alloc: Allocator, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
@@ -102,36 +88,6 @@ pub const RpcRegistry = struct {
             },
         }
     }
-
-
-
-    // fn callOnArray(alloc: Allocator, handler: RpcHandler, array: Array) anyerror!DispatchResult {
-    //     _=alloc;
-    //     _=handler;
-    //     _=array;
-    // }
-
-
-    // fn callOnArray(alloc: Allocator, handler_fn: HandlerFn, array: Array) anyerror!DispatchResult {
-    //     // Call on array based parameter.
-    //     if (handler_fn == .fnArr) return handler_fn.fnArr(alloc, array);
-
-    //     // Call on fixed-length based parameters.
-    //     const p = array.items;
-    //     if (paramLen(handler_fn) != p.len) return DispatchErrors.MismatchedParamCounts;
-    //     return switch (handler_fn) {
-    //         .fn0 => |f| f(alloc),
-    //         .fn1 => |f| f(alloc, p[0]),
-    //         .fn2 => |f| f(alloc, p[0], p[1]),
-    //         .fn3 => |f| f(alloc, p[0], p[1], p[2]),
-    //         .fn4 => |f| f(alloc, p[0], p[1], p[2], p[3]),
-    //         .fn5 => |f| f(alloc, p[0], p[1], p[2], p[3], p[4]),
-    //         .fn6 => |f| f(alloc, p[0], p[1], p[2], p[3], p[4], p[5]),
-    //         .fnArr => unreachable,  // already handled previously; shouldn't here.
-    //         .fnObj => unreachable,  // already handled previously; shouldn't here.
-    //         .fnRaw => unreachable,  // already handled previously; shouldn't here.
-    //     };
-    // }
 
 };
 
@@ -168,7 +124,9 @@ const RpcHandler = struct {
 };
 
 fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
-    // const param_ttype = ParamTupleType(fn_info.params);
+    const param_ttype = ParamTupleType(fn_info.params);
+    const is_void = isVoid(fn_info.return_type);
+    const has_err = isErrorUnion(fn_info.return_type);
     return .{
         .context = "",
         .nparams = fn_info.params.len,
@@ -176,23 +134,46 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
                 _ = context;
-                _ = json_args;
+                // _ = json_args;
 
-                if (isVoid(fn_info.return_type)) {
-                    // TODO: validate request with an id but function has a void return type. Check in high level.
-                    if (isErrorUnion(fn_info.return_type)) {
-                        try @call(.auto, F, .{});
-                    } else {
-                        @call(.auto, F, .{});
-                    }
-                    return DispatchResult.asNone();
-                } else {
-                    const result = if (isErrorUnion(fn_info.return_type))
-                        try @call(.auto, F, .{})
-                    else
-                        @call(.auto, F, .{});
-                    return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, result, .{}));
+                switch (json_args) {
+                    .null   => {
+                        if (fn_info.params.len != 0) return DispatchErrors.MismatchedParamCounts;
+                        if (is_void) {
+                            // TODO: validate request with an id but function has a void return type. Check in high level.
+                            if (has_err) try @call(.auto, F, .{}) else @call(.auto, F, .{});
+                            return DispatchResult.asNone();
+                        } else {
+                            const res = if (has_err) try @call(.auto, F, .{}) else @call(.auto, F, .{});
+                            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+                        }
+                    },
+                    .array  => |array| {
+                        const args = try valuesToTuple(param_ttype, array); // JSON array to fn params.
+                        if (is_void) {
+                            if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
+                            return DispatchResult.asNone();
+                        } else {
+                            const res = if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
+                            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+                        }
+                    },
+                    // .object => |object| {
+                    //     switch (h) {
+                    //         .fnRaw  =>  |f| return f(alloc, req.params),
+                    //         .fnObj  =>  |f| return f(alloc, object),
+                    //         else    =>      return DispatchErrors.NoHandlerForObjectParam,
+                    //     }
+                    // },
+                    // TODO: Handle std.json.Value func parameter
+                    // TODO: Handle std.json.Array func parameter
+                    // TODO: Handle std.json.ObjectMap func parameter
+                    else    => {
+                        std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
+                        return DispatchErrors.InvalidParams;
+                    },
                 }
+                
                 // } else {
                 //     if (return_type == void or return_type == null) {
                 //         std.debug.print("3. return_type: {any}\n", .{@typeInfo(return_type.?)});

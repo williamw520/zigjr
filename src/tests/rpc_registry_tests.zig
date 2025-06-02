@@ -42,50 +42,44 @@ fn fn0_return_value_with_err() ![]const u8 {
     return "Hello";
 }
 
-fn fn0_with_result_error(alloc: Allocator) anyerror!DispatchResult {
-    return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, "Hello", .{}));
+
+fn fn1(a: i64) void {
+    std.debug.print("fn1() called, a:{}\n", .{a});
 }
 
-fn fn0_with_result_lit(alloc: Allocator) anyerror!DispatchResult {
-    _=alloc;
-    return DispatchResult.withResultLit("\"Hello\"");
+fn fn1_with_err(a: i64) !void {
+    std.debug.print("fn1_with_err() called, a:{}\n", .{a});
+}
+
+fn fn1_return_value(a: i64) []const u8 {
+    std.debug.print("fn1_return_value() called, a:{}\n", .{a});
+    return "Hello";
+}
+
+fn fn1_return_value_with_err(a: i64) ![]const u8 {
+    std.debug.print("fn1_return_value_with_err() called, a:{}\n", .{a});
+    return "Hello";
 }
 
 
-
-
-fn fun0(alloc: Allocator) anyerror![]const u8 {
-    return std.json.stringifyAlloc(alloc, "Hello", .{});
+fn fn2(a: i64, b: bool) void {
+    std.debug.print("fn2() called, a:{}, b:{}\n", .{a, b});
 }
 
-fn fun1(alloc: Allocator, p1: Value) anyerror![]const u8 {
-    const n1 = p1.string;
-    const str = try allocPrint(alloc, "Hello {s}", .{n1});
-    defer alloc.free(str);
-    return std.json.stringifyAlloc(alloc, str, .{});
+fn fn2_with_err(a: i64, b: bool) !void {
+    std.debug.print("fn2_with_err() called, a:{}, b:{}\n", .{a, b});
 }
 
-fn fun2(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
-    const n1 = p1.integer;
-    const n2 = p2.integer;
-    return std.json.stringifyAlloc(alloc, n1 - n2, .{});
+fn fn2_return_value(a: i64, b: bool) i64 {
+    std.debug.print("fn2_return_value() called, a:{}, b:{}\n", .{a, b});
+    return if (b) a * 1 else a * 2;
 }
 
-fn fun2a(alloc: Allocator, p1: Value, p2: Value) anyerror![]const u8 {
-    return std.json.stringifyAlloc(alloc, (p1.integer - p2.integer) * 2, .{});
+fn fn2_return_value_with_err(a: i64, b: bool) i64 {
+    std.debug.print("fn2_return_value_with_err() called, a:{}, b:{}\n", .{a, b});
+    return if (b) a * 1 else a * 2;
 }
 
-fn fun3(alloc: Allocator, p1: Value, p2: Value, p3: Value) anyerror![]const u8 {
-    return std.json.stringifyAlloc(alloc, p1.integer + p2.integer + p3.integer, .{});
-}
-
-fn fun9(alloc: Allocator, p1: Value, p2: Value, p3: Value, p4: Value,
-        p5: Value, p6: Value, p7: Value, p8: Value, p9: Value) anyerror![]const u8 {
-    return std.json.stringifyAlloc(alloc,
-                                   p1.integer + p2.integer + p3.integer + p4.integer +
-                                   p5.integer + p6.integer + p7.integer + p8.integer + p9.integer,
-                                   .{});
-}
 
 fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
     const str = try allocPrint(alloc, "Hello {}", .{array});
@@ -148,7 +142,7 @@ fn fun_wrong_param_type2(alloc: Allocator, _: Value, _: u8) anyerror![]const u8 
 }
 
 
-test "rpc_reg fn0" {
+test "rpc_registry fn0" {
     const alloc = gpa.allocator();
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
@@ -164,12 +158,9 @@ test "rpc_reg fn0" {
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
 
             try testing.expect(res_json.len == 0);
-            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-            // defer res_result.deinit();
-            // try testing.expect((try res_result.response()).resultEql(0));
         }
 
         {
@@ -177,12 +168,9 @@ test "rpc_reg fn0" {
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
 
             try testing.expect(res_json.len == 0);
-            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-            // defer res_result.deinit();
-            // try testing.expect((try res_result.response()).resultEql(0));
         }
         
         {
@@ -190,7 +178,7 @@ test "rpc_reg fn0" {
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
@@ -202,7 +190,68 @@ test "rpc_reg fn0" {
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
+        
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "rpc_registry fn1" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit(alloc);
+
+        try registry.register("fn1", fn1, .{});
+        try registry.register("fn1_with_err", fn1_with_err, .{});
+        try registry.register("fn1_return_value", fn1_return_value, .{});
+        try registry.register("fn1_return_value_with_err", fn1_return_value_with_err, .{});
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            try testing.expect(res_json.len == 0);
+            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            // defer res_result.deinit();
+            // try testing.expect((try res_result.response()).resultEql(0));
+        }
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            try testing.expect(res_json.len == 0);
+            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            // defer res_result.deinit();
+            // try testing.expect((try res_result.response()).resultEql(0));
+        }
+        
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
+        
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
@@ -214,89 +263,60 @@ test "rpc_reg fn0" {
 }
 
 
+test "rpc_registry fn2" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit(alloc);
 
-// test "Registry. Dispatching to 0-parameter method" {
-//     const alloc = gpa.allocator();
-//     {
-//         var registry = reg.Registry.init(alloc);
-//         defer registry.deinit();
+        try registry.register("fn2", fn2, .{});
+        try registry.register("fn2_with_err", fn2_with_err, .{});
+        try registry.register("fn2_return_value", fn2_return_value, .{});
+        try registry.register("fn2_return_value_with_err", fn2_return_value_with_err, .{});
 
-//         try registry.register("fn0", fn0, .{});
-//         try registry.register("fn0_with_result", fn0_with_result, .{});
-//         try registry.register("fn0_with_result_lit", fn0_with_result_lit, .{});
-//         try testing.expect(registry.has("fn0"));
-//         try testing.expect(registry.has("fn0_with_result"));
-//         try testing.expect(registry.has("fn0_with_result_lit"));
-//         try testing.expect(!registry.has("non-existing"));
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
 
-//         {
-//             const res_json = try zigjr.handleRequestToJson(alloc,
-//                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-//             , &registry) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(res_json.len == 0);
+        }
 
-//             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//             try testing.expect((try res_result.response()).id.eql(1));
-//         }
-//         {
-//             const res_json = try zigjr.handleRequestToJson(alloc,
-//                 \\{"jsonrpc": "2.0", "method": "fn0_with_result", "id": 2}
-//             , &registry) orelse "";
-//             defer alloc.free(res_json);
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
 
-//             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//             try testing.expect((try res_result.response()).id.eql(2));
-//         }
-//         {
-//             const res_json = try zigjr.handleRequestToJson(alloc,
-//                 \\{"jsonrpc": "2.0", "method": "fn0_with_result_lit", "id": 3}
-//             , &registry) orelse "";
-//             defer alloc.free(res_json);
-
-//             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//             try testing.expect((try res_result.response()).id.eql(3));
-//         }
+            try testing.expect(res_json.len == 0);
+        }
         
-//     }
-//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-// }
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
 
-// test "Registry. Dispatching to 0-parameter method, with error" {
-//     const alloc = gpa.allocator();
-//     {
-//         var registry = reg.Registry.init(alloc);
-//         defer registry.deinit();
-
-//         try registry.register("fn0", fn0, .{});
-//         try registry.register("fn0_with_result", fn0_with_result, .{});
-//         try registry.register("fn0_with_result_lit", fn0_with_result_lit, .{});
-//         try registry.register("fn0_with_err", fn0_with_err, .{});
-
-//         {
-//             const res_json = try zigjr.handleRequestToJson(alloc,
-//                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
-//             , &registry) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expectEqual((try res_result.response()).err().code, @intFromEnum(ErrorCode.InternalError));
-//             try testing.expectEqualSlices(u8, (try res_result.response()).err().message, "Hello error");
-//             try testing.expect((try res_result.response()).id.eql(1));
-//         }
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
+        }
         
-//     }
-//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-// }
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
 
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(8));
+        }
+        
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 
 
