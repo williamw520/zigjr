@@ -203,7 +203,9 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
 
     const dresult: DispatchResult = call: {
         break :call dispatcher.dispatch(alloc, req) catch |err| {
-            break :call DispatchResult.withAnyErr(err); // turn dispatching error into DispatchResult.err.
+            // Turn dispatching error into DispatchResult.err.
+            // Handle errors here so dispatchers don't have to worry about error handling.
+            break :call DispatchResult.withAnyErr(err);
         };
     };
 

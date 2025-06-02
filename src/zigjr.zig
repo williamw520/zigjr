@@ -47,7 +47,8 @@ test {
     // _ = @import("tests/response_tests.zig");
     // _ = @import("tests/stream_tests.zig");
     // _ = @import("tests/registry_tests.zig");
-    _ = @import("tests/json_tests.zig");
+    _ = @import("tests/rpc_registry_tests.zig");
+    // _ = @import("tests/json_tests.zig");
     // _ = @import("tests/tests.zig");
 }
 

@@ -222,7 +222,7 @@ pub fn makeCallable(comptime F: anytype) Callable {
     return .{
         .context = "",
         .call = &struct {
-            // This is the actual runtime wrapper that gets called.
+            // Wrapper for the specific function.
             fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
                 _ = context;
                 // _ = alloc;
