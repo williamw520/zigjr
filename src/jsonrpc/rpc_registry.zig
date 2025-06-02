@@ -134,7 +134,6 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
                 _ = context;
-                // _ = json_args;
 
                 switch (json_args) {
                     .null   => {
@@ -149,6 +148,7 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
                         }
                     },
                     .array  => |array| {
+                        if (fn_info.params.len != array.items.len) return DispatchErrors.MismatchedParamCounts;
                         const args = try valuesToTuple(param_ttype, array); // JSON array to fn params.
                         if (is_void) {
                             if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
@@ -173,73 +173,6 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
                         return DispatchErrors.InvalidParams;
                     },
                 }
-                
-                // } else {
-                //     if (return_type == void or return_type == null) {
-                //         std.debug.print("3. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //         // TODO: handle request with an id but function has a void return type.
-                //         @call(.auto, F, .{});
-                //         return DispatchResult.asNone();
-                //     } else {
-                //         std.debug.print("4. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //         // TODO: handle request with an id but function has a void return type.
-                //         const result = @call(.auto, F, .{});
-                //         return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
-                //     }
-                // }
-                // try @call(.auto, F, .{});
-                // return DispatchResult.asNone();
-                
-                // switch (json_args) {
-                //     .null   => {
-                //         if (fn_info.params.len != 0) return DispatchErrors.MismatchedParamCounts;
-
-                //         if (hasErrorSet(return_type)) {
-                //             if (return_type == void or return_type == null) {
-                //                 // TODO: handle request with an id but function has a void return type.
-                //                 std.debug.print("1. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //                 // @call(.auto, F, .{});
-                //                 // return DispatchResult.asNone();
-                //             } else {
-                //                 std.debug.print("2. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //                 // const result = try @call(.auto, F, .{});
-                //                 // return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
-                //             }
-                //         } else {
-                //             if (return_type == void or return_type == null) {
-                //                 std.debug.print("3. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //                 // TODO: handle request with an id but function has a void return type.
-                //                 @call(.auto, F, .{});
-                //                 return DispatchResult.asNone();
-                //             } else {
-                //                 std.debug.print("4. return_type: {any}\n", .{@typeInfo(return_type.?)});
-                //                 // TODO: handle request with an id but function has a void return type.
-                //                 const result = @call(.auto, F, .{});
-                //                 return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
-                //             }
-                //         }
-                //         try @call(.auto, F, .{});
-                //         return DispatchResult.asNone();
-                //     },
-                // .array  => |array| {
-                //     // Pack the JSON values as the parameters for the function.
-                //     const args_tuple = try valuesToTuple(param_ttype, array);
-                //     // TODO: handle error.
-                //     const result = @call(.auto, F, args_tuple);
-                //     return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
-                // },
-                // .object => |object| {
-                //     switch (h) {
-                //         .fnRaw  =>  |f| return f(alloc, req.params),
-                //         .fnObj  =>  |f| return f(alloc, object),
-                //         else    =>      return DispatchErrors.NoHandlerForObjectParam,
-                //     }
-                // },
-                // TODO: Handle std.json.Value func parameter
-                // TODO: Handle std.json.Array func parameter
-                // TODO: Handle std.json.ObjectMap func parameter
-                // else    => return DispatchErrors.InvalidParams,
-                // }
             }
         }.call_wrapper,
     };

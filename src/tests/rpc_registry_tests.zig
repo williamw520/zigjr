@@ -24,6 +24,9 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 // Test handler registration.
 
+// TODO: add fn returning a struct, add fn taking in string, add fn taking in struct,
+// add fn taking Value, Array, ObjectMap.
+
 fn fn0() void {
     std.debug.print("fn0() called\n", .{});
 }
