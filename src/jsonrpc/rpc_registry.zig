@@ -152,41 +152,13 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
                 switch (json_args) {
                     .null   => {
-                        const extra_param = if (has_ctx) 1 else 0;
-                        if (fn_info.params.len != extra_param)
-                            return DispatchErrors.MismatchedParamCounts;
-
-                        const args: param_ttype = if (has_ctx)
-                            try valuesToTuple2(param_ttype, Array.init(alloc), ctx.?, ctx_type)
-                        else
-                            try valuesToTuple(param_ttype, Array.init(alloc));
-
-                        if (is_void) {
-                            // TODO: validate request with an id but function has a void return type. Check in high level.
-                            if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
-                            return DispatchResult.asNone();
-                        } else {
-                            const res = if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
-                            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
-                        }
+                        const array = Array.init(alloc);
+                        return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                             ctx_type, alloc, ctx, array);
                     },
                     .array  => |array| {
-                        const extra_param = if (has_ctx) 1 else 0;
-                        if (fn_info.params.len != array.items.len + extra_param)
-                            return DispatchErrors.MismatchedParamCounts;
-
-                        const args: param_ttype = if (has_ctx)
-                            try valuesToTuple2(param_ttype, array, ctx.?, ctx_type)
-                        else
-                            try valuesToTuple(param_ttype, array);  // JSON array to fn params.
-
-                        if (is_void) {
-                            if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
-                            return DispatchResult.asNone();
-                        } else {
-                            const res = if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
-                            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
-                        }
+                        return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                             ctx_type, alloc, ctx, array);
                     },
                     // .object => |object| {
                     //     switch (h) {
@@ -257,6 +229,35 @@ inline fn isVoid(comptime T: ?type) bool {
     }
 }
 
+fn callFnOnArray(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
+          comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+          alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
+
+    const extra_param = if (has_ctx) 1 else 0;
+    if (fn_info.params.len != array.items.len + extra_param)
+        return DispatchErrors.MismatchedParamCounts;
+
+    // Pack JSON array params to a tuple for fn params.
+    const args: param_ttype = if (has_ctx)
+        try valuesToTupleCtx(param_ttype, array, ctx.?, ctx_type)
+    else
+        try valuesToTuple(param_ttype, array);
+
+    if (is_void) {
+        if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.asNone();
+    } else {
+        const res = if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+    }
+}
+
 /// Make a tuple type from the parameters of a function.
 /// Each parameter becomes a field of the tuple.
 fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
@@ -294,7 +295,7 @@ fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
     return tuple;
 }
 
-fn valuesToTuple2(comptime tuple_type: type, values: Array, ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
+fn valuesToTupleCtx(comptime tuple_type: type, values: Array, ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
     const tt_info = @typeInfo(tuple_type).@"struct";
     var tuple: tuple_type = undefined;
     // const ctx_ptr: ctx_type = @ptrCast(@alignCast(@alignOf(ctx_type)), ));
