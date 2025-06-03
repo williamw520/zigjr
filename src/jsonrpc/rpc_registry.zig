@@ -52,7 +52,8 @@ pub const RpcRegistry = struct {
         // Clean up any contexts owned by the RpcHandler entries
         var it = self.handlers.iterator();
         while (it.next()) |entry| {
-            entry.value_ptr.deinit(alloc);
+            const rpc_handler = entry.value_ptr;
+            rpc_handler.deinit(alloc);
         }
         self.handlers.deinit();
     }
@@ -60,7 +61,18 @@ pub const RpcRegistry = struct {
     pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype, opt: RegisterOptions) !void {
         const fn_info = getFnInfo(handler_fn);
         try validateHandler(fn_info, method, opt);
-        const h = makeRpcHandler(handler_fn, fn_info);
+        const ctx_type = void;
+        const h = makeRpcHandler(handler_fn, fn_info, ctx_type);
+        try self.handlers.put(method, h);
+    }
+
+    pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype,
+                           opt: RegisterOptions) !void {
+        const fn_info = getFnInfo(handler_fn);
+        const ctx_type = @TypeOf(context);
+        try validateHandler(fn_info, method, opt);
+        var h = makeRpcHandler(handler_fn, fn_info, ctx_type);
+        h.setCtx(context);
         try self.handlers.put(method, h);
     }
 
@@ -109,47 +121,65 @@ pub const RegistrationErrors = error {
 // Uniform callback object that can be stored in the hash map.
 // makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 const RpcHandler = struct {
-    context: *anyopaque,
-    nparams: usize,
-    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult,
+    // Poorman's pointer with an one-entry vtable.
+    context: ?*anyopaque,
+    call: *const fn(alloc: Allocator, context: ?*anyopaque, json_args: Value) anyerror!DispatchResult,
+
+    fn setCtx(self: *RpcHandler, context: ?*anyopaque) void {
+        self.context = context;
+    }
 
     pub fn invoke(self: RpcHandler, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
-        return self.call(self.context, alloc, json_args);
+        return self.call(alloc, self.context, json_args);
     }
 
     pub fn deinit(self: RpcHandler, allocator: Allocator) void {
+        // TODO: deinit on context.
         _=self;
         _=allocator;
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn) RpcHandler {
+fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_type: type) RpcHandler {
     const param_ttype = ParamTupleType(fn_info.params);
     const is_void = isVoid(fn_info.return_type);
     const has_err = isErrorUnion(fn_info.return_type);
+    const has_ctx = ctx_type != void;
     return .{
-        .context = "",
-        .nparams = fn_info.params.len,
+        .context = null,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
-            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
-                _ = context;
-
+            fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
                 switch (json_args) {
                     .null   => {
-                        if (fn_info.params.len != 0) return DispatchErrors.MismatchedParamCounts;
+                        const extra_param = if (has_ctx) 1 else 0;
+                        if (fn_info.params.len != extra_param)
+                            return DispatchErrors.MismatchedParamCounts;
+
+                        const args: param_ttype = if (has_ctx)
+                            try valuesToTuple2(param_ttype, Array.init(alloc), ctx.?, ctx_type)
+                        else
+                            try valuesToTuple(param_ttype, Array.init(alloc));
+
                         if (is_void) {
                             // TODO: validate request with an id but function has a void return type. Check in high level.
-                            if (has_err) try @call(.auto, F, .{}) else @call(.auto, F, .{});
+                            if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
                             return DispatchResult.asNone();
                         } else {
-                            const res = if (has_err) try @call(.auto, F, .{}) else @call(.auto, F, .{});
+                            const res = if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
                             return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
                         }
                     },
                     .array  => |array| {
-                        if (fn_info.params.len != array.items.len) return DispatchErrors.MismatchedParamCounts;
-                        const args = try valuesToTuple(param_ttype, array); // JSON array to fn params.
+                        const extra_param = if (has_ctx) 1 else 0;
+                        if (fn_info.params.len != array.items.len + extra_param)
+                            return DispatchErrors.MismatchedParamCounts;
+
+                        const args: param_ttype = if (has_ctx)
+                            try valuesToTuple2(param_ttype, array, ctx.?, ctx_type)
+                        else
+                            try valuesToTuple(param_ttype, array);  // JSON array to fn params.
+
                         if (is_void) {
                             if (has_err) try @call(.auto, F, args) else @call(.auto, F, args);
                             return DispatchResult.asNone();
@@ -255,8 +285,25 @@ fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
 fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
     const tt_info = @typeInfo(tuple_type).@"struct";
     var tuple: tuple_type = undefined;
-    inline for (tt_info.fields, 0..)|field, i| {
+
+    inline for (0..tt_info.fields.len)|i| {
+        const field = tt_info.fields[i];
         const value = values.items[i];
+        @field(tuple, field.name) = try ValueAs(field.type).from(value);
+    }
+    return tuple;
+}
+
+fn valuesToTuple2(comptime tuple_type: type, values: Array, ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
+    const tt_info = @typeInfo(tuple_type).@"struct";
+    var tuple: tuple_type = undefined;
+    // const ctx_ptr: ctx_type = @ptrCast(@alignCast(@alignOf(ctx_type)), ));
+    const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
+
+    @field(tuple, "0") = ctx_ptr;
+    inline for (1..tt_info.fields.len)|i| {
+        const field = tt_info.fields[i];
+        const value = values.items[i - 1];
         @field(tuple, field.name) = try ValueAs(field.type).from(value);
     }
     return tuple;

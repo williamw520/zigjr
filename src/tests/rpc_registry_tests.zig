@@ -84,6 +84,28 @@ fn fn2_return_value_with_err(a: i64, b: bool) i64 {
 }
 
 
+const Ctx = struct {
+    count: i64 = 0,
+
+    // All methods must have self as pointer as the context is passed in as a pointer.
+    fn get(self: *@This()) i64 {
+        std.debug.print("ctx.get() called, count:{}\n", .{self.count});
+        return self.count;
+    }
+
+    fn fn0(self: *@This()) void {
+        std.debug.print("ctx.fn0() called, count:{}\n", .{self.count});
+    }
+
+    fn fn1(self: *@This(), a: i64) void {
+        self.count += a;
+        std.debug.print("ctx.fn1() called, count:{}\n", .{self.count});
+    }
+
+};
+
+
+
 fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
     const str = try allocPrint(alloc, "Hello {}", .{array});
     defer alloc.free(str);
@@ -316,6 +338,86 @@ test "rpc_registry fn2" {
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(8));
         }
+        
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry with context" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit(alloc);
+
+        var ctx = Ctx { .count = 0 };
+
+        try registry.registerWithCtx("ctx.get", &ctx, Ctx.get, .{});
+        try registry.registerWithCtx("ctx.fn0", &ctx, Ctx.fn0, .{});
+        try registry.registerWithCtx("ctx.fn1", &ctx, Ctx.fn1, .{});
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(0));
+        }
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            try testing.expect(res_json.len == 0);
+        }
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            try testing.expect(res_json.len == 0);
+        }
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(2));
+        }
+        
+        // {
+        //     const res_json = try zigjr.handleRequestToJson(alloc,
+        //         \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
+        //     , &registry) orelse "";
+        //     defer alloc.free(res_json);
+
+        //     var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+        //     defer res_result.deinit();
+        //     try testing.expect((try res_result.response()).resultEql("Hello"));
+        // }
+        
+        // {
+        //     const res_json = try zigjr.handleRequestToJson(alloc,
+        //         \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
+        //     , &registry) orelse "";
+        //     defer alloc.free(res_json);
+
+        //     var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+        //     defer res_result.deinit();
+        //     try testing.expect((try res_result.response()).resultEql("Hello"));
+        // }
         
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
