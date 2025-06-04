@@ -137,6 +137,14 @@ fn fn_cat_objmap(obj: std.json.ObjectMap) CatInfo {
     };
 }
 
+fn fn_cat_value(json_value: std.json.Value) CatInfo {
+    return .{
+        .cat_name = json_value.object.get("cat_name").?.string,
+        .weight = json_value.object.get("weight").?.float,
+        .eye_color = json_value.object.get("eye_color").?.string,
+    };
+}
+
 fn fn_cat_add_weight(cat: CatInfo) CatInfo {
     return .{
         .cat_name = cat.cat_name,
@@ -494,6 +502,40 @@ test "rpc_registry passing in an ObjectMap as a parameter" {
             // std.debug.print("cat: {any}\n", .{parsed_cat.value});
             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat2");
             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
+            try testing.expectEqual(parsed_cat.value.weight, 5.0);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in an Value as a parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit(alloc);
+
+        try registry.register("fn_cat_value", fn_cat_value, .{});
+
+        {
+            const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
+            defer alloc.free(req_json);
+            std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "black");
             try testing.expectEqual(parsed_cat.value.weight, 5.0);
         }
 

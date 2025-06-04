@@ -148,6 +148,7 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
     const has_err = isErrorUnion(fn_info.return_type);
     const has_ctx = ctx_type != void;
     const is_objmap = isParamObjMap(fn_info.params, has_ctx);
+    const is_value  = isParamValue(fn_info.params, has_ctx);
     // @compileLog(is_objmap);
 
     return .{
@@ -155,10 +156,10 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
-                // TODO: Handle std.json.Value func parameter
-                // TODO: Handle std.json.Array func parameter
-                // Handle std.json.ObjectMap func parameter
-                if (is_objmap) {
+                if (is_value) {
+                    return callFnOnValue(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                         ctx_type, alloc, ctx, json_args);
+                } else if (is_objmap) {
                     switch (json_args) {
                         .object => |objmap| {
                             return callFnOnObjMap(F, fn_info, param_ttype, has_ctx, has_err, is_void,
@@ -237,6 +238,35 @@ inline fn isVoid(comptime T: ?type) bool {
         }
     } else {
         return false;
+    }
+}
+
+fn callFnOnValue(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
+                 comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+                 alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
+
+    const extra_param = if (has_ctx) 1 else 0;
+    if (fn_info.params.len != 1 + extra_param)
+        return DispatchErrors.MismatchedParamCounts;
+
+    // Pack JSON array params to a tuple for fn params.
+    const args: param_ttype = if (has_ctx)
+        valueToTupleCtx(param_ttype, json_args, ctx.?, ctx_type)
+    else
+        valueToTuple(param_ttype, json_args);
+
+    if (is_void) {
+        if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.asNone();
+    } else {
+        const res = if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
     }
 }
 
@@ -326,12 +356,36 @@ inline fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
 inline fn isParamObjMap(comptime params: []const Type.Fn.Param, comptime has_ctx: bool) bool {
     // @compileLog("param[0].type == ObjectMap?", params[0].type.? == ObjectMap, params[0].type);
     if (has_ctx) {
-        return params.len > 1 and params[1].type.? == ObjectMap;
+        return params.len > 1 and params[1].type.? == std.json.ObjectMap;
     } else {
-        return params.len > 0 and params[0].type.? == ObjectMap;
+        return params.len > 0 and params[0].type.? == std.json.ObjectMap;
     }
 }    
 
+inline fn isParamValue(comptime params: []const Type.Fn.Param, comptime has_ctx: bool) bool {
+    // @compileLog("param[0].type == ObjectMap?", params[0].type.? == Value, params[0].type);
+    if (has_ctx) {
+        return params.len > 1 and params[1].type.? == std.json.Value;
+    } else {
+        return params.len > 0 and params[0].type.? == std.json.Value;
+    }
+}    
+
+fn valueToTuple(comptime tuple_type: type, value: Value) tuple_type {
+    var tuple: tuple_type = undefined;
+    @field(tuple, "0") = value;
+    return tuple;
+}
+
+fn valueToTupleCtx(comptime tuple_type: type, value: Value,
+                   ctx: *anyopaque, comptime ctx_type: type) tuple_type {
+    var tuple: tuple_type = undefined;
+    const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
+
+    @field(tuple, "0") = ctx_ptr;
+    @field(tuple, "1") = value;
+    return tuple;
+}
 
 fn objmapToTuple(comptime tuple_type: type, objmap: ObjectMap) tuple_type {
     var tuple: tuple_type = undefined;
