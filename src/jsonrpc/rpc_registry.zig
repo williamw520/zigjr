@@ -147,35 +147,44 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
     const is_void = isVoid(fn_info.return_type);
     const has_err = isErrorUnion(fn_info.return_type);
     const has_ctx = ctx_type != void;
+    const is_objmap = isParamObjMap(fn_info.params, has_ctx);
+    // @compileLog(is_objmap);
+
     return .{
         .context = null,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
-                switch (json_args) {
-                    .null   => {
-                        const array = Array.init(alloc);
-                        return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                             ctx_type, alloc, ctx, array);
-                    },
-                    .array  => |array| {
-                        return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                             ctx_type, alloc, ctx, array);
-                    },
-                    // .object => |object| {
-                    //     switch (h) {
-                    //         .fnRaw  =>  |f| return f(alloc, req.params),
-                    //         .fnObj  =>  |f| return f(alloc, object),
-                    //         else    =>      return DispatchErrors.NoHandlerForObjectParam,
-                    //     }
-                    // },
-                    // TODO: Handle std.json.Value func parameter
-                    // TODO: Handle std.json.Array func parameter
-                    // TODO: Handle std.json.ObjectMap func parameter
-                    else    => {
-                        std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
-                        return DispatchErrors.InvalidParams;
-                    },
+                // TODO: Handle std.json.Value func parameter
+                // TODO: Handle std.json.Array func parameter
+                // Handle std.json.ObjectMap func parameter
+                if (is_objmap) {
+                    switch (json_args) {
+                        .object => |objmap| {
+                            return callFnOnObjMap(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                                  ctx_type, alloc, ctx, objmap);
+                        },
+                        else    => {
+                            std.debug.print("Expect ObjectMap but get unexpected JSON params: {any}\n", .{json_args});
+                            return DispatchErrors.InvalidParams;
+                        },
+                    }
+                } else {
+                    switch (json_args) {
+                        .null   => {
+                            const array = Array.init(alloc);
+                            return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                                 ctx_type, alloc, ctx, array);
+                        },
+                        .array  => |array| {
+                            return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
+                                                 ctx_type, alloc, ctx, array);
+                        },
+                        else    => {
+                            std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
+                            return DispatchErrors.InvalidParams;
+                        },
+                    }
                 }
             }
         }.call_wrapper,
@@ -231,9 +240,38 @@ inline fn isVoid(comptime T: ?type) bool {
     }
 }
 
+fn callFnOnObjMap(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
+                  comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+                  alloc: Allocator, ctx: ?*anyopaque, objmap: ObjectMap) anyerror!DispatchResult {
+
+    const extra_param = if (has_ctx) 1 else 0;
+    if (fn_info.params.len != 1 + extra_param)
+        return DispatchErrors.MismatchedParamCounts;
+
+    // Pack JSON array params to a tuple for fn params.
+    const args: param_ttype = if (has_ctx)
+        objmapToTupleCtx(param_ttype, objmap, ctx.?, ctx_type)
+    else
+        objmapToTuple(param_ttype, objmap);
+
+    if (is_void) {
+        if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.asNone();
+    } else {
+        const res = if (has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+    }
+}
+
 fn callFnOnArray(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
-          comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
-          alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
+                 comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+                 alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
 
     const extra_param = if (has_ctx) 1 else 0;
     if (fn_info.params.len != array.items.len + extra_param)
@@ -262,7 +300,7 @@ fn callFnOnArray(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_
 
 /// Make a tuple type from the parameters of a function.
 /// Each parameter becomes a field of the tuple.
-fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
+inline fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
     comptime var fields: [params.len]std.builtin.Type.StructField = undefined;
     inline for (params, 0..)|param, i| {
         fields[i] = .{
@@ -285,6 +323,32 @@ fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
     });
 }
 
+inline fn isParamObjMap(comptime params: []const Type.Fn.Param, comptime has_ctx: bool) bool {
+    // @compileLog("param[0].type == ObjectMap?", params[0].type.? == ObjectMap, params[0].type);
+    if (has_ctx) {
+        return params.len > 1 and params[1].type.? == ObjectMap;
+    } else {
+        return params.len > 0 and params[0].type.? == ObjectMap;
+    }
+}    
+
+
+fn objmapToTuple(comptime tuple_type: type, objmap: ObjectMap) tuple_type {
+    var tuple: tuple_type = undefined;
+    @field(tuple, "0") = objmap;
+    return tuple;
+}
+
+fn objmapToTupleCtx(comptime tuple_type: type, objmap: ObjectMap,
+                    ctx: *anyopaque, comptime ctx_type: type) tuple_type {
+    var tuple: tuple_type = undefined;
+    const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
+
+    @field(tuple, "0") = ctx_ptr;
+    @field(tuple, "1") = objmap;
+    return tuple;
+}
+
 fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
     const tt_info = @typeInfo(tuple_type).@"struct";
     var tuple: tuple_type = undefined;
@@ -297,7 +361,8 @@ fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
     return tuple;
 }
 
-fn valuesToTupleCtx(comptime tuple_type: type, values: Array, ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
+fn valuesToTupleCtx(comptime tuple_type: type, values: Array,
+                    ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
     const tt_info = @typeInfo(tuple_type).@"struct";
     var tuple: tuple_type = undefined;
     // const ctx_ptr: ctx_type = @ptrCast(@alignCast(@alignOf(ctx_type)), ));

@@ -86,6 +86,7 @@ fn fn2_return_value_with_err(a: i64, b: bool) i64 {
 
 const Ctx = struct {
     count: i64 = 0,
+    alloc: Allocator,
 
     // All methods must have self as pointer as the context is passed in as a pointer.
     fn get(self: *@This()) i64 {
@@ -100,6 +101,15 @@ const Ctx = struct {
     fn fn1(self: *@This(), a: i64) void {
         self.count += a;
         std.debug.print("ctx.fn1() called, count:{}\n", .{self.count});
+    }
+
+    fn fn_cat_value_parse(self: *@This(), obj: std.json.ObjectMap) !CatInfo {
+        const parsed = try std.json.parseFromValue(CatInfo, self.alloc, obj, .{});
+        return .{
+            .cat_name = parsed.value.cat_name,
+            .weight = parsed.value.weight,
+            .eye_color = parsed.value.eye_color,
+        };
     }
 
 };
@@ -119,13 +129,22 @@ fn fn_cat(name: []const u8, weight: f64, color: []const u8) CatInfo {
     };
 }
 
-fn fn_cat_add(cat: CatInfo) CatInfo {
+fn fn_cat_objmap(obj: std.json.ObjectMap) CatInfo {
+    return .{
+        .cat_name = obj.get("cat_name").?.string,
+        .weight = obj.get("weight").?.float,
+        .eye_color = obj.get("eye_color").?.string,
+    };
+}
+
+fn fn_cat_add_weight(cat: CatInfo) CatInfo {
     return .{
         .cat_name = cat.cat_name,
         .weight = cat.weight + 1,
         .eye_color = cat.eye_color,
     };
 }
+
 
 
 fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
@@ -366,7 +385,7 @@ test "rpc_registry with context" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit(alloc);
 
-        var ctx = Ctx { .count = 0 };
+        var ctx = Ctx { .count = 0, .alloc = alloc };
 
         try registry.registerWithCtx("ctx.get", &ctx, Ctx.get, .{});
         try registry.registerWithCtx("ctx.fn0", &ctx, Ctx.fn0, .{});
@@ -436,12 +455,12 @@ test "rpc_registry with return struct value" {
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-            const parsed_cat1 = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-            defer parsed_cat1.deinit();
-            // std.debug.print("cat1: {any}\n", .{parsed_cat1.value});
-            try testing.expectEqualSlices(u8, parsed_cat1.value.cat_name, "cat1");
-            try testing.expectEqualSlices(u8, parsed_cat1.value.eye_color, "blue");
-            try testing.expectEqual(parsed_cat1.value.weight, 9);
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 9);
         }
 
     }
@@ -449,37 +468,108 @@ test "rpc_registry with return struct value" {
 }
 
 
-test "rpc_registry passing in a struct as a parameter" {
+test "rpc_registry passing in an ObjectMap as a parameter" {
     const alloc = gpa.allocator();
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit(alloc);
 
-        // try registry.register("fn_cat_add", fn_cat_add, .{});
+        try registry.register("fn_cat_objmap", fn_cat_objmap, .{});
 
-        // const cat2 = CatInfo { .cat_name = "cat2", .weight = 5.0, .eye_color = "brown" };
+        {
+            const cat2 = CatInfo { .cat_name = "cat2", .weight = 5.0, .eye_color = "brown" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_objmap", cat2, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
 
-        // {
-        //     const res_json = try zigjr.handleRequestToJson(alloc,
-        //         \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
-        //     , &registry) orelse "";
-        //     defer alloc.free(res_json);
-        //     // std.debug.print("response: {s}\n", .{res_json});
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
 
-        //     var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-        //     defer res_result.deinit();
-        //     // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-        //     const parsed_cat1 = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-        //     defer parsed_cat1.deinit();
-        //     // std.debug.print("cat1: {any}\n", .{parsed_cat1.value});
-        //     try testing.expectEqualSlices(u8, parsed_cat1.value.cat_name, "cat1");
-        //     try testing.expectEqualSlices(u8, parsed_cat1.value.eye_color, "blue");
-        //     try testing.expectEqual(parsed_cat1.value.weight, 9);
-        // }
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat2");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
+            try testing.expectEqual(parsed_cat.value.weight, 5.0);
+        }
 
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
+
+// test "rpc_registry passing in an ObjectMap Value as a parameter, with a context, parsing the Value to a struct" {
+//     const alloc = gpa.allocator();
+//     {
+//         var registry = rpc_reg.RpcRegistry.init(alloc);
+//         defer registry.deinit(alloc);
+
+//         var ctx = Ctx { .count = 0, .alloc = alloc };
+
+//         try registry.registerWithCtx("ctx.fn_cat_value_parse", &ctx, Ctx.fn_cat_value_parse, .{});
+
+//         {
+//             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
+//             const req_json = try zigjr.messages.toRequestJson(alloc, "ctx.fn_cat_objmap_parse", cat3, .{ .num = 1 });
+//             defer alloc.free(req_json);
+//             std.debug.print("request: {s}\n", .{req_json});
+
+//             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+//             defer alloc.free(res_json);
+//             std.debug.print("response: {s}\n", .{res_json});
+
+//             // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+//             // defer res_result.deinit();
+//             // // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+//             // const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+//             // defer parsed_cat.deinit();
+//             // // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+//             // try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+//             // try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+//             // try testing.expectEqual(parsed_cat.value.weight, 9);
+//         }
+
+//     }
+//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+// }
+
+
+// test "rpc_registry passing in a struct as a parameter" {
+//     const alloc = gpa.allocator();
+//     {
+//         var registry = rpc_reg.RpcRegistry.init(alloc);
+//         defer registry.deinit(alloc);
+
+//         // try registry.register("fn_cat_add_weight", fn_cat_add_weight, .{});
+
+//         // const cat2 = CatInfo { .cat_name = "cat2", .weight = 5.0, .eye_color = "brown" };
+
+//         // {
+//         //     const res_json = try zigjr.handleRequestToJson(alloc,
+//         //         \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
+//         //     , &registry) orelse "";
+//         //     defer alloc.free(res_json);
+//         //     // std.debug.print("response: {s}\n", .{res_json});
+
+//         //     var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+//         //     defer res_result.deinit();
+//         //     // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+//         //     const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+//         //     defer parsed_cat.deinit();
+//         //     // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+//         //     try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+//         //     try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+//         //     try testing.expectEqual(parsed_cat.value.weight, 9);
+//         // }
+
+//     }
+//     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+// }
+
 
 
 
