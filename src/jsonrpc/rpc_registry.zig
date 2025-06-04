@@ -58,6 +58,8 @@ pub const RpcRegistry = struct {
         self.handlers.deinit();
     }
 
+    // TODO: Need to register a 'free' handler to free the result.
+    // Call it after building the DispatchResult in invoke().
     pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype, opt: RegisterOptions) !void {
         const fn_info = getFnInfo(handler_fn);
         try validateHandler(fn_info, method, opt);
