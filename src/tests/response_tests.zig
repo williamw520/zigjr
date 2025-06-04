@@ -173,7 +173,7 @@ test "Response to a request of hello method" {
     {
         var response_buf = std.ArrayList(u8).init(alloc);
         defer response_buf.deinit();
-        _ = try zigjr.handleRequest(alloc,
+        _ = try zigjr.handleJsonRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
             , response_buf.writer(), HelloDispatcher);
         // std.debug.print("response: {s}\n", .{response_buf.items});
@@ -705,13 +705,13 @@ test "Dispatch on the response to a request of float add" {
     {
         var response_buf = std.ArrayList(u8).init(alloc);
         defer response_buf.deinit();
-        _ = try zigjr.handleRequest(alloc,
+        _ = try zigjr.handleJsonRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
             , response_buf.writer(), FloatCalcDispatcher);
         const res_json = response_buf.items;
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        try zigjr.handleResponse(alloc, res_json, struct {
+        try zigjr.handleJsonResponse(alloc, res_json, struct {
             pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
                 try testing.expectEqual(res.result.float, 3);
@@ -749,7 +749,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
 
         const non_exist_id = "xyz";
 
-        try zigjr.handleResponse(alloc, batch_res_json, struct {
+        try zigjr.handleJsonResponse(alloc, batch_res_json, struct {
             pub fn dispatch(_: Allocator, res: zigjr.RpcResponse) !void {
                 // std.debug.print("response: {any}\n", .{res});
                 if (res.id.eql(2)) {

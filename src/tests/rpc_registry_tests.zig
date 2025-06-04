@@ -119,6 +119,13 @@ fn fn_cat(name: []const u8, weight: f64, color: []const u8) CatInfo {
     };
 }
 
+fn fn_cat_add(cat: CatInfo) CatInfo {
+    return .{
+        .cat_name = cat.cat_name,
+        .weight = cat.weight + 1,
+        .eye_color = cat.eye_color,
+    };
+}
 
 
 fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
@@ -436,6 +443,39 @@ test "rpc_registry with return struct value" {
             try testing.expectEqualSlices(u8, parsed_cat1.value.eye_color, "blue");
             try testing.expectEqual(parsed_cat1.value.weight, 9);
         }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in a struct as a parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit(alloc);
+
+        // try registry.register("fn_cat_add", fn_cat_add, .{});
+
+        // const cat2 = CatInfo { .cat_name = "cat2", .weight = 5.0, .eye_color = "brown" };
+
+        // {
+        //     const res_json = try zigjr.handleRequestToJson(alloc,
+        //         \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
+        //     , &registry) orelse "";
+        //     defer alloc.free(res_json);
+        //     // std.debug.print("response: {s}\n", .{res_json});
+
+        //     var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+        //     defer res_result.deinit();
+        //     // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+        //     const parsed_cat1 = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+        //     defer parsed_cat1.deinit();
+        //     // std.debug.print("cat1: {any}\n", .{parsed_cat1.value});
+        //     try testing.expectEqualSlices(u8, parsed_cat1.value.cat_name, "cat1");
+        //     try testing.expectEqualSlices(u8, parsed_cat1.value.eye_color, "blue");
+        //     try testing.expectEqual(parsed_cat1.value.weight, 9);
+        // }
 
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});

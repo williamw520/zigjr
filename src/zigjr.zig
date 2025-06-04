@@ -26,10 +26,10 @@ pub const RpcResponseMessage = response.RpcResponseMessage;
 pub const RpcResponse = response.RpcResponse;
 pub const RpcResponseError = response.RpcResponseError;
 
-pub const handleRequest = handler.handleRequest;
+pub const handleJsonRequest = handler.handleJsonRequest;
 pub const handleRequestToJson = handler.handleRequestToJson;
 pub const handleRequestToResponse = handler.handleRequestToResponse;
-pub const handleResponse = handler.handleResponse;
+pub const handleJsonResponse = handler.handleJsonResponse;
 pub const handleRpcRequest = handler.handleRpcRequest;
 pub const handleRpcRequests = handler.handleRpcRequests;
 pub const DispatchResult = handler.DispatchResult;
@@ -43,13 +43,13 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
-    // _ = @import("tests/response_tests.zig");
-    // _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/registry_tests.zig");
+    _ = @import("tests/request_tests.zig");
+    _ = @import("tests/response_tests.zig");
+    _ = @import("tests/stream_tests.zig");
+    _ = @import("tests/registry_tests.zig");
     _ = @import("tests/rpc_registry_tests.zig");
-    // _ = @import("tests/json_tests.zig");
-    // _ = @import("tests/tests.zig");
+    _ = @import("tests/json_tests.zig");
+    _ = @import("tests/tests.zig");
 }
 
 

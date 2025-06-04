@@ -63,7 +63,7 @@ pub const DelimiterStream = struct {
 
             self.options.logger("receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try handler.handleRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try output_writer.writeAll(response_buf.items);
                 try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
@@ -92,9 +92,9 @@ pub const DelimiterStream = struct {
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger("receive response", response_json);
-            handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
+            handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
-                stderr.print("Error in handleResponse(). {any}", .{err}) catch {};
+                stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
             };
         }
     }
@@ -171,7 +171,7 @@ pub const ContentLengthStream = struct {
 
             self.options.logger("receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try handler.handleRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
                 self.options.logger("return response", response_buf.items);
@@ -197,9 +197,9 @@ pub const ContentLengthStream = struct {
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger("receive response", response_json);
-            handler.handleResponse(self.alloc, response_json, dispatcher) catch |err| {
+            handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
-                stderr.print("Error in handleResponse(). {any}", .{err}) catch {};
+                stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
             };
         }
     }
