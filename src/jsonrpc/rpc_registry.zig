@@ -65,19 +65,20 @@ pub const RpcRegistry = struct {
     // TODO: Need to register a 'free' handler to free the result.
     // Call it after building the DispatchResult in invoke().
     pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype, opt: RegisterOptions) !void {
-        const fn_info = getFnInfo(handler_fn);
-        try validateHandler(fn_info, method, opt);
         const ctx_type = void;
-        const h = try makeRpcHandler(handler_fn, fn_info, ctx_type, self.alloc);
+        const hinfo = getHandlerInfo(handler_fn, ctx_type);
+        // @compileLog(hinfo);
+        try validateHandler(hinfo.fn_info, method, opt);
+        const h = try makeRpcHandler(handler_fn, hinfo, self.alloc);
         try self.handlers.put(method, h);
     }
 
     pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype,
                            opt: RegisterOptions) !void {
-        const fn_info = getFnInfo(handler_fn);
         const ctx_type = @TypeOf(context);
-        try validateHandler(fn_info, method, opt);
-        var h = try makeRpcHandler(handler_fn, fn_info, ctx_type, self.alloc);
+        const hinfo = getHandlerInfo(handler_fn, ctx_type);
+        try validateHandler(hinfo.fn_info, method, opt);
+        var h = try makeRpcHandler(handler_fn, hinfo, self.alloc);
         h.setCtx(context);
         try self.handlers.put(method, h);
     }
@@ -150,16 +151,7 @@ const RpcHandler = struct {
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_type: type,
-                  backing_alloc: Allocator) !RpcHandler {
-    const param_ttype = ParamTupleType(fn_info.params);
-    const is_void = isVoid(fn_info.return_type);
-    const has_err = isErrorUnion(fn_info.return_type);
-    const has_ctx = ctx_type != void;
-    const is_objmap = isParamObjMap(fn_info.params, has_ctx);
-    const is_value  = isParamValue(fn_info.params, has_ctx);
-    // @compileLog(is_objmap);
-
+fn makeRpcHandler(comptime F: anytype, hinfo: HandlerInfo, backing_alloc: Allocator) !RpcHandler {
     const arena_ptr = try backing_alloc.create(ArenaAllocator);
     arena_ptr.* = ArenaAllocator.init(backing_alloc);
 
@@ -170,15 +162,11 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
-                if (is_value) {
-                    return callFnOnValue(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                         ctx_type, alloc, ctx, json_args);
-                } else if (is_objmap) {
+                if (hinfo.is_value) {
+                    return callFnOnValue(F, hinfo, alloc, ctx, json_args);
+                } else if (hinfo.is_objmap) {
                     switch (json_args) {
-                        .object => |objmap| {
-                            return callFnOnObjMap(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                                  ctx_type, alloc, ctx, objmap);
-                        },
+                        .object => |objmap| return callFnOnObjMap(F, hinfo, alloc, ctx, objmap),
                         else    => {
                             std.debug.print("Expect ObjectMap but get unexpected JSON params: {any}\n", .{json_args});
                             return DispatchErrors.InvalidParams;
@@ -186,15 +174,8 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
                     }
                 } else {
                     switch (json_args) {
-                        .null   => {
-                            const array = Array.init(alloc);
-                            return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                                 ctx_type, alloc, ctx, array);
-                        },
-                        .array  => |array| {
-                            return callFnOnArray(F, fn_info, param_ttype, has_ctx, has_err, is_void,
-                                                 ctx_type, alloc, ctx, array);
-                        },
+                        .null   => return callFnOnArray(F, hinfo, alloc, ctx, Array.init(alloc)),
+                        .array  => |array| return callFnOnArray(F, hinfo, alloc, ctx, array),
                         else    => {
                             std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
                             return DispatchErrors.InvalidParams;
@@ -221,7 +202,76 @@ fn validateHandler(comptime fn_info: Type.Fn, method: []const u8, opt: RegisterO
     }
 }
 
-// Note: these functions must be inline to force evaluation in comptime.
+// Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
+
+// This is a comptime struct capturing the needed comptime info to do call the handler.
+const HandlerInfo = struct {
+    ctx_type:       type,
+    fn_info:        Type.Fn,
+    params:         []const Type.Fn.Param,
+    tuple_type:     type,
+    has_ctx:        bool,
+    has_alloc:      bool,
+    alloc_idx:      usize,
+    user_idx:       usize,
+    is_value:       bool,
+    is_objmap:      bool,
+    is_array:       bool,
+    has_err:        bool,
+    is_void:        bool,
+};
+
+inline fn getHandlerInfo(comptime handler_fn: anytype, comptime ctx_type: type) HandlerInfo {
+    const fn_info = getFnInfo(handler_fn);
+    const params = fn_info.params;
+    const has_ctx = ctx_type != void;
+    const after_ctx_idx = if (has_ctx) 1 else 0;            // index of the parameter after context;
+    const alloc_idx = after_ctx_idx;                        // index of the allocator parameter.
+    const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
+    const user_idx = alloc_idx + if (has_alloc) 1 else 0;   // index of the first user parameter.
+
+    return .{
+        .ctx_type   = ctx_type,
+        .fn_info    = fn_info,
+        .params     = params,
+        .tuple_type = ParamTupleType(params),
+        .has_ctx    = has_ctx,
+        .has_alloc  = has_alloc,
+        .alloc_idx  = alloc_idx,
+        .user_idx   = user_idx,
+        .is_value   = params.len > user_idx and params[user_idx].type.? == std.json.Value,
+        .is_objmap  = params.len > user_idx and params[user_idx].type.? == std.json.ObjectMap,
+        .is_array   = params.len > user_idx and params[user_idx].type.? == std.json.Array,
+        .has_err    = isErrorUnion(fn_info.return_type),
+        .is_void    = isVoid(fn_info.return_type),
+    };
+}
+
+/// Make a tuple type from the parameters of a function.
+/// Each parameter becomes a field of the tuple.
+inline fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
+    comptime var fields: [params.len]std.builtin.Type.StructField = undefined;
+    inline for (params, 0..)|param, i| {
+        fields[i] = .{
+            .name = std.fmt.comptimePrint("{d}", .{i}),
+            .type = param.type orelse null,
+            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
+            .default_value_ptr = null,
+            .alignment = 0,
+        };
+    }
+
+    // Create the tuple type. A tuple is a struct the is_tuple set.
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = fields[0..],
+            .decls = &.{},
+            .is_tuple = true,
+        },
+    });
+}
+
 inline fn getFnInfo(comptime handler_fn: anytype) Type.Fn {
     const type_info: Type = @typeInfo(@TypeOf(handler_fn));
     return switch (type_info) {
@@ -255,28 +305,27 @@ inline fn isVoid(comptime T: ?type) bool {
     }
 }
 
-fn callFnOnValue(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
-                 comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
                  alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
 
-    const extra_param = if (has_ctx) 1 else 0;
-    if (fn_info.params.len != 1 + extra_param)
+    const extra_param = if (hinfo.has_ctx) 1 else 0;
+    if (hinfo.fn_info.params.len != 1 + extra_param)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
-    const args: param_ttype = if (has_ctx)
-        valueToTupleCtx(param_ttype, json_args, ctx.?, ctx_type)
+    const args: hinfo.tuple_type = if (hinfo.has_ctx)
+        valueToTupleCtx(hinfo.tuple_type, json_args, ctx.?, hinfo.ctx_type)
     else
-        valueToTuple(param_ttype, json_args);
+        valueToTuple(hinfo.tuple_type, json_args);
 
-    if (is_void) {
-        if (has_err)
+    if (hinfo.is_void) {
+        if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
         return DispatchResult.asNone();
     } else {
-        const res = if (has_err)
+        const res = if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
@@ -284,28 +333,27 @@ fn callFnOnValue(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_
     }
 }
 
-fn callFnOnObjMap(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
-                  comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+fn callFnOnObjMap(comptime F: anytype, comptime hinfo: HandlerInfo,
                   alloc: Allocator, ctx: ?*anyopaque, objmap: ObjectMap) anyerror!DispatchResult {
 
-    const extra_param = if (has_ctx) 1 else 0;
-    if (fn_info.params.len != 1 + extra_param)
+    const extra_param = if (hinfo.has_ctx) 1 else 0;
+    if (hinfo.fn_info.params.len != 1 + extra_param)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
-    const args: param_ttype = if (has_ctx)
-        objmapToTupleCtx(param_ttype, objmap, ctx.?, ctx_type)
+    const args: hinfo.tuple_type = if (hinfo.has_ctx)
+        objmapToTupleCtx(hinfo.tuple_type, objmap, ctx.?, hinfo.ctx_type)
     else
-        objmapToTuple(param_ttype, objmap);
+        objmapToTuple(hinfo.tuple_type, objmap);
 
-    if (is_void) {
-        if (has_err)
+    if (hinfo.is_void) {
+        if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
         return DispatchResult.asNone();
     } else {
-        const res = if (has_err)
+        const res = if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
@@ -313,77 +361,33 @@ fn callFnOnObjMap(comptime F: anytype, comptime fn_info: Type.Fn, comptime param
     }
 }
 
-fn callFnOnArray(comptime F: anytype, comptime fn_info: Type.Fn, comptime param_ttype: type, 
-                 comptime has_ctx: bool, comptime has_err: bool, comptime is_void: bool, comptime ctx_type: type,
+fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
                  alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
 
-    const extra_param = if (has_ctx) 1 else 0;
-    if (fn_info.params.len != array.items.len + extra_param)
+    const extra_param = if (hinfo.has_ctx) 1 else 0;
+    if (hinfo.fn_info.params.len != array.items.len + extra_param)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
-    const args: param_ttype = if (has_ctx)
-        try valuesToTupleCtx(param_ttype, array, ctx.?, ctx_type)
+    const args: hinfo.tuple_type = if (hinfo.has_ctx)
+        try valuesToTupleCtx(hinfo.tuple_type, array, ctx.?, hinfo.ctx_type)
     else
-        try valuesToTuple(param_ttype, array);
+        try valuesToTuple(hinfo.tuple_type, array);
 
-    if (is_void) {
-        if (has_err)
+    if (hinfo.is_void) {
+        if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
         return DispatchResult.asNone();
     } else {
-        const res = if (has_err)
+        const res = if (hinfo.has_err)
             try @call(.auto, F, args)
         else
             @call(.auto, F, args);
         return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
     }
 }
-
-/// Make a tuple type from the parameters of a function.
-/// Each parameter becomes a field of the tuple.
-inline fn ParamTupleType(comptime params: []const Type.Fn.Param) type {
-    comptime var fields: [params.len]std.builtin.Type.StructField = undefined;
-    inline for (params, 0..)|param, i| {
-        fields[i] = .{
-            .name = std.fmt.comptimePrint("{d}", .{i}),
-            .type = param.type orelse null,
-            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
-            .default_value_ptr = null,
-            .alignment = 0,
-        };
-    }
-
-    // Create the tuple type. A tuple is a struct the is_tuple set.
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .fields = fields[0..],
-            .decls = &.{},
-            .is_tuple = true,
-        },
-    });
-}
-
-inline fn isParamObjMap(comptime params: []const Type.Fn.Param, comptime has_ctx: bool) bool {
-    // @compileLog("param[0].type == ObjectMap?", params[0].type.? == ObjectMap, params[0].type);
-    if (has_ctx) {
-        return params.len > 1 and params[1].type.? == std.json.ObjectMap;
-    } else {
-        return params.len > 0 and params[0].type.? == std.json.ObjectMap;
-    }
-}    
-
-inline fn isParamValue(comptime params: []const Type.Fn.Param, comptime has_ctx: bool) bool {
-    // @compileLog("param[0].type == ObjectMap?", params[0].type.? == Value, params[0].type);
-    if (has_ctx) {
-        return params.len > 1 and params[1].type.? == std.json.Value;
-    } else {
-        return params.len > 0 and params[0].type.? == std.json.Value;
-    }
-}    
 
 fn valueToTuple(comptime tuple_type: type, value: Value) tuple_type {
     var tuple: tuple_type = undefined;
