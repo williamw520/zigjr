@@ -36,7 +36,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn free(_: Allocator, dresult: DispatchResult) void {
+    pub fn dispatchEnd(_: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         // All result data are constant strings.  Nothing to free.
         switch (dresult) {
             .none => {},
@@ -81,7 +81,7 @@ const IntCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+    pub fn dispatchEnd(alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => alloc.free(dresult.result),
@@ -132,7 +132,7 @@ const FloatCalcDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+    pub fn dispatchEnd(alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .result => alloc.free(dresult.result),
             .err => {},
@@ -159,9 +159,9 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
-        switch (dr) {
-            .result => alloc.free(dr.result),
+    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+        switch (dresult) {
+            .result => alloc.free(dresult.result),
             else => {},
         }
     }
@@ -235,7 +235,7 @@ test "Handle a request with anonymous dispatcher struct" {
             pub fn dispatch(_: Allocator, _: RpcRequest) !DispatchResult {
                 return .{ .result = "\"hello back\"" };
             }
-            pub fn free(_: Allocator, dresult: DispatchResult) void {
+            pub fn dispatchEnd(_: Allocator, _: RpcRequest, dresult: DispatchResult) void {
                 switch (dresult) {
                     else => {}
                 }

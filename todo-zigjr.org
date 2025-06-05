@@ -20,12 +20,13 @@ TODOs
 * DONE Message logging.
 * DONE Rename run() to dispatch() on dispatcher.
 * DONE Compact JSON output.
-* TODO Return DispatchResult for the Callable.invocation.
-* TODO Registration of function with arbitrary parameters.
-* TODO Invoke function with arbitrary parameters.
-* TODO Registration of function with arbitrary return type.
-* TODO Capture the function return value and convert to JSON result.
-* TODO Convert JSON to native values.
+* DONE Return DispatchResult for the Callable.invocation.
+* DONE Registration of function with arbitrary parameters.
+* DONE Invoke function with arbitrary parameters.
+* DONE Registration of function with arbitrary return type.
+* DONE Capture the function return value and convert to JSON result.
+* DONE Convert JSON to native values.
+* DONE Use ArenaAllocator for each request handling invocation to avoid complicated cleanup.
 * TODO Check the possible usage of ArrayList.toOwnedSlice().
 * TODO Add dispatching registry.
 * TODO Add CLI on running request and response and on streaming.

@@ -10,6 +10,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Type = std.builtin.Type;
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const StringHashMap = std.hash_map.StringHashMap;
 const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
@@ -32,6 +33,7 @@ const JrErrors = errors.JrErrors;
 const ValueAs = @import("jsonutil.zig").ValueAs;
 
 
+// TODO: remove
 pub const RegisterOptions = struct {
     context: ?*anyopaque = null,
     raw_params: bool = false,
@@ -40,20 +42,22 @@ pub const RegisterOptions = struct {
 pub const RpcRegistry = struct {
     const Self = @This();
 
+    alloc:      Allocator,
     handlers:   StringHashMap(RpcHandler),
 
     pub fn init(alloc: Allocator) Self {
         return .{
+            .alloc = alloc,
             .handlers = StringHashMap(RpcHandler).init(alloc),
         };
     }
 
-    pub fn deinit(self: *Self, alloc: Allocator) void {
+    pub fn deinit(self: *Self) void {
         // Clean up any contexts owned by the RpcHandler entries
         var it = self.handlers.iterator();
         while (it.next()) |entry| {
-            const rpc_handler = entry.value_ptr;
-            rpc_handler.deinit(alloc);
+            var rpc_handler = entry.value_ptr;
+            rpc_handler.deinit();
         }
         self.handlers.deinit();
     }
@@ -64,7 +68,7 @@ pub const RpcRegistry = struct {
         const fn_info = getFnInfo(handler_fn);
         try validateHandler(fn_info, method, opt);
         const ctx_type = void;
-        const h = makeRpcHandler(handler_fn, fn_info, ctx_type);
+        const h = try makeRpcHandler(handler_fn, fn_info, ctx_type, self.alloc);
         try self.handlers.put(method, h);
     }
 
@@ -73,7 +77,7 @@ pub const RpcRegistry = struct {
         const fn_info = getFnInfo(handler_fn);
         const ctx_type = @TypeOf(context);
         try validateHandler(fn_info, method, opt);
-        var h = makeRpcHandler(handler_fn, fn_info, ctx_type);
+        var h = try makeRpcHandler(handler_fn, fn_info, ctx_type, self.alloc);
         h.setCtx(context);
         try self.handlers.put(method, h);
     }
@@ -85,21 +89,17 @@ pub const RpcRegistry = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    pub fn dispatch(self: *Self, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        const h = self.handlers.get(req.method) orelse return DispatchErrors.MethodNotFound;
-        return h.invoke(alloc, req.params);
+    pub fn dispatch(self: *Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        var h = self.handlers.getPtr(req.method) orelse return DispatchErrors.MethodNotFound;
+        return h.invoke(req.params);
     }
 
-    // TODO: rename free() to freeResult()
-    pub fn free(_: *Self, alloc: Allocator, dresult: DispatchResult) void {
-        switch (dresult) {
-            .none => {},
-            .result => |json_result| alloc.free(json_result),
-            .result_lit => {},
-            .err => |err| {
-                if (err.msg_alloc) alloc.free(err.msg);
-                if (err.data)|data| alloc.free(data);
-            },
+    pub fn dispatchEnd(self: *Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+        _=alloc;
+        _=dresult;
+
+        if (self.handlers.getPtr(req.method))|h| {
+            h.invokeEnd();
         }
     }
 
@@ -123,7 +123,8 @@ pub const RegistrationErrors = error {
 // Uniform callback object that can be stored in the hash map.
 // makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 const RpcHandler = struct {
-    // Poorman's pointer with an one-entry vtable.
+    arena: *ArenaAllocator,     // arena needs to be a ptr to the struct to survive copying.
+    arena_alloc: Allocator,
     context: ?*anyopaque,
     call: *const fn(alloc: Allocator, context: ?*anyopaque, json_args: Value) anyerror!DispatchResult,
 
@@ -131,18 +132,26 @@ const RpcHandler = struct {
         self.context = context;
     }
 
-    pub fn invoke(self: RpcHandler, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
-        return self.call(alloc, self.context, json_args);
+    fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
+        return self.call(self.arena_alloc, self.context, json_args);
     }
 
-    pub fn deinit(self: RpcHandler, allocator: Allocator) void {
+    fn invokeEnd(self: *RpcHandler) void {
+        // Reset arena memory at the end of each invocation.
+        _ = self.arena.reset(.{ .retain_with_limit = 1024 });
+    }
+
+    fn deinit(self: *RpcHandler) void {
         // TODO: deinit on context.
-        _=self;
-        _=allocator;
+
+        self.arena.deinit();
+        const backing_alloc = self.arena.child_allocator;
+        backing_alloc.destroy(self.arena);
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_type: type) RpcHandler {
+fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_type: type,
+                  backing_alloc: Allocator) !RpcHandler {
     const param_ttype = ParamTupleType(fn_info.params);
     const is_void = isVoid(fn_info.return_type);
     const has_err = isErrorUnion(fn_info.return_type);
@@ -151,7 +160,12 @@ fn makeRpcHandler(comptime F: anytype, comptime fn_info: Type.Fn, comptime ctx_t
     const is_value  = isParamValue(fn_info.params, has_ctx);
     // @compileLog(is_objmap);
 
+    const arena_ptr = try backing_alloc.create(ArenaAllocator);
+    arena_ptr.* = ArenaAllocator.init(backing_alloc);
+
     return .{
+        .arena = arena_ptr,
+        .arena_alloc = arena_ptr.allocator(),
         .context = null,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.

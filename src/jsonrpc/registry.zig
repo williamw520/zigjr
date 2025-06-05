@@ -63,18 +63,6 @@ pub const Registry = struct {
         return self.handlers.get(method) != null;
     }
 
-    pub fn free(_: *Self, alloc: Allocator, dresult: DispatchResult) void {
-        switch (dresult) {
-            .none => {},
-            .result => |json_result| alloc.free(json_result),
-            .result_lit => {},
-            .err => |err| {
-                if (err.msg_alloc) alloc.free(err.msg);
-                if (err.data)|data| alloc.free(data);
-            },
-        }
-    }
-
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
@@ -97,6 +85,18 @@ pub const Registry = struct {
                 }
             },
             else    => return DispatchErrors.InvalidParams,
+        }
+    }
+
+    pub fn dispatchEnd(_: *Self, alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+        switch (dresult) {
+            .none => {},
+            .result => |json_result| alloc.free(json_result),
+            .result_lit => {},
+            .err => |err| {
+                if (err.msg_alloc) alloc.free(err.msg);
+                if (err.data)|data| alloc.free(data);
+            },
         }
     }
 

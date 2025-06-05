@@ -32,7 +32,7 @@ const EchoDispatcher = struct {
         };
     }
 
-    pub fn free(alloc: Allocator, dresult: DispatchResult) void {
+    pub fn dispatchEnd(alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => |json| alloc.free(json),
@@ -59,9 +59,9 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn free(_: *@This(), alloc: Allocator, dr: DispatchResult) void {
-        switch (dr) {
-            .result => alloc.free(dr.result),
+    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+        switch (dresult) {
+            .result => alloc.free(dresult.result),
             else => {},
         }
     }

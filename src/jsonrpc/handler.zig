@@ -194,7 +194,7 @@ pub fn handleJsonResponse(alloc: Allocator, response_json: ?[]const u8, dispatch
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
 pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
-                        prefix: []const u8, suffix: []const u8, dispatcher: anytype) AllocError!bool {
+                        prefix: []const u8, suffix: []const u8, req_dispatcher: anytype) AllocError!bool {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
         try messages.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
@@ -202,19 +202,19 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
     }
 
     const dresult: DispatchResult = call: {
-        break :call dispatcher.dispatch(alloc, req) catch |err| {
+        break :call req_dispatcher.dispatch(alloc, req) catch |err| {
             // Turn dispatching error into DispatchResult.err.
             // Handle errors here so dispatchers don't have to worry about error handling.
             break :call DispatchResult.withAnyErr(err);
         };
     };
+    defer req_dispatcher.dispatchEnd(alloc, req, dresult);
 
     switch (dresult) {
         .none => {
             return false;   // notification request has no result.
         },
         .result => |json| {
-            defer dispatcher.free(alloc, dresult);
             if (req.id.isNotification()) {
                 return false;
             }
@@ -233,7 +233,6 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
             return true;
         },
         .err => |err| {
-            defer dispatcher.free(alloc, dresult);
             try writer.writeAll(prefix);
             if (err.data)|data_json| {
                 try messages.writeErrorDataResponseJson(req.id, err.code, err.msg, data_json, writer);
