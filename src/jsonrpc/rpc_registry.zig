@@ -62,24 +62,23 @@ pub const RpcRegistry = struct {
         self.handlers.deinit();
     }
 
-    // TODO: Need to register a 'free' handler to free the result.
-    // Call it after building the DispatchResult in invoke().
     pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype, opt: RegisterOptions) !void {
+        const fn_info = getFnInfo(handler_fn);
+        try validateHandler(fn_info, method, opt);
         const ctx_type = void;
-        const hinfo = getHandlerInfo(handler_fn, ctx_type);
+        const hinfo = getHandlerInfo(fn_info, ctx_type);
         // @compileLog(hinfo);
-        try validateHandler(hinfo.fn_info, method, opt);
-        const h = try makeRpcHandler(handler_fn, hinfo, self.alloc);
+        const h = try makeRpcHandler(handler_fn, null, hinfo, self.alloc);
         try self.handlers.put(method, h);
     }
 
     pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype,
                            opt: RegisterOptions) !void {
+        const fn_info = getFnInfo(handler_fn);
+        try validateHandler(fn_info, method, opt);
         const ctx_type = @TypeOf(context);
-        const hinfo = getHandlerInfo(handler_fn, ctx_type);
-        try validateHandler(hinfo.fn_info, method, opt);
-        var h = try makeRpcHandler(handler_fn, hinfo, self.alloc);
-        h.setCtx(context);
+        const hinfo = getHandlerInfo(fn_info, ctx_type);
+        const h = try makeRpcHandler(handler_fn, context, hinfo, self.alloc);
         try self.handlers.put(method, h);
     }
 
@@ -129,10 +128,6 @@ const RpcHandler = struct {
     context: ?*anyopaque,
     call: *const fn(alloc: Allocator, context: ?*anyopaque, json_args: Value) anyerror!DispatchResult,
 
-    fn setCtx(self: *RpcHandler, context: ?*anyopaque) void {
-        self.context = context;
-    }
-
     fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
         return self.call(self.arena_alloc, self.context, json_args);
     }
@@ -151,14 +146,14 @@ const RpcHandler = struct {
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, hinfo: HandlerInfo, backing_alloc: Allocator) !RpcHandler {
+fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, backing_alloc: Allocator) !RpcHandler {
     const arena_ptr = try backing_alloc.create(ArenaAllocator);
     arena_ptr.* = ArenaAllocator.init(backing_alloc);
 
     return .{
         .arena = arena_ptr,
         .arena_alloc = arena_ptr.allocator(),
-        .context = null,
+        .context = context,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
@@ -221,8 +216,7 @@ const HandlerInfo = struct {
     is_void:        bool,
 };
 
-inline fn getHandlerInfo(comptime handler_fn: anytype, comptime ctx_type: type) HandlerInfo {
-    const fn_info = getFnInfo(handler_fn);
+inline fn getHandlerInfo(comptime fn_info: Type.Fn, comptime ctx_type: type) HandlerInfo {
     const params = fn_info.params;
     const has_ctx = ctx_type != void;
     const after_ctx_idx = if (has_ctx) 1 else 0;            // index of the parameter after context;
@@ -231,8 +225,8 @@ inline fn getHandlerInfo(comptime handler_fn: anytype, comptime ctx_type: type) 
     const user_idx = alloc_idx + if (has_alloc) 1 else 0;   // index of the first user parameter.
 
     return .{
-        .ctx_type   = ctx_type,
         .fn_info    = fn_info,
+        .ctx_type   = ctx_type,
         .params     = params,
         .tuple_type = ParamTupleType(params),
         .has_ctx    = has_ctx,
@@ -307,16 +301,14 @@ inline fn isVoid(comptime T: ?type) bool {
 
 fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
                  alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
-
-    const extra_param = if (hinfo.has_ctx) 1 else 0;
-    if (hinfo.fn_info.params.len != 1 + extra_param)
+    if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
     const args: hinfo.tuple_type = if (hinfo.has_ctx)
-        valueToTupleCtx(hinfo.tuple_type, json_args, ctx.?, hinfo.ctx_type)
+        valueToTupleCtx(hinfo, alloc, json_args, ctx.?, hinfo.ctx_type)
     else
-        valueToTuple(hinfo.tuple_type, json_args);
+        valueToTuple(hinfo, alloc, json_args);
 
     if (hinfo.is_void) {
         if (hinfo.has_err)
@@ -364,15 +356,14 @@ fn callFnOnObjMap(comptime F: anytype, comptime hinfo: HandlerInfo,
 fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
                  alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
 
-    const extra_param = if (hinfo.has_ctx) 1 else 0;
-    if (hinfo.fn_info.params.len != array.items.len + extra_param)
+    if (hinfo.params.len != hinfo.user_idx + array.items.len)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
     const args: hinfo.tuple_type = if (hinfo.has_ctx)
-        try valuesToTupleCtx(hinfo.tuple_type, array, ctx.?, hinfo.ctx_type)
+        try valuesToTupleCtx(hinfo, alloc, array, ctx.?, hinfo.ctx_type)
     else
-        try valuesToTuple(hinfo.tuple_type, array);
+        try valuesToTuple(hinfo, alloc, array);
 
     if (hinfo.is_void) {
         if (hinfo.has_err)
@@ -389,19 +380,29 @@ fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
     }
 }
 
-fn valueToTuple(comptime tuple_type: type, value: Value) tuple_type {
-    var tuple: tuple_type = undefined;
-    @field(tuple, "0") = value;
+fn valueToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, value: Value) hinfo.tuple_type {
+    var tuple: hinfo.tuple_type = undefined;
+    if (hinfo.has_alloc) {
+        @field(tuple, "0") = alloc;
+        @field(tuple, "1") = value;
+    } else {
+        @field(tuple, "0") = value;
+    }
     return tuple;
 }
 
-fn valueToTupleCtx(comptime tuple_type: type, value: Value,
-                   ctx: *anyopaque, comptime ctx_type: type) tuple_type {
-    var tuple: tuple_type = undefined;
+fn valueToTupleCtx(comptime hinfo: HandlerInfo, alloc: Allocator, value: Value,
+                   ctx: *anyopaque, comptime ctx_type: type) hinfo.tuple_type {
+    var tuple: hinfo.tuple_type = undefined;
     const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
-
-    @field(tuple, "0") = ctx_ptr;
-    @field(tuple, "1") = value;
+    if (hinfo.has_alloc) {
+        @field(tuple, "0") = ctx_ptr;
+        @field(tuple, "1") = alloc;
+        @field(tuple, "2") = value;
+    } else {
+        @field(tuple, "0") = ctx_ptr;
+        @field(tuple, "1") = value;
+    }
     return tuple;
 }
 
@@ -421,29 +422,38 @@ fn objmapToTupleCtx(comptime tuple_type: type, objmap: ObjectMap,
     return tuple;
 }
 
-fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
-    const tt_info = @typeInfo(tuple_type).@"struct";
-    var tuple: tuple_type = undefined;
+fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array) !hinfo.tuple_type {
+    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
+    var tuple: hinfo.tuple_type = undefined;
 
-    inline for (0..tt_info.fields.len)|i| {
+    if (hinfo.has_alloc) {
+        @field(tuple, "0") = alloc;
+    }
+    const start_idx = hinfo.user_idx;
+    inline for (start_idx..tt_info.fields.len)|i| {
         const field = tt_info.fields[i];
-        const value = values.items[i];
+        const value = values.items[i - start_idx];
         @field(tuple, field.name) = try ValueAs(field.type).from(value);
     }
     return tuple;
 }
 
-fn valuesToTupleCtx(comptime tuple_type: type, values: Array,
-                    ctx: *anyopaque, comptime ctx_type: type) !tuple_type {
-    const tt_info = @typeInfo(tuple_type).@"struct";
-    var tuple: tuple_type = undefined;
-    // const ctx_ptr: ctx_type = @ptrCast(@alignCast(@alignOf(ctx_type)), ));
+fn valuesToTupleCtx(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array,
+                    ctx: *anyopaque, comptime ctx_type: type) !hinfo.tuple_type {
+    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
+    var tuple: hinfo.tuple_type = undefined;
     const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
 
-    @field(tuple, "0") = ctx_ptr;
-    inline for (1..tt_info.fields.len)|i| {
+    if (hinfo.has_alloc) {
+        @field(tuple, "0") = ctx_ptr;
+        @field(tuple, "1") = alloc;
+    } else {
+        @field(tuple, "0") = ctx_ptr;
+    }
+    const start_idx = hinfo.user_idx;
+    inline for (start_idx..tt_info.fields.len)|i| {
         const field = tt_info.fields[i];
-        const value = values.items[i - 1];
+        const value = values.items[i - start_idx];
         @field(tuple, field.name) = try ValueAs(field.type).from(value);
     }
     return tuple;
