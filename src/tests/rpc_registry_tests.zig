@@ -24,8 +24,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 // Test handler registration.
 
-// TODO: add fn taking in struct,
-// add fn taking Value, Array, ObjectMap.
+// TODO: add fn taking in struct
 
 fn fn0() void {
     std.debug.print("fn0() called\n", .{});
@@ -142,14 +141,6 @@ fn fn_cat(name: []const u8, weight: f64, color: []const u8) CatInfo {
     };
 }
 
-fn fn_cat_objmap(obj: std.json.ObjectMap) CatInfo {
-    return .{
-        .cat_name = obj.get("cat_name").?.string,
-        .weight = obj.get("weight").?.float,
-        .eye_color = obj.get("eye_color").?.string,
-    };
-}
-
 fn fn_cat_value(json_value: std.json.Value) CatInfo {
     // std.debug.print("fn_cat_value() called\n", .{});
     return .{
@@ -178,44 +169,11 @@ fn fn_cat_add_weight(cat: CatInfo) CatInfo {
 }
 
 
-
-fn funArray(alloc: Allocator, array: Array) anyerror![]const u8 {
-    const str = try allocPrint(alloc, "Hello {}", .{array});
-    defer alloc.free(str);
-    return std.json.stringifyAlloc(alloc, str, .{});
-}
-
-fn addArray(alloc: Allocator, array: Array) anyerror![]const u8 {
-    var sum: isize = 0;
-    for (array.items) |value| {
-        sum += value.integer;
-    }
-    return std.json.stringifyAlloc(alloc, sum, .{});
-}
-
 const MyErrors = error {
     MissingName,
 };
 
-fn funObj(alloc: Allocator, map: ObjectMap) anyerror![]const u8 {
-    if (map.get("name")) |name| {
-        const str = try allocPrint(alloc, "Hello {s}", .{name.string});
-        defer alloc.free(str);
-        return std.json.stringifyAlloc(alloc, str, .{});
-    } else {
-        return MyErrors.MissingName;
-    }
-}
 
-fn funCat(alloc: Allocator, obj: Value) anyerror![]const u8 {
-    const parsed = try std.json.parseFromValue(CatInfo, alloc, obj, .{});
-    defer parsed.deinit();
-    const cat_info = parsed.value;
-    // std.debug.print("cat_info: {any}\n", .{cat_info});
-    return std.json.stringifyAlloc(alloc, cat_info, .{});
-}
-
-    
 fn fun_too_many_params(_: Allocator, p1: Value, p2: Value, p3: Value, p4: Value, p5: Value,
                        p6: Value, p7: Value, p8: Value, p9: Value, p10: Value) anyerror![]const u8 {
     _=p1; _=p2; _=p3; _=p4; _=p5; _=p6; _=p7; _=p8; _=p9; _=p10;
@@ -514,40 +472,6 @@ test "rpc_registry with return struct value" {
             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
             try testing.expectEqual(parsed_cat.value.weight, 9);
-        }
-
-    }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
-}
-
-
-test "rpc_registry passing in an ObjectMap as a parameter" {
-    const alloc = gpa.allocator();
-    {
-        var registry = rpc_reg.RpcRegistry.init(alloc);
-        defer registry.deinit();
-
-        try registry.register("fn_cat_objmap", fn_cat_objmap, .{});
-
-        {
-            const cat2 = CatInfo { .cat_name = "cat2", .weight = 5.0, .eye_color = "brown" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_objmap", cat2, .{ .num = 1 });
-            defer alloc.free(req_json);
-            // std.debug.print("request: {s}\n", .{req_json});
-
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
-            defer alloc.free(res_json);
-            // std.debug.print("response: {s}\n", .{res_json});
-
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-            defer res_result.deinit();
-            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-            defer parsed_cat.deinit();
-            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
-            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat2");
-            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
-            try testing.expectEqual(parsed_cat.value.weight, 5.0);
         }
 
     }
