@@ -158,11 +158,11 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
                 if (hinfo.is_value) {
-                    return callFnOnValue(F, hinfo, alloc, ctx, json_args);
+                    return callFnOnValue(F, hinfo, ctx, alloc, json_args);
                 } else {
                     switch (json_args) {
-                        .null   => return callFnOnArray(F, hinfo, alloc, ctx, Array.init(alloc)),
-                        .array  => |array| return callFnOnArray(F, hinfo, alloc, ctx, array),
+                        .null   => return callFnOnArray(F, hinfo, ctx, alloc, Array.init(alloc)),
+                        .array  => |array| return callFnOnArray(F, hinfo, ctx, alloc, array),
                         else    => {
                             std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
                             return DispatchErrors.InvalidParams;
@@ -288,15 +288,13 @@ inline fn isVoid(comptime T: ?type) bool {
 }
 
 fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
-                 alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
+                 ctx: ?*anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
+
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
-    // Pack JSON array params to a tuple for fn params.
-    const args: hinfo.tuple_type = if (hinfo.has_ctx)
-        valueToTupleCtx(hinfo, alloc, json_args, ctx.?, hinfo.ctx_type)
-    else
-        valueToTuple(hinfo, alloc, json_args);
+    // Pack JSON array params to a tuple for the F's params.
+    const args: hinfo.tuple_type = valueToTuple(hinfo, ctx, alloc, json_args);
 
     if (hinfo.is_void) {
         if (hinfo.has_err)
@@ -314,16 +312,13 @@ fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
 }
 
 fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
-                 alloc: Allocator, ctx: ?*anyopaque, array: Array) anyerror!DispatchResult {
+                 ctx: ?*anyopaque, alloc: Allocator, array: Array) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + array.items.len)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack JSON array params to a tuple for fn params.
-    const args: hinfo.tuple_type = if (hinfo.has_ctx)
-        try valuesToTupleCtx(hinfo, alloc, array, ctx.?, hinfo.ctx_type)
-    else
-        try valuesToTuple(hinfo, alloc, array);
+    const args: hinfo.tuple_type = try valuesToTuple(hinfo, alloc, array, ctx);
 
     if (hinfo.is_void) {
         if (hinfo.has_err)
@@ -340,60 +335,49 @@ fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
     }
 }
 
-fn valueToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, value: Value) hinfo.tuple_type {
+fn valueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, value: Value) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
-    if (hinfo.has_alloc) {
-        @field(tuple, "0") = alloc;
-        @field(tuple, "1") = value;
+
+    if (hinfo.has_ctx) {
+        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = ctx_ptr;
+            @field(tuple, "1") = alloc;
+            @field(tuple, "2") = value;
+        } else {
+            @field(tuple, "0") = ctx_ptr;
+            @field(tuple, "1") = value;
+        }
     } else {
-        @field(tuple, "0") = value;
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = alloc;
+            @field(tuple, "1") = value;
+        } else {
+            @field(tuple, "0") = value;
+        }
     }
     return tuple;
 }
 
-fn valueToTupleCtx(comptime hinfo: HandlerInfo, alloc: Allocator, value: Value,
-                   ctx: *anyopaque, comptime ctx_type: type) hinfo.tuple_type {
+fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array,
+                    ctx: ?*anyopaque) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
-    const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
-    if (hinfo.has_alloc) {
-        @field(tuple, "0") = ctx_ptr;
-        @field(tuple, "1") = alloc;
-        @field(tuple, "2") = value;
-    } else {
-        @field(tuple, "0") = ctx_ptr;
-        @field(tuple, "1") = value;
-    }
-    return tuple;
-}
 
-fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array) !hinfo.tuple_type {
+    if (hinfo.has_ctx) {
+        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = ctx_ptr;
+            @field(tuple, "1") = alloc;
+        } else {
+            @field(tuple, "0") = ctx_ptr;
+        }
+    } else {
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = alloc;
+        }
+    }
+
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
-    var tuple: hinfo.tuple_type = undefined;
-
-    if (hinfo.has_alloc) {
-        @field(tuple, "0") = alloc;
-    }
-    const start_idx = hinfo.user_idx;
-    inline for (start_idx..tt_info.fields.len)|i| {
-        const field = tt_info.fields[i];
-        const value = values.items[i - start_idx];
-        @field(tuple, field.name) = try ValueAs(field.type).from(value);
-    }
-    return tuple;
-}
-
-fn valuesToTupleCtx(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array,
-                    ctx: *anyopaque, comptime ctx_type: type) !hinfo.tuple_type {
-    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
-    var tuple: hinfo.tuple_type = undefined;
-    const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
-
-    if (hinfo.has_alloc) {
-        @field(tuple, "0") = ctx_ptr;
-        @field(tuple, "1") = alloc;
-    } else {
-        @field(tuple, "0") = ctx_ptr;
-    }
     const start_idx = hinfo.user_idx;
     inline for (start_idx..tt_info.fields.len)|i| {
         const field = tt_info.fields[i];
