@@ -24,8 +24,6 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 // Test handler registration.
 
-// TODO: add fn taking in struct
-
 fn fn0() void {
     std.debug.print("fn0() called\n", .{});
 }
@@ -124,6 +122,24 @@ const Ctx = struct {
         };
     }
 
+    fn fn_cat_struct_ctx(self: *@This(), cat: CatInfo) CatInfo {
+        self.count += 1;
+        return .{
+            .cat_name = cat.cat_name,
+            .weight = cat.weight + 1,
+            .eye_color = cat.eye_color,
+        };
+    }
+
+    fn fn_cat_struct_ctx_alloc(self: *@This(), alloc: Allocator, cat: CatInfo) !CatInfo {
+        self.count += 1;
+        return .{
+            .cat_name = try allocPrint(alloc, "{s}'s cousin", .{cat.cat_name}),
+            .weight = cat.weight + 1,
+            .eye_color = try allocPrint(alloc, "double {s}", .{cat.eye_color}),
+        };
+    }
+
 };
 
 
@@ -160,11 +176,19 @@ fn fn_cat_value_alloc(alloc: Allocator, json_value: std.json.Value) !CatInfo {
     };
 }
 
-fn fn_cat_add_weight(cat: CatInfo) CatInfo {
+fn fn_cat_struct(cat: CatInfo) CatInfo {
     return .{
         .cat_name = cat.cat_name,
         .weight = cat.weight + 1,
         .eye_color = cat.eye_color,
+    };
+}
+
+fn fn_cat_struct_alloc(alloc: Allocator, cat: CatInfo) !CatInfo {
+    return .{
+        .cat_name = try allocPrint(alloc, "{s}'s cousin", .{cat.cat_name}),
+        .weight = cat.weight + 1,
+        .eye_color = try allocPrint(alloc, "double {s}", .{cat.eye_color}),
     };
 }
 
@@ -193,6 +217,27 @@ fn fun_wrong_param_type2(alloc: Allocator, _: Value, _: u8) anyerror![]const u8 
 
 
 test "rpc_registry fn0" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn0", fn0);
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            try testing.expect(res_json.len == 0);
+        }
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "rpc_registry fn0 variants" {
     const alloc = gpa.allocator();
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
@@ -250,6 +295,7 @@ test "rpc_registry fn0" {
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
 
 test "rpc_registry fn1" {
     const alloc = gpa.allocator();
@@ -581,6 +627,145 @@ test "rpc_registry passing in an ObjectMap Value as a parameter, with a context,
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+
+test "rpc_registry passing in a struct object as a parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_cat_struct", fn_cat_struct);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in a struct object as a parameter, with Allocator parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_cat_struct_alloc", fn_cat_struct_alloc);
+
+        {
+            const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat5's cousin");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in a struct object as a parameter, on a ctx" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        var ctx = Ctx { .count = 0, .alloc = alloc };
+
+        try registry.registerWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in a struct object as a parameter, on a ctx, with Allocator parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        var ctx = Ctx { .count = 0, .alloc = alloc };
+
+        try registry.registerWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4's cousin");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
 
 
 

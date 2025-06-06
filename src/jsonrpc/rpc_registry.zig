@@ -57,20 +57,20 @@ pub const RpcRegistry = struct {
     }
 
     pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype) !void {
+        // @compileLog(fn_info);
         const fn_info = getFnInfo(handler_fn);
-        try validateHandler(fn_info, method);
         const ctx_type = void;
         const hinfo = getHandlerInfo(fn_info, ctx_type);
-        // @compileLog(hinfo);
+        try validateHandler(hinfo, method);
         const h = try makeRpcHandler(handler_fn, null, hinfo, self.alloc);
         try self.handlers.put(method, h);
     }
 
     pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
         const fn_info = getFnInfo(handler_fn);
-        try validateHandler(fn_info, method);
         const ctx_type = @TypeOf(context);
         const hinfo = getHandlerInfo(fn_info, ctx_type);
+        try validateHandler(hinfo, method);
         const h = try makeRpcHandler(handler_fn, context, hinfo, self.alloc);
         try self.handlers.put(method, h);
     }
@@ -151,11 +151,13 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
                 if (hinfo.is_value) {
-                    return callFnOnValue(F, hinfo, ctx, alloc, json_args);
+                    return callOnValue(F, hinfo, ctx, alloc, json_args);
+                } else if (hinfo.is_obj) {
+                    return callOnObject(F, hinfo, ctx, alloc, json_args);
                 } else {
                     switch (json_args) {
-                        .null   => return callFnOnArray(F, hinfo, ctx, alloc, Array.init(alloc)),
-                        .array  => |array| return callFnOnArray(F, hinfo, ctx, alloc, array),
+                        .null   => return callOnArray(F, hinfo, ctx, alloc, Array.init(alloc)),
+                        .array  => |array| return callOnArray(F, hinfo, ctx, alloc, array),
                         else    => {
                             std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
                             return DispatchErrors.InvalidParams;
@@ -168,8 +170,8 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
 }
 
 
-fn validateHandler(comptime fn_info: Type.Fn, method: []const u8) !void {
-    _=fn_info;
+fn validateHandler(comptime hinfo: HandlerInfo, method: []const u8) !void {
+    _=hinfo;
 
     if (std.mem.startsWith(u8, method, "rpc.")) {   // By the JSON-RPC spec, "rpc." is reserved.
         return RegistrationErrors.InvalidMethodName;
@@ -180,26 +182,29 @@ fn validateHandler(comptime fn_info: Type.Fn, method: []const u8) !void {
 
 // This is a comptime struct capturing the needed comptime info to do call the handler.
 const HandlerInfo = struct {
-    ctx_type:       type,
-    fn_info:        Type.Fn,
-    params:         []const Type.Fn.Param,
-    tuple_type:     type,
-    has_ctx:        bool,
-    has_alloc:      bool,
-    alloc_idx:      usize,
-    user_idx:       usize,
-    is_value:       bool,
-    has_err:        bool,
-    is_void:        bool,
+    ctx_type:       type,                   // The type of the context object (the self pointer type).
+    fn_info:        Type.Fn,                // Info on the handler function.
+    params:         []const Type.Fn.Param,  // The parameter array of the handler function.
+    tuple_type:     type,                   // The type of parameter tuple for calling the handler function.
+    has_ctx:        bool,                   // Handler is registered with a context object.
+    has_alloc:      bool,                   // The first parameter of the handler is an Allocator.
+    user_idx:       usize,                  // The index of the first user parameter of the handler.
+    is_value:       bool,                   // The first user parameter is a std.json.Value.
+    is_obj:         bool,                   // The first user parameter is an object of a struct type.
+    obj_type:       type,                   // The struct type of the object.
+    has_err:        bool,                   // The handler function has a error union in the return type.
+    is_void:        bool,                   // The handler function has a void return type.
 };
 
 inline fn getHandlerInfo(comptime fn_info: Type.Fn, comptime ctx_type: type) HandlerInfo {
-    const params = fn_info.params;
-    const has_ctx = ctx_type != void;
-    const after_ctx_idx = if (has_ctx) 1 else 0;            // index of the parameter after context;
-    const alloc_idx = after_ctx_idx;                        // index of the allocator parameter.
+    const params    = fn_info.params;
+    const has_ctx   = ctx_type != void;
+    const alloc_idx = if (has_ctx) 1 else 0;                // alloc parameter index is after context
     const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
-    const user_idx = alloc_idx + if (has_alloc) 1 else 0;   // index of the first user parameter.
+    const user_idx  = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user parameter.
+    const is_value  = params.len > user_idx and isValue(params[user_idx].type);
+    const is_obj    = params.len > user_idx and isStruct(params[user_idx].type);
+    const obj_type  = if (is_obj) params[user_idx].type.? else void;
 
     return .{
         .fn_info    = fn_info,
@@ -208,9 +213,10 @@ inline fn getHandlerInfo(comptime fn_info: Type.Fn, comptime ctx_type: type) Han
         .tuple_type = ParamTupleType(params),
         .has_ctx    = has_ctx,
         .has_alloc  = has_alloc,
-        .alloc_idx  = alloc_idx,
         .user_idx   = user_idx,
-        .is_value   = params.len > user_idx and params[user_idx].type.? == std.json.Value,
+        .is_value   = is_value,
+        .is_obj     = is_obj,
+        .obj_type   = obj_type,
         .has_err    = isErrorUnion(fn_info.return_type),
         .is_void    = isVoid(fn_info.return_type),
     };
@@ -274,8 +280,30 @@ inline fn isVoid(comptime T: ?type) bool {
     }
 }
 
-fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
-                 ctx: ?*anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
+inline fn isValue(comptime T: ?type) bool {
+    if (T)|t| {
+        return t == std.json.Value;
+    } else {
+        return false;
+    }
+}
+
+inline fn isStruct(comptime T: ?type) bool {
+    if (T)|t| {
+        if (t == std.json.Value)    // Skip Value.  Value parameter has special treatment.
+            return false;
+        const type_info: Type = @typeInfo(t);
+        switch (type_info) {
+            .@"struct" =>   return true,
+            else =>         return false,
+        }
+    } else {
+        return false;
+    }
+}
+
+fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
+               ctx: ?*anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
@@ -298,8 +326,37 @@ fn callFnOnValue(comptime F: anytype, comptime hinfo: HandlerInfo,
     }
 }
 
-fn callFnOnArray(comptime F: anytype, hinfo: HandlerInfo,
-                 ctx: ?*anyopaque, alloc: Allocator, array: Array) anyerror!DispatchResult {
+fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo,
+                ctx: ?*anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
+
+    if (hinfo.params.len != hinfo.user_idx + 1)
+        return DispatchErrors.MismatchedParamCounts;
+
+    // Map the incoming JSON value into a struct object.
+    // alloc is an arena allocator; don't need to free the parsed result here.
+    const parsed = try std.json.parseFromValue(hinfo.obj_type, alloc, json_args, .{});
+    const obj: hinfo.obj_type = parsed.value;
+
+    // Pack JSON array params to a tuple for the F's params.
+    const args: hinfo.tuple_type = objToTuple(hinfo, ctx, alloc, obj);
+
+    if (hinfo.is_void) {
+        if (hinfo.has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.asNone();
+    } else {
+        const res = if (hinfo.has_err)
+            try @call(.auto, F, args)
+        else
+            @call(.auto, F, args);
+        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+    }
+}
+
+fn callOnArray(comptime F: anytype, hinfo: HandlerInfo,
+               ctx: ?*anyopaque, alloc: Allocator, array: Array) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + array.items.len)
         return DispatchErrors.MismatchedParamCounts;
@@ -341,6 +398,30 @@ fn valueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
             @field(tuple, "1") = value;
         } else {
             @field(tuple, "0") = value;
+        }
+    }
+    return tuple;
+}
+
+fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, obj: hinfo.obj_type) hinfo.tuple_type {
+    var tuple: hinfo.tuple_type = undefined;
+
+    if (hinfo.has_ctx) {
+        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = ctx_ptr;
+            @field(tuple, "1") = alloc;
+            @field(tuple, "2") = obj;
+        } else {
+            @field(tuple, "0") = ctx_ptr;
+            @field(tuple, "1") = obj;
+        }
+    } else {
+        if (hinfo.has_alloc) {
+            @field(tuple, "0") = alloc;
+            @field(tuple, "1") = obj;
+        } else {
+            @field(tuple, "0") = obj;
         }
     }
     return tuple;
