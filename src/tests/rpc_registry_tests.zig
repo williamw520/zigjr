@@ -86,7 +86,6 @@ fn fn2_return_value_with_err(a: i64, b: bool) i64 {
 
 const Ctx = struct {
     count: i64 = 0,
-    alloc: Allocator,
 
     // All methods must have self as pointer as the context is passed in as a pointer.
     fn get(self: *@This()) i64 {
@@ -442,7 +441,7 @@ test "rpc_registry with context" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        var ctx = Ctx { .count = 0, .alloc = alloc };
+        var ctx = Ctx { .count = 0 };
 
         try registry.registerWithCtx("ctx.get", &ctx, Ctx.get);
         try registry.registerWithCtx("ctx.fn0", &ctx, Ctx.fn0);
@@ -609,7 +608,7 @@ test "rpc_registry passing in an ObjectMap Value as a parameter, with a context,
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        var ctx = Ctx { .count = 0, .alloc = alloc };
+        var ctx = Ctx { .count = 0 };
 
         try registry.registerWithCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
 
@@ -713,7 +712,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        var ctx = Ctx { .count = 0, .alloc = alloc };
+        var ctx = Ctx { .count = 0 };
 
         try registry.registerWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
 
@@ -749,7 +748,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        var ctx = Ctx { .count = 0, .alloc = alloc };
+        var ctx = Ctx { .count = 0 };
 
         try registry.registerWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
 

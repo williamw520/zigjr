@@ -9,22 +9,15 @@
 const std = @import("std");
 const Type = std.builtin.Type;
 const Allocator = std.mem.Allocator;
-const StringHashMap = std.hash_map.StringHashMap;
-const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
 const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const errors = @import("errors.zig");
-const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
 
-const handler = @import("handler.zig");
-const DispatchResult = handler.DispatchResult;
-const DispatchErrors = handler.DispatchErrors;
 
-
+/// Convert the std.json.Value to the primitive type (bool, i64, f64, []const u8),
+/// within the scope of JSON data type.
 pub fn ValueAs(comptime V: type) type {
     const vinfo = @typeInfo(V);
 
@@ -92,182 +85,6 @@ pub fn ValueAs(comptime V: type) type {
         
     };
 
-}
-
-/// Make a tuple type from the parameters of the function.
-/// Each parameter becomes a field of the tuple.
-pub fn ParamTupleType(comptime func: anytype) type {
-    const f_info = @typeInfo(@TypeOf(func)).@"fn";
-
-    comptime var fields: [f_info.params.len]std.builtin.Type.StructField = undefined;
-    inline for (f_info.params, 0..)|param, i| {
-        fields[i] = .{
-            .name = std.fmt.comptimePrint("{d}", .{i}),
-            .type = param.type orelse null,
-            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
-            .default_value_ptr = null,
-            .alignment = 0,
-        };
-    }
-
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .fields = fields[0..],
-            .decls = &.{},
-            .is_tuple = true,
-        },
-    });
-}
-
-/// Make a tuple type from the parameters of the function.
-/// Each parameter becomes a field of the tuple.
-pub fn ParamTupleType2(comptime func: anytype) type {
-    const f_info = @typeInfo(@TypeOf(func)).@"fn";
-
-    comptime var fields: [1 + f_info.params.len]std.builtin.Type.StructField = undefined;
-
-    fields[0] = .{
-        .name = "0",
-        .type = Allocator,
-        .is_comptime = false,
-        .default_value_ptr = null,
-        .alignment = 0,
-    };
-    
-    inline for (f_info.params, 0..)|param, i| {
-        fields[i+1] = .{
-            .name = std.fmt.comptimePrint("{d}", .{i+1}),
-            .type = param.type orelse null,
-            .is_comptime = false,   // make all the fields not comptime to allow mutable tuple.
-            .default_value_ptr = null,
-            .alignment = 0,
-        };
-    }
-
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .fields = fields[0..],
-            .decls = &.{},
-            .is_tuple = true,
-        },
-    });
-}
-
-pub fn valuesToTuple(comptime tuple_type: type, values: Array) !tuple_type {
-    const tt_info = @typeInfo(tuple_type).@"struct";
-    var tuple: tuple_type = undefined;
-    inline for (tt_info.fields, 0..)|field, i| {
-        const value = values.items[i];
-        // std.debug.print("@\"{d}\"| field: {any} | arg: {any}\n", .{i, field, value});
-        @field(tuple, field.name) = try ValueAs(field.type).from(value);
-    }
-    return tuple;
-}
-
-pub fn valuesToTuple2(comptime tuple_type: type, alloc: Allocator, values: Array) !tuple_type {
-    const tt_info = @typeInfo(tuple_type).@"struct";
-    var tuple: tuple_type = undefined;
-    @field(tuple, "0") = alloc;
-    inline for (1..tt_info.fields.len)|i| {
-        const field = tt_info.fields[i];
-        const value = values.items[i-1];
-        // std.debug.print("@\"{d}\"| field: {any} | arg: {any}\n", .{i, field, value});
-        @field(tuple, field.name) = try ValueAs(field.type).from(value);
-    }
-    return tuple;
-}
-
-pub fn Fn2(comptime P1: type, comptime P2: type, callback: anytype) type {
-    return struct {
-        pub fn callWith(v1: Value, v2: Value) ![]const u8 {
-            const x1 = try ValueAs(P1).from(v1);
-            const x2 = try ValueAs(P2).from(v2);
-            return try callback.run(x1, x2);
-        }
-    };
-}
-
-pub fn Fn3(comptime P1: type, comptime P2: type, comptime P3: type, callback: anytype) type {
-    return struct {
-        pub fn callWith(v1: Value, v2: Value, v3: Value) ![]const u8 {
-            const x1 = try ValueAs(P1).from(v1);
-            const x2 = try ValueAs(P2).from(v2);
-            const x3 = try ValueAs(P3).from(v3);
-            return try callback.run(x1, x2, x3);
-        }
-    };
-}
-
-// Uniform callback object that can be stored in the hash map.
-// makeCallable will deal with the parameter unpacking of specific function at comptime.
-pub const Callable = struct {
-    context: *anyopaque,
-    call: *const fn(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult,
-
-    pub fn invoke(self: Callable, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
-        return self.call(self.context, alloc, json_args);
-    }
-
-    pub fn deinit(self: Callable, allocator: Allocator) void {
-        _=self;
-        _=allocator;
-    }
-};
-
-pub fn makeCallable(comptime F: anytype) Callable {
-    const param_ttype = ParamTupleType(F);
-
-    return .{
-        .context = "",
-        .call = &struct {
-            // Wrapper for the specific function.
-            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value) anyerror!DispatchResult {
-                _ = context;
-                // _ = alloc;
-
-                // Pack the JSON values as the parameters for the function.
-                const args_tuple = try valuesToTuple2(param_ttype, alloc, json_args.array);
-                const result =  @call(.auto, F, args_tuple);
-                return .{ .result = try std.json.stringifyAlloc(alloc, result, .{}) };
-            }
-        }.call_wrapper,
-    };
-}
-
-
-pub fn makeCallable2(comptime F: anytype) Callable {
-    const f_info = @typeInfo(@TypeOf(F)).@"fn";
-    // const param_ttype = ParamTupleType(F);
-    const param_ttype = ParamTupleType(F);
-    const return_type = f_info.return_type;
-
-    return .{
-        .context = "",
-        .call = &struct {
-            // This is the actual runtime wrapper that gets called.
-            fn call_wrapper(context: *anyopaque, alloc: Allocator, json_args: Value, result_ptr: *anyopaque) anyerror![]const u8 {
-                _ = context;
-                // _ = alloc;
-
-                // Pack the JSON values as the parameters for the function.
-                const args_tuple = try valuesToTuple2(param_ttype, alloc, json_args.array);
-
-                // Call the original function
-                if (return_type == void or return_type == null) {
-                    @call(.auto, F, args_tuple);
-                } else if (@typeInfo(return_type) == .ErrorSet) {
-                    const result: *return_type = @ptrCast(result_ptr);
-                    result.* = @call(.auto, F, args_tuple) catch |err| return err;
-                } else {
-                    const result: *return_type = @ptrCast(result_ptr);
-                    result.* = @call(.auto, F, args_tuple) catch |err| return err;
-                }
-                
-            }
-        }.call_wrapper,
-    };
 }
 
 

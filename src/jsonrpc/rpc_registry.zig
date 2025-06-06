@@ -76,7 +76,7 @@ pub const RpcRegistry = struct {
     }
 
     pub fn has(self: *Self, method: []const u8) bool {
-        return self.handlers.get(method) != null;
+        return self.handlers.getPtr(method) != null;
     }
 
     /// Run a handler on the request and generate a DispatchResult.
@@ -119,10 +119,10 @@ const RpcHandler = struct {
     arena: *ArenaAllocator,     // arena needs to be a ptr to the struct to survive copying.
     arena_alloc: Allocator,
     context: ?*anyopaque,
-    call: *const fn(alloc: Allocator, context: ?*anyopaque, json_args: Value) anyerror!DispatchResult,
+    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult,
 
     fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
-        return self.call(self.arena_alloc, self.context, json_args);
+        return self.call(self.context, self.arena_alloc, json_args);
     }
 
     fn invokeEnd(self: *RpcHandler) void {
@@ -149,15 +149,15 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
         .context = context,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
-            fn call_wrapper(alloc: Allocator, ctx: ?*anyopaque, json_args: Value) anyerror!DispatchResult {
+            fn call_wrapper(ctx: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult {
                 if (hinfo.is_value) {
-                    return callOnValue(F, hinfo, ctx, alloc, json_args);
+                    return callOnValue(F, hinfo, ctx, arena_alloc, json_args);
                 } else if (hinfo.is_obj) {
-                    return callOnObject(F, hinfo, ctx, alloc, json_args);
+                    return callOnObject(F, hinfo, ctx, arena_alloc, json_args);
                 } else {
                     switch (json_args) {
-                        .null   => return callOnArray(F, hinfo, ctx, alloc, Array.init(alloc)),
-                        .array  => |array| return callOnArray(F, hinfo, ctx, alloc, array),
+                        .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
+                        .array  => |array| return callOnArray(F, hinfo, ctx, arena_alloc, array),
                         else    => {
                             std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
                             return DispatchErrors.InvalidParams;
