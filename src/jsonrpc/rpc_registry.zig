@@ -33,12 +33,6 @@ const JrErrors = errors.JrErrors;
 const ValueAs = @import("jsonutil.zig").ValueAs;
 
 
-// TODO: remove
-pub const RegisterOptions = struct {
-    context: ?*anyopaque = null,
-    raw_params: bool = false,
-};
-
 pub const RpcRegistry = struct {
     const Self = @This();
 
@@ -62,9 +56,9 @@ pub const RpcRegistry = struct {
         self.handlers.deinit();
     }
 
-    pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype, opt: RegisterOptions) !void {
+    pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype) !void {
         const fn_info = getFnInfo(handler_fn);
-        try validateHandler(fn_info, method, opt);
+        try validateHandler(fn_info, method);
         const ctx_type = void;
         const hinfo = getHandlerInfo(fn_info, ctx_type);
         // @compileLog(hinfo);
@@ -72,10 +66,9 @@ pub const RpcRegistry = struct {
         try self.handlers.put(method, h);
     }
 
-    pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype,
-                           opt: RegisterOptions) !void {
+    pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
         const fn_info = getFnInfo(handler_fn);
-        try validateHandler(fn_info, method, opt);
+        try validateHandler(fn_info, method);
         const ctx_type = @TypeOf(context);
         const hinfo = getHandlerInfo(fn_info, ctx_type);
         const h = try makeRpcHandler(handler_fn, context, hinfo, self.alloc);
@@ -175,17 +168,11 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
 }
 
 
-fn validateHandler(comptime fn_info: Type.Fn, method: []const u8, opt: RegisterOptions) !void {
+fn validateHandler(comptime fn_info: Type.Fn, method: []const u8) !void {
+    _=fn_info;
+
     if (std.mem.startsWith(u8, method, "rpc.")) {   // By the JSON-RPC spec, "rpc." is reserved.
         return RegistrationErrors.InvalidMethodName;
-    }
-
-    // handler taking the raw-params as a Value can only have one parameter.
-    if (opt.raw_params) {
-        if (fn_info.params.len != 1) return RegistrationErrors.MismatchedParameterCountsForRawParams;
-        const p_type = fn_info.params[0].type orelse return RegistrationErrors.InvalidParamTypeForRawParams;
-        if (p_type != Value) return RegistrationErrors.InvalidParamTypeForRawParams;
-        // TODO: Does this need special handling?
     }
 }
 
