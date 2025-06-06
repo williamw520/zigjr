@@ -27,8 +27,7 @@ TODOs
 * DONE Capture the function return value and convert to JSON result.
 * DONE Convert JSON to native values.
 * DONE Use ArenaAllocator for each request handling invocation to avoid complicated cleanup.
-* TODO Check the possible usage of ArrayList.toOwnedSlice().
-* TODO Add dispatching registry.
+* DONE Add dispatching registry.
 * TODO Add CLI on running request and response and on streaming.
 * TODO Add network server and client example.
 * TODO Add request and notification message builders.

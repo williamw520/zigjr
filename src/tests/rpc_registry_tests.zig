@@ -192,6 +192,18 @@ fn fn_cat_struct_alloc(alloc: Allocator, cat: CatInfo) !CatInfo {
 }
 
 
+const Standalone = struct {
+    flag:   bool = false,
+};
+
+fn fn_standalone_on (ctx: *Standalone) void { ctx.flag = true;  }
+fn fn_standalone_off(ctx: *Standalone) void { ctx.flag = false; }
+fn fn_standalone_get(ctx: *Standalone) bool { return ctx.flag;  }
+fn fn_standalone_msg(ctx: *Standalone, alloc: Allocator) ![]const u8 {
+    return try allocPrint(alloc, "flag value is: {}", .{ ctx.flag });
+}
+
+
 const MyErrors = error {
     MissingName,
 };
@@ -762,6 +774,78 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
             try testing.expectEqual(parsed_cat.value.weight, 6);
         }
 
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry register standalone functions on standalone object." {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        var s = Standalone{};
+
+        try registry.registerWithCtx("fn_standalone_on", &s, fn_standalone_on);
+        try registry.registerWithCtx("fn_standalone_off", &s, fn_standalone_off);
+        try registry.registerWithCtx("fn_standalone_get", &s, fn_standalone_get);
+        try registry.registerWithCtx("fn_standalone_msg", &s, fn_standalone_msg);
+
+        {
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_on", null, .none);
+            defer alloc.free(req_json);
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+        }
+
+        {
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
+        }
+
+        {
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_off", null, .none);
+            defer alloc.free(req_json);
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+        }
+
+        {
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(false));
+        }
+
+        {
+            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("flag value is: false"));
+        }
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
