@@ -9,7 +9,7 @@
 const request = @import("jsonrpc/request.zig");
 const response = @import("jsonrpc/response.zig");
 const handler = @import("jsonrpc/handler.zig");
-const registry = @import("jsonrpc/registry.zig");
+const rpc_registry = @import("jsonrpc/rpc_registry.zig");
 const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 
@@ -35,21 +35,20 @@ pub const handleRpcRequests = handler.handleRpcRequests;
 pub const DispatchResult = handler.DispatchResult;
 pub const DispatchErrors = handler.DispatchErrors;
 
-pub const Registry = registry.Registry;
-pub const RegistrationErrors = registry.RegistrationErrors;
+pub const RpcRegistry = rpc_registry.RpcRegistry;
+pub const RegistrationErrors = rpc_registry.RegistrationErrors;
 
 pub const ErrorCode = errors.ErrorCode;
 pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
-    // _ = @import("tests/response_tests.zig");
-    // _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/registry_tests.zig");
+    _ = @import("tests/request_tests.zig");
+    _ = @import("tests/response_tests.zig");
+    _ = @import("tests/stream_tests.zig");
     _ = @import("tests/rpc_registry_tests.zig");
-    // _ = @import("tests/json_tests.zig");
-    // _ = @import("tests/tests.zig");
+    _ = @import("tests/json_tests.zig");
+    _ = @import("tests/tests.zig");
 }
 
 
