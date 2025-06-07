@@ -12,9 +12,11 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const bufferedWriter = std.io.bufferedWriter;
 
-const msg_handler = @import("msg_handler.zig");
+const zigjr = @import("../zigjr.zig");
+
+const msg_handler = zigjr.msg_handler;
+const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
-const JrErrors = @import("errors.zig").JrErrors;
 
 
 /// Provides frame level support for JSON-RPC streaming based on frame delimiters.

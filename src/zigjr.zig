@@ -6,12 +6,14 @@
 // MIT License.  See the LICENSE file.
 //
 
-const request = @import("jsonrpc/request.zig");
-const response = @import("jsonrpc/response.zig");
-const msg_handler = @import("jsonrpc/msg_handler.zig");
-const rpc_registry = @import("jsonrpc/rpc_registry.zig");
-const errors = @import("jsonrpc/errors.zig");
+pub const request = @import("jsonrpc/request.zig");
+pub const response = @import("jsonrpc/response.zig");
+pub const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
+pub const stream = @import("streaming/stream.zig");
+pub const frame = @import("streaming/frame.zig");
+pub const msg_handler = @import("handler/msg_handler.zig");
+pub const rpc_registry = @import("handler/rpc_registry.zig");
 
 pub const parseRpcRequest = request.parseRpcRequest;
 pub const RpcRequestResult = request.RpcRequestResult;

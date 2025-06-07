@@ -18,17 +18,25 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
-const req_parser = @import("request.zig");
-const RpcRequest = req_parser.RpcRequest;
-const RpcId = req_parser.RpcId;
+const zigjr = @import("../zigjr.zig");
 
-const msg_handler = @import("msg_handler.zig");
-const DispatchResult = msg_handler.DispatchResult;
-const DispatchErrors = msg_handler.DispatchErrors;
+const parseRpcRequest = zigjr.request.parseRpcRequest;
+const RpcRequest = zigjr.request.RpcRequest;
+const RpcId = zigjr.request.RpcId;
 
-const errors = @import("errors.zig");
-const ErrorCode = errors.ErrorCode;
-const JrErrors = errors.JrErrors;
+const parseRpcResponse = zigjr.response.parseRpcResponse;
+const RpcResponse = zigjr.response.RpcResponse;
+const RpcResponseResult = zigjr.response.RpcResponseResult;
+const RpcResponseMessage = zigjr.response.response.RpcResponseMessage;
+
+const DispatchResult = zigjr.DispatchResult;
+const DispatchErrors = zigjr.DispatchErrors;
+
+const ErrorCode = zigjr.errors.ErrorCode;
+const JrErrors = zigjr.errors.JrErrors;
+const AllocError = zigjr.errors.AllocError;
+
+const messages = zigjr.messages;
 
 const ValueAs = @import("jsonutil.zig").ValueAs;
 

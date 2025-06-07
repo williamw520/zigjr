@@ -12,8 +12,7 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const Value = std.json.Value;
 
-const errors = @import("errors.zig");
-const JrErrors = errors.JrErrors;
+const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
 /// Convert the std.json.Value to the primitive type (bool, i64, f64, []const u8),

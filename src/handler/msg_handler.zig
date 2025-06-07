@@ -11,23 +11,22 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
-const request = @import("request.zig");
-const parseRpcRequest = request.parseRpcRequest;
-const RpcRequest = request.RpcRequest;
-const RpcId = request.RpcId;
+const zigjr = @import("../zigjr.zig");
 
-const response = @import("response.zig");
-const parseRpcResponse = response.parseRpcResponse;
-const RpcResponse = response.RpcResponse;
-const RpcResponseResult = response.RpcResponseResult;
-const RpcResponseMessage = response.RpcResponseMessage;
+const parseRpcRequest = zigjr.request.parseRpcRequest;
+const RpcRequest = zigjr.request.RpcRequest;
+const RpcId = zigjr.request.RpcId;
 
-const errors = @import("errors.zig");
-const ErrorCode = errors.ErrorCode;
-const JrErrors = errors.JrErrors;
-const AllocError = errors.AllocError;
+const parseRpcResponse = zigjr.response.parseRpcResponse;
+const RpcResponse = zigjr.response.RpcResponse;
+const RpcResponseResult = zigjr.response.RpcResponseResult;
+const RpcResponseMessage = zigjr.response.RpcResponseMessage;
 
-const messages = @import("messages.zig");
+const ErrorCode = zigjr.errors.ErrorCode;
+const JrErrors = zigjr.errors.JrErrors;
+const AllocError = zigjr.errors.AllocError;
+
+const messages = zigjr.messages;
 
 
 /// The returning result from dispatcher.dispatch(), expected by handleRpcRequest() below

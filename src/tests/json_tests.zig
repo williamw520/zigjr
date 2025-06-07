@@ -11,7 +11,7 @@ const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
-const jsonutil = @import("../jsonrpc/jsonutil.zig");
+const jsonutil = @import("../handler/jsonutil.zig");
 const JrErrors = zigjr.JrErrors;
 
 
