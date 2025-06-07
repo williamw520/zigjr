@@ -22,9 +22,9 @@ const req_parser = @import("request.zig");
 const RpcRequest = req_parser.RpcRequest;
 const RpcId = req_parser.RpcId;
 
-const handler = @import("handler.zig");
-const DispatchResult = handler.DispatchResult;
-const DispatchErrors = handler.DispatchErrors;
+const msg_handler = @import("msg_handler.zig");
+const DispatchResult = msg_handler.DispatchResult;
+const DispatchErrors = msg_handler.DispatchErrors;
 
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;

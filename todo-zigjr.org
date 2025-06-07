@@ -6,7 +6,7 @@ TODOs
 * DONE Test on float number in request and response messages.
 * DONE Add check for notification request.
 * DONE Add batch response message builder.
-* DONE Add batch dispatching in handler.
+* DONE Add batch dispatching in msg_handler.
 * DONE Add parsing batch result.
 * DONE Rename RpcMessage to RpcRequestMessage.
 * DONE Add test on parsing empty batch request.

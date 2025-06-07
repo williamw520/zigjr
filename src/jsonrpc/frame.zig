@@ -11,7 +11,7 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 
-const JrErrors = @import("../zigjr.zig").JrErrors;
+const JrErrors = @import("errors.zig").JrErrors;
 
 
 /// Write a data frame to a writer, with a header section containing
