@@ -35,7 +35,6 @@ const EchoDispatcher = struct {
         switch (dresult) {
             .none => {},
             .result => |json| alloc.free(json),
-            .result_lit => {},
             .err => {},
         }
     }

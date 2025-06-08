@@ -41,7 +41,6 @@ const HelloDispatcher = struct {
         switch (dresult) {
             .none => {},
             .result => {},
-            .result_lit => {},
             .err => {},
         }
     }
@@ -85,7 +84,6 @@ const IntCalcDispatcher = struct {
         switch (dresult) {
             .none => {},
             .result => alloc.free(dresult.result),
-            .result_lit => {},
             .err => {},
         }
     }
