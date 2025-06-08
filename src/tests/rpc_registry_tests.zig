@@ -503,7 +503,7 @@ test "rpc_registry with context" {
 }
 
 
-test "rpc_registry with return struct value" {
+test "rpc_registry fn with array params returning struct value" {
     const alloc = gpa.allocator();
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
@@ -534,6 +534,40 @@ test "rpc_registry with return struct value" {
 }
 
 
+test "rpc_registry fn with built array params returning struct value" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_cat", null, fn_cat);
+
+        {
+            const params = .{"cat1", 9, "blue"};
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
+            defer alloc.free(req_json);
+            std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, &registry) orelse "";
+            defer alloc.free(res_json);
+            std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 9);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
 test "rpc_registry passing in an Value as a parameter" {
     const alloc = gpa.allocator();
     {
@@ -544,7 +578,7 @@ test "rpc_registry passing in an Value as a parameter" {
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -577,7 +611,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
         try registry.register("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -613,7 +647,7 @@ test "rpc_registry passing in an ObjectMap Value as a parameter, with a context,
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -647,7 +681,7 @@ test "rpc_registry passing in a struct object as a parameter" {
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -681,7 +715,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
 
         {
             const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -717,7 +751,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -753,7 +787,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -791,7 +825,7 @@ test "rpc_registry register standalone functions on standalone object." {
         try registry.register("fn_standalone_msg", &s, fn_standalone_msg);
 
         {
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_on", null, .none);
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_on", null, .none);
             defer alloc.free(req_json);
 
             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
@@ -800,7 +834,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
@@ -813,7 +847,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_off", null, .none);
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_off", null, .none);
             defer alloc.free(req_json);
 
             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
@@ -821,7 +855,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
@@ -833,7 +867,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
