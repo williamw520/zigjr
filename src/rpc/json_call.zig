@@ -7,140 +7,45 @@
 //
 
 const std = @import("std");
-const assert = std.debug.assert;
 const Type = std.builtin.Type;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
-const StringHashMap = std.hash_map.StringHashMap;
-const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
 const Value = std.json.Value;
 const Array = std.json.Array;
 const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
-
-const parseRpcRequest = zigjr.request.parseRpcRequest;
-const RpcRequest = zigjr.request.RpcRequest;
-const RpcId = zigjr.request.RpcId;
-
-const parseRpcResponse = zigjr.response.parseRpcResponse;
-const RpcResponse = zigjr.response.RpcResponse;
-const RpcResponseResult = zigjr.response.RpcResponseResult;
-const RpcResponseMessage = zigjr.response.response.RpcResponseMessage;
-
+const JrErrors = zigjr.JrErrors;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
-
-const ErrorCode = zigjr.errors.ErrorCode;
-const JrErrors = zigjr.errors.JrErrors;
-const AllocError = zigjr.errors.AllocError;
-
-const messages = zigjr.messages;
-
-const ValueAs = @import("jsonutil.zig").ValueAs;
-
-
-pub const RpcRegistry = struct {
-    const Self = @This();
-
-    alloc:      Allocator,
-    handlers:   StringHashMap(RpcHandler),
-
-    pub fn init(alloc: Allocator) Self {
-        return .{
-            .alloc = alloc,
-            .handlers = StringHashMap(RpcHandler).init(alloc),
-        };
-    }
-
-    pub fn deinit(self: *Self) void {
-        // Clean up any contexts owned by the RpcHandler entries
-        var it = self.handlers.iterator();
-        while (it.next()) |entry| {
-            var rpc_handler = entry.value_ptr;
-            rpc_handler.deinit();
-        }
-        self.handlers.deinit();
-    }
-
-    pub fn register(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
-        try validateMethod(method);
-        if (@typeInfo(@TypeOf(context)) == .null) {
-            var nul_context = {};                   // empty struct for no context.
-            const h = try makeRpcHandler(handler_fn, &nul_context, self.alloc);
-            try self.handlers.put(method, h);
-        } else {
-            const h = try makeRpcHandler(handler_fn, context, self.alloc);
-            try self.handlers.put(method, h);
-        }
-    }
-
-    pub fn has(self: *Self, method: []const u8) bool {
-        return self.handlers.getPtr(method) != null;
-    }
-
-    /// Run a handler on the request and generate a DispatchResult.
-    /// Return any error during the function call.  Caller handles any error.
-    /// Call free() to free the DispatchResult.
-    pub fn dispatch(self: *Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        var h = self.handlers.getPtr(req.method) orelse return DispatchErrors.MethodNotFound;
-        return h.invoke(req.params);
-    }
-
-    pub fn dispatchEnd(self: *Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-        _=alloc;
-        _=dresult;
-
-        if (self.handlers.getPtr(req.method))|h| {
-            h.invokeEnd();
-        }
-    }
-
-};
-
-
-pub const RegistrationErrors = error {
-    InvalidMethodName,
-    HandlerNotFunction,
-    MissingAllocatorParameter,
-    MissingParameterType,
-    UnsupportedParameterType,
-    HandlerInvalidParameter,
-    HandlerInvalidParameterType,
-    HandlerTooManyParams,
-    MismatchedParameterCountsForRawParams,
-    InvalidParamTypeForRawParams,
-};
 
 
 // Uniform callback object that can be stored in the hash map.
 // makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
-const RpcHandler = struct {
+pub const RpcHandler = struct {
     arena: *ArenaAllocator,     // arena needs to be a ptr to the struct to survive copying.
     arena_alloc: Allocator,
     context: ?*anyopaque,
     call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult,
 
-    fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
+    pub fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
         return self.call(self.context, self.arena_alloc, json_args);
     }
 
-    fn invokeEnd(self: *RpcHandler) void {
+    pub fn invokeDone(self: *RpcHandler) void {
         // Reset arena memory at the end of each invocation.
         _ = self.arena.reset(.{ .retain_with_limit = 1024 });
     }
 
-    fn deinit(self: *RpcHandler) void {
-        // TODO: deinit on context.
-
+    pub fn deinit(self: *RpcHandler) void {
         self.arena.deinit();
         const backing_alloc = self.arena.child_allocator;
         backing_alloc.destroy(self.arena);
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, context: anytype, backing_alloc: Allocator) !RpcHandler {
+pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allocator) !RpcHandler {
     const arena_ptr = try backing_alloc.create(ArenaAllocator);
     arena_ptr.* = ArenaAllocator.init(backing_alloc);
 
@@ -171,13 +76,6 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, backing_alloc: Allocato
             }
         }.call_wrapper,
     };
-}
-
-
-fn validateMethod(method: []const u8) !void {
-    if (std.mem.startsWith(u8, method, "rpc.")) {   // By the JSON-RPC spec, "rpc." is reserved.
-        return RegistrationErrors.InvalidMethodName;
-    }
 }
 
 fn validateHandler(comptime hinfo: HandlerInfo) !void {
@@ -462,6 +360,77 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator, values: Array,
         @field(tuple, field.name) = try ValueAs(field.type).from(value);
     }
     return tuple;
+}
+
+/// Convert the std.json.Value to the primitive type (bool, i64, f64, []const u8),
+/// within the scope of JSON data type.
+pub fn ValueAs(comptime V: type) type {
+    const vinfo = @typeInfo(V);
+
+    // Check for supported parameter value types.
+    switch (vinfo) {
+        .bool => {},
+        .int => {
+            if (vinfo.int.signedness == .unsigned) @compileError("Required signed integer, at least i64.");
+            if (vinfo.int.bits < 64) @compileError("Required at least i64 for integer.");
+        },
+        .float => {
+            if (vinfo.float.bits < 64) @compileError("Required at least f64 for floating point number.");
+        },
+        .pointer => {
+            if (vinfo.pointer.child != u8)
+                @compileError("String slice requires the '[]const u8' type.");
+        },
+        else => @compileError("Unsupported parameter value type."),
+    }
+
+    return struct {
+        pub fn from(json_value: Value) !V {
+            return fromAlloc(json_value, .{});
+        }
+
+        pub fn fromAlloc(json_value: Value, opts: struct { alloc: ?Allocator = null }) !V {
+            switch (vinfo) {
+                .bool => switch (json_value) {
+                    .bool       => |x| return x,
+                    .integer    => |x| return x != 0,
+                    .float      => |x| return x != 0.0,
+                    .string     => |x| return std.mem.eql(u8, x, "true"),
+                    else        => return JrErrors.InvalidJsonValueType,
+                },
+                .int => switch (json_value) {
+                    .integer    => |x| return x,
+                    .string     => |x| return try std.fmt.parseInt(i64, x, 10),
+                    else        => return JrErrors.InvalidJsonValueType,
+                },
+                .float => switch (json_value) {
+                    .float      => |x| return x,
+                    .integer    => |x| return @as(f64, @floatFromInt(x)),
+                    .string     => |x| return try std.fmt.parseFloat(f64, x),
+                    else        => return JrErrors.InvalidJsonValueType,
+                },
+                .pointer => {
+                    if (opts.alloc) |alloc| {
+                        switch (json_value) {
+                            .bool       => |x| return try allocPrint(alloc, "{}", .{x}),
+                            .integer    => |x| return try allocPrint(alloc, "{}", .{x}),
+                            .float      => |x| return try allocPrint(alloc, "{}", .{x}),
+                            .string     => |x| return try allocPrint(alloc, "{s}", .{x}),
+                            else        => return JrErrors.InvalidJsonValueType,
+                        }
+                    } else {
+                        switch (json_value) {
+                            .string     => |x| return x,
+                            else        => return JrErrors.InvalidJsonValueType,
+                        }
+                    }
+                },
+                else => return JrErrors.InvalidParamType,
+            }
+        }
+        
+    };
+
 }
 
 
