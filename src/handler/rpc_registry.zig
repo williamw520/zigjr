@@ -64,23 +64,16 @@ pub const RpcRegistry = struct {
         self.handlers.deinit();
     }
 
-    pub fn register(self: *Self, method: []const u8, comptime handler_fn: anytype) !void {
-        // @compileLog(fn_info);
-        const fn_info = getFnInfo(handler_fn);
-        const ctx_type = void;
-        const hinfo = getHandlerInfo(fn_info, ctx_type);
-        try validateHandler(hinfo, method);
-        const h = try makeRpcHandler(handler_fn, null, hinfo, self.alloc);
-        try self.handlers.put(method, h);
-    }
-
-    pub fn registerWithCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
-        const fn_info = getFnInfo(handler_fn);
-        const ctx_type = @TypeOf(context);
-        const hinfo = getHandlerInfo(fn_info, ctx_type);
-        try validateHandler(hinfo, method);
-        const h = try makeRpcHandler(handler_fn, context, hinfo, self.alloc);
-        try self.handlers.put(method, h);
+    pub fn register(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
+        try validateMethod(method);
+        if (@typeInfo(@TypeOf(context)) == .null) {
+            var nul_context = {};                   // empty struct for no context.
+            const h = try makeRpcHandler(handler_fn, &nul_context, self.alloc);
+            try self.handlers.put(method, h);
+        } else {
+            const h = try makeRpcHandler(handler_fn, context, self.alloc);
+            try self.handlers.put(method, h);
+        }
     }
 
     pub fn has(self: *Self, method: []const u8) bool {
@@ -147,14 +140,17 @@ const RpcHandler = struct {
     }
 };
 
-fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, backing_alloc: Allocator) !RpcHandler {
+fn makeRpcHandler(comptime F: anytype, context: anytype, backing_alloc: Allocator) !RpcHandler {
     const arena_ptr = try backing_alloc.create(ArenaAllocator);
     arena_ptr.* = ArenaAllocator.init(backing_alloc);
+
+    const hinfo = getHandlerInfo(F, context);
+    try validateHandler(hinfo);
 
     return .{
         .arena = arena_ptr,
         .arena_alloc = arena_ptr.allocator(),
-        .context = context,
+        .context = if (hinfo.has_ctx) context else null,
         .call = &struct {
             // Wrapping a specific function, its parameters, its return value, and its return error.
             fn call_wrapper(ctx: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult {
@@ -178,12 +174,14 @@ fn makeRpcHandler(comptime F: anytype, context: anytype, hinfo: HandlerInfo, bac
 }
 
 
-fn validateHandler(comptime hinfo: HandlerInfo, method: []const u8) !void {
-    _=hinfo;
-
+fn validateMethod(method: []const u8) !void {
     if (std.mem.startsWith(u8, method, "rpc.")) {   // By the JSON-RPC spec, "rpc." is reserved.
         return RegistrationErrors.InvalidMethodName;
     }
+}
+
+fn validateHandler(comptime hinfo: HandlerInfo) !void {
+    _=hinfo;
 }
 
 // Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
@@ -204,9 +202,12 @@ const HandlerInfo = struct {
     is_void:        bool,                   // The handler function has a void return type.
 };
 
-inline fn getHandlerInfo(comptime fn_info: Type.Fn, comptime ctx_type: type) HandlerInfo {
+// inline fn getHandlerInfo(comptime handler_fn: anytype, comptime ctx_type: type) HandlerInfo {
+inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) HandlerInfo {
+    const fn_info   = getFnInfo(handler_fn);
     const params    = fn_info.params;
-    const has_ctx   = ctx_type != void;
+    const ctx_type  = @TypeOf(context);
+    const has_ctx   = ctx_type != void and ctx_type != *void;
     const alloc_idx = if (has_ctx) 1 else 0;                // alloc parameter index is after context
     const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
     const user_idx  = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user parameter.
@@ -216,9 +217,9 @@ inline fn getHandlerInfo(comptime fn_info: Type.Fn, comptime ctx_type: type) Han
 
     return .{
         .fn_info    = fn_info,
-        .ctx_type   = ctx_type,
         .params     = params,
         .tuple_type = ParamTupleType(params),
+        .ctx_type   = ctx_type,
         .has_ctx    = has_ctx,
         .has_alloc  = has_alloc,
         .user_idx   = user_idx,

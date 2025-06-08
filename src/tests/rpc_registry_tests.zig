@@ -232,7 +232,7 @@ test "rpc_registry fn0" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn0", fn0);
+        try registry.register("fn0", null, fn0);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -253,10 +253,10 @@ test "rpc_registry fn0 variants" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn0", fn0);
-        try registry.register("fn0_with_err", fn0_with_err);
-        try registry.register("fn0_return_value", fn0_return_value);
-        try registry.register("fn0_return_value_with_err", fn0_return_value_with_err);
+        try registry.register("fn0", null, fn0);
+        try registry.register("fn0_with_err", null, fn0_with_err);
+        try registry.register("fn0_return_value", null, fn0_return_value);
+        try registry.register("fn0_return_value_with_err", null, fn0_return_value_with_err);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -313,11 +313,11 @@ test "rpc_registry fn1" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn1", fn1);
-        try registry.register("fn1_with_err", fn1_with_err);
-        try registry.register("fn1_return_value", fn1_return_value);
-        try registry.register("fn1_return_value_with_err", fn1_return_value_with_err);
-        try registry.register("fn1_alloc", fn1_alloc);
+        try registry.register("fn1", null, fn1);
+        try registry.register("fn1_with_err", null, fn1_with_err);
+        try registry.register("fn1_return_value", null, fn1_return_value);
+        try registry.register("fn1_return_value_with_err", null, fn1_return_value_with_err);
+        try registry.register("fn1_alloc", null, fn1_alloc);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -385,10 +385,10 @@ test "rpc_registry fn2" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn2", fn2);
-        try registry.register("fn2_with_err", fn2_with_err);
-        try registry.register("fn2_return_value", fn2_return_value);
-        try registry.register("fn2_return_value_with_err", fn2_return_value_with_err);
+        try registry.register("fn2", null, fn2);
+        try registry.register("fn2_with_err", null, fn2_with_err);
+        try registry.register("fn2_return_value", null, fn2_return_value);
+        try registry.register("fn2_return_value_with_err", null, fn2_return_value_with_err);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -434,7 +434,6 @@ test "rpc_registry fn2" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
-
 test "rpc_registry with context" {
     const alloc = gpa.allocator();
     {
@@ -443,10 +442,10 @@ test "rpc_registry with context" {
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.registerWithCtx("ctx.get", &ctx, Ctx.get);
-        try registry.registerWithCtx("ctx.fn0", &ctx, Ctx.fn0);
-        try registry.registerWithCtx("ctx.fn1", &ctx, Ctx.fn1);
-        try registry.registerWithCtx("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
+        try registry.register("ctx.get", &ctx, Ctx.get);
+        try registry.register("ctx.fn0", &ctx, Ctx.fn0);
+        try registry.register("ctx.fn1", &ctx, Ctx.fn1);
+        try registry.register("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -510,7 +509,7 @@ test "rpc_registry with return struct value" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn_cat", fn_cat);
+        try registry.register("fn_cat", null, fn_cat);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -541,7 +540,7 @@ test "rpc_registry passing in an Value as a parameter" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn_cat_value", fn_cat_value);
+        try registry.register("fn_cat_value", null, fn_cat_value);
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
@@ -575,7 +574,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn_cat_value_alloc", fn_cat_value_alloc);
+        try registry.register("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
             const req_json = try zigjr.messages.toRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
@@ -610,7 +609,7 @@ test "rpc_registry passing in an ObjectMap Value as a parameter, with a context,
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.registerWithCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
+        try registry.register("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
@@ -644,7 +643,7 @@ test "rpc_registry passing in a struct object as a parameter" {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn_cat_struct", fn_cat_struct);
+        try registry.register("fn_cat_struct", null, fn_cat_struct);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -678,7 +677,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.register("fn_cat_struct_alloc", fn_cat_struct_alloc);
+        try registry.register("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
 
         {
             const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
@@ -714,7 +713,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.registerWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
+        try registry.register("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -750,7 +749,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.registerWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
+        try registry.register("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -786,10 +785,10 @@ test "rpc_registry register standalone functions on standalone object." {
 
         var s = Standalone{};
 
-        try registry.registerWithCtx("fn_standalone_on", &s, fn_standalone_on);
-        try registry.registerWithCtx("fn_standalone_off", &s, fn_standalone_off);
-        try registry.registerWithCtx("fn_standalone_get", &s, fn_standalone_get);
-        try registry.registerWithCtx("fn_standalone_msg", &s, fn_standalone_msg);
+        try registry.register("fn_standalone_on", &s, fn_standalone_on);
+        try registry.register("fn_standalone_off", &s, fn_standalone_off);
+        try registry.register("fn_standalone_get", &s, fn_standalone_get);
+        try registry.register("fn_standalone_msg", &s, fn_standalone_msg);
 
         {
             const req_json = try zigjr.messages.toRequestJson(alloc, "fn_standalone_on", null, .none);
