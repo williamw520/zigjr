@@ -25,7 +25,6 @@ const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
 const json_call = @import("json_call.zig");
-// const ValueAs = json_call.ValueAs;
 
 
 pub const RpcRegistry = struct {

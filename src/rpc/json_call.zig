@@ -8,6 +8,7 @@
 
 const std = @import("std");
 const Type = std.builtin.Type;
+const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const allocPrint = std.fmt.allocPrint;
@@ -246,20 +247,7 @@ fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyo
 
     // Pack the JSON param to a tuple for the F's params.
     const args: hinfo.tuple_type = try valueToTuple(hinfo, ctx, alloc, json_primitive);
-
-    if (hinfo.is_void) {
-        if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.asNone();
-    } else {
-        const res = if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
-    }
+    return callF(F, hinfo, alloc, args);
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
@@ -268,22 +256,9 @@ fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
-    // Pack JSON array params to a tuple for the F's params.
+    // Pack the JSON params to a tuple for the F's params.
     const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, json_args);
-
-    if (hinfo.is_void) {
-        if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.asNone();
-    } else {
-        const res = if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
-    }
+    return callF(F, hinfo, alloc, args);
 }
 
 fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
@@ -293,37 +268,28 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
         return DispatchErrors.MismatchedParamCounts;
 
     // Map the incoming JSON value into a struct object.
-    // alloc is an arena allocator; don't need to free the parsed result here.
+    // Alloc is an arena allocator; don't need to free the parsed result here.
     const parsed = try std.json.parseFromValue(hinfo.obj_type, alloc, obj_map, .{});
     const obj: hinfo.obj_type = parsed.value;
 
     // Pack JSON array params to a tuple for the F's params.
     const args: hinfo.tuple_type = objToTuple(hinfo, ctx, alloc, obj);
-
-    if (hinfo.is_void) {
-        if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.asNone();
-    } else {
-        const res = if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
-    }
+    return callF(F, hinfo, alloc, args);
 }
 
-fn callOnArray(comptime F: anytype, hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
                array: Array) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + array.items.len)
         return DispatchErrors.MismatchedParamCounts;
 
-    // Pack JSON array params to a tuple for fn params.
+    // Pack the JSON array params to a tuple for fn params.
     const args: hinfo.tuple_type = try valuesToTuple(hinfo, alloc, array, ctx);
+    return callF(F, hinfo, alloc, args);
+}
 
+fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, alloc: Allocator,
+         args: hinfo.tuple_type) anyerror!DispatchResult {
     if (hinfo.is_void) {
         if (hinfo.has_err)
             try @call(.auto, F, args)
@@ -446,7 +412,7 @@ fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, o
 
 /// Convert the std.json.Value to the primitive type (bool, i64, f64, []const u8),
 /// within the scope of JSON data type.
-pub fn ValueAs(comptime V: type) type {
+fn ValueAs(comptime V: type) type {
     const vinfo = @typeInfo(V);
 
     // Check for supported parameter value types.
@@ -513,6 +479,66 @@ pub fn ValueAs(comptime V: type) type {
         
     };
 
+}
+
+
+
+test "Test simple JSON value conversion." {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = gpa.allocator();
+    {
+        _=alloc;
+        try testing.expectEqual(ValueAs(i64).from(.{ .integer = 10 }), 10);
+        try testing.expectEqual(ValueAs(i128).from(.{ .integer = 10 }), 10);
+
+        try testing.expectEqual(ValueAs(bool).from(.{ .bool = true }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .bool = false }), false);
+        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 0 }), false);
+        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 1 }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 2 }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .integer = -2 }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .float = 0 }), false);
+        try testing.expectEqual(ValueAs(bool).from(.{ .float = 1 }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .float = -1 }), true);
+        try testing.expectEqual(ValueAs(bool).from(.{ .float = -1.2 }), true);
+
+        try testing.expectEqual(ValueAs(f64).from(.{ .float = 1.2 }), 1.2);
+        try testing.expectEqual(ValueAs(f64).from(.{ .float = -1.2 }), -1.2);
+        try testing.expectEqual(ValueAs(f128).from(.{ .float = 10 }), 10);
+        try testing.expectEqual(ValueAs(f64).from(.{ .integer = 12 }), 12);
+
+        try testing.expectEqualSlices(u8, try ValueAs([]const u8).from(.{ .string = "hello" }), "hello");
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test simple JSON value conversion on invalid JSON values." {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = gpa.allocator();
+    {
+        _=alloc;
+        try testing.expectEqual(ValueAs(i64).from(.{ .float = 0 }), JrErrors.InvalidJsonValueType);
+        try testing.expectEqual(ValueAs(i128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+        try testing.expectEqual(ValueAs(i64).from(.{ .string = "abc" }), error.InvalidCharacter);
+
+        try testing.expectEqual(ValueAs(f128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+        try testing.expectEqual(ValueAs(f64).from(.{ .string = "abc" }), error.InvalidCharacter);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test JSON value conversion with alloc." {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = gpa.allocator();
+    {
+        const x = try ValueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });
+        try testing.expectEqualSlices(u8, x, "hello");
+
+        try testing.expectEqual(ValueAs(i64).fromAlloc(.{ .integer = 10 }, .{ .alloc = alloc }), 10);
+        
+        alloc.free(x);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 
