@@ -80,7 +80,7 @@ pub const RpcRegistry = struct {
         _=dresult;
 
         if (self.handlers.getPtr(req.method))|h| {
-            h.invokeDone();
+            h.reset();
         }
     }
 

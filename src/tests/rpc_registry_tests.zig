@@ -41,6 +41,12 @@ fn fn0_return_value_with_err() ![]const u8 {
     return "Hello";
 }
 
+fn fn0_alloc(alloc: Allocator) !void {
+    std.debug.print("fn0_alloc() called\n", .{});
+    // The arena allocator will take care of freeing it.
+    _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
+}
+
 
 fn fn1(a: i64) void {
     std.debug.print("fn1() called, a:{}\n", .{a});
@@ -60,8 +66,9 @@ fn fn1_return_value_with_err(a: i64) ![]const u8 {
     return "Hello";
 }
 
-fn fn1_alloc(alloc: Allocator, a: i64) !void {
-    std.debug.print("fn1_alloc() called, a:{}\n", .{a});
+fn fn1_alloc_with_err(alloc: Allocator, a: i64) !void {
+    std.debug.print("fn1_alloc_with_err() called, a:{}\n", .{a});
+    // The arena allocator will take care of freeing it.
     _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
 }
 
@@ -81,6 +88,12 @@ fn fn2_return_value(a: i64, b: bool) i64 {
 fn fn2_return_value_with_err(a: i64, b: bool) i64 {
     std.debug.print("fn2_return_value_with_err() called, a:{}, b:{}\n", .{a, b});
     return if (b) a * 1 else a * 2;
+}
+
+fn fn2_alloc_with_err(alloc: Allocator, a: i64, b: bool) !void {
+    std.debug.print("fn2_alloc_with_err() called, a:{}, b:{}\n", .{a, b});
+    // The arena allocator will take care of freeing it.
+    _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
 }
 
 
@@ -257,6 +270,7 @@ test "rpc_registry fn0 variants" {
         try registry.register("fn0_with_err", null, fn0_with_err);
         try registry.register("fn0_return_value", null, fn0_return_value);
         try registry.register("fn0_return_value_with_err", null, fn0_return_value_with_err);
+        try registry.register("fn0_alloc", null, fn0_alloc);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -301,7 +315,17 @@ test "rpc_registry fn0 variants" {
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("Hello"));
         }
-        
+
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            try testing.expect(res_json.len == 0);
+        }
+
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -317,7 +341,7 @@ test "rpc_registry fn1" {
         try registry.register("fn1_with_err", null, fn1_with_err);
         try registry.register("fn1_return_value", null, fn1_return_value);
         try registry.register("fn1_return_value_with_err", null, fn1_return_value_with_err);
-        try registry.register("fn1_alloc", null, fn1_alloc);
+        try registry.register("fn1_alloc_with_err", null, fn1_alloc_with_err);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -367,7 +391,7 @@ test "rpc_registry fn1" {
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
-                \\{"jsonrpc": "2.0", "method": "fn1_alloc", "params": [1], "id": 1}
+                \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
             , &registry) orelse "";
             defer alloc.free(res_json);
 
@@ -389,6 +413,7 @@ test "rpc_registry fn2" {
         try registry.register("fn2_with_err", null, fn2_with_err);
         try registry.register("fn2_return_value", null, fn2_return_value);
         try registry.register("fn2_return_value_with_err", null, fn2_return_value_with_err);
+        try registry.register("fn2_alloc_with_err", null, fn2_alloc_with_err);
 
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
@@ -430,9 +455,19 @@ test "rpc_registry fn2" {
             try testing.expect((try res_result.response()).resultEql(8));
         }
         
+        {
+            const res_json = try zigjr.handleRequestToJson(alloc,
+                \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
+            , &registry) orelse "";
+            defer alloc.free(res_json);
+
+            try testing.expect(res_json.len == 0);
+        }
+
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
 
 test "rpc_registry with context" {
     const alloc = gpa.allocator();
