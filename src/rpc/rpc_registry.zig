@@ -75,9 +75,9 @@ pub const RpcRegistry = struct {
     }
 
     pub fn dispatchEnd(self: *Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+        // RpcHandler uses ArenaAllocator so no need to explicitly free the dresult.
         _=alloc;
         _=dresult;
-
         if (self.handlers.getPtr(req.method))|h| {
             h.reset();
         }

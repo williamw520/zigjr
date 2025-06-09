@@ -28,14 +28,26 @@ pub const RpcHandler = struct {
     arena: *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
     arena_alloc: Allocator,
     context: ?*anyopaque,
-    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult,
+    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult,
 
     /// Call the handler callback fn with the arguments in the JSON value.
-    pub fn invoke(self: *RpcHandler, json_args: Value) anyerror!DispatchResult {
-        return self.call(self.context, self.arena_alloc, json_args);
+    pub fn invoke(self: *RpcHandler, value_args: Value) anyerror!DispatchResult {
+        return self.call(self.context, self.arena_alloc, value_args);
     }
 
-    /// Reset arena memory accumulated at each invoke() call.
+    /// Call the handler callback fn with the arguments in the JSON string.
+    pub fn invokeJson(self: *RpcHandler, json_args: []const u8) anyerror!DispatchResult {
+        const trimmed = std.mem.trim(u8, json_args, " ");
+        if (trimmed.len == 0) {
+            return self.call(self.context, self.arena_alloc, .{ .null = {} });
+        } else {
+            const parsed = try std.json.parseFromSlice(Value, self.arena_alloc, trimmed, .{});
+            defer parsed.deinit();
+            return self.call(self.context, self.arena_alloc, parsed.value);
+        }
+    }
+
+    /// Reset arena memory accumulated at each invoke()/invokeJson() call.
     /// The frequency of reset is up to the caller. It can be for each invoke() or batched up.
     pub fn reset(self: *RpcHandler) void {
         _ = self.arena.reset(.{ .retain_with_limit = 1024 });
@@ -87,19 +99,19 @@ pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allo
         .arena_alloc = arena_ptr.allocator(),
         .context = if (hinfo.has_ctx) context else null,
         .call = &struct {
-            fn call_wrapper(ctx: ?*anyopaque, arena_alloc: Allocator, json_args: Value) anyerror!DispatchResult {
+            fn call_wrapper(ctx: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult {
                 if (hinfo.is_value) {
-                    return callOnValue(F, hinfo, ctx, arena_alloc, json_args);
+                    return callOnValue(F, hinfo, ctx, arena_alloc, value_args);
                 } else if (hinfo.is_obj) {
-                    return callOnObject(F, hinfo, ctx, arena_alloc, json_args);
+                    return callOnObject(F, hinfo, ctx, arena_alloc, value_args);
                 }
-                switch (json_args) {
+                switch (value_args) {
                     .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
-                    .array  => return callOnArray(F, hinfo, ctx, arena_alloc, json_args.array),
+                    .array  => return callOnArray(F, hinfo, ctx, arena_alloc, value_args.array),
                     .bool, .integer, .float, .string =>
-                        return callOnPrimitive(F, hinfo, ctx, arena_alloc, json_args),
+                        return callOnPrimitive(F, hinfo, ctx, arena_alloc, value_args),
                     else    => {
-                        std.debug.print("Unexpected JSON params: {any}\n", .{json_args});
+                        std.debug.print("Unexpected JSON params: {any}\n", .{value_args});
                         return DispatchErrors.InvalidParams;
                     },
                 }
@@ -251,13 +263,13 @@ fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyo
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-               json_args: Value) anyerror!DispatchResult {
+               value_args: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack the JSON params to a tuple for the F's params.
-    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, json_args);
+    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, value_args);
     return callF(F, hinfo, alloc, args);
 }
 

@@ -71,6 +71,23 @@ fn fn1_alloc_with_err(alloc: Allocator, a: i64) !void {
 }
 
 
+fn fn4(a: i64, b: f64, c: bool, d: []const u8) void {
+    std.debug.print("fn4_integer() called, a:{}, b:{}, c:{}, d:{s}\n", .{a, b, c, d});
+}
+
+
+const CatInfo = struct {
+    cat_name: []const u8,
+    weight: f64,
+    eye_color: []const u8,
+};
+
+fn fn_cat(a: CatInfo) void {
+    std.debug.print("fn4_integer() called, a:{any}\n", .{a});
+}
+
+
+
 test "Test rpc call on fn0." {
     const alloc = gpa.allocator();
     {
@@ -78,6 +95,7 @@ test "Test rpc call on fn0." {
         var h = try json_call.makeRpcHandler(&ctx, fn0, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .null = {} });
+        _ = try h.invokeJson("");
         h.reset();
         _ = try h.invoke(.{ .null = {} });
         h.reset();
@@ -91,11 +109,13 @@ test "Test rpc call on fn0." {
         defer h.deinit();
         _ = try h.invoke(.{ .null = {} });
         _ = try h.invoke(.{ .null = {} });
+        _ = try h.invokeJson("");
         h.reset();
     }
 
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
+
 
 test "Test rpc call on fn1." {
     const alloc = gpa.allocator();
@@ -104,24 +124,28 @@ test "Test rpc call on fn1." {
         var h = try json_call.makeRpcHandler(&ctx, fn1_integer, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .integer = 123 });
+        _ = try h.invokeJson("123");
         h.reset();
 
         var array = std.json.Array.init(alloc);
         try array.append(.{ .integer = 456 });
         defer array.deinit();
         _ = try h.invoke(.{ .array = array });
+        _ = try h.invokeJson("[123]");
         h.reset();
     }
     {
         var h = try json_call.makeRpcHandler(&ctx, fn1_alloc_with_err, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .integer = 123 });
+        _ = try h.invokeJson("123");
     }
 
     {
         var h = try json_call.makeRpcHandler(&ctx, fn1_float, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .float = 1.23 });
+        _ = try h.invokeJson("1.23");
         h.reset();
     }
     {
@@ -131,6 +155,7 @@ test "Test rpc call on fn1." {
         try array.append(.{ .float = 4.56 });
         defer array.deinit();
         _ = try h.invoke(.{ .array = array });
+        _ = try h.invokeJson("[1.23]");
         h.reset();
     }
     
@@ -138,6 +163,7 @@ test "Test rpc call on fn1." {
         var h = try json_call.makeRpcHandler(&ctx, fn1_bool, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .bool = true });
+        _ = try h.invokeJson("true");
         h.reset();
     }
     {
@@ -147,6 +173,7 @@ test "Test rpc call on fn1." {
         try array.append(.{ .bool = false });
         defer array.deinit();
         _ = try h.invoke(.{ .array = array });
+        _ = try h.invokeJson("[false]");
         h.reset();
     }
     
@@ -154,6 +181,7 @@ test "Test rpc call on fn1." {
         var h = try json_call.makeRpcHandler(&ctx, fn1_string, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .string = "Hello123" });
+        _ = try h.invokeJson("\"Hello123\"");
         h.reset();
     }
     {
@@ -163,9 +191,40 @@ test "Test rpc call on fn1." {
         try array.append(.{ .string = "Hello456" });
         defer array.deinit();
         _ = try h.invoke(.{ .array = array });
+        _ = try h.invokeJson("[\"Hello456\"]");
         h.reset();
     }
 
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test rpc call on fn4." {
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn4, alloc);
+        defer h.deinit();
+        _ = try h.invokeJson("[123, 4.56, true, \"abc\"]");
+        h.reset();
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test rpc call on fn_cat." {
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn_cat, alloc);
+        defer h.deinit();
+        _ = try h.invokeJson(
+                \\{
+                \\ "cat_name": "cat1",
+                \\ "weight": 5.5,
+                \\ "eye_color": "brown"
+                \\}
+        );
+        h.reset();
+    }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
