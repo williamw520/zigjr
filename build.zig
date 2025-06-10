@@ -21,13 +21,28 @@ pub fn build(b: *std.Build) void {
     });
     cli_exe_mod.addImport("zigjr", zigjr_mod);
 
-    const exe = b.addExecutable(.{
+    const cli_exe = b.addExecutable(.{
         .name = "zigjr-cli",
         .root_module = cli_exe_mod,
     });
-    b.installArtifact(exe);
+    b.installArtifact(cli_exe);
 
-    const run_cmd = b.addRunArtifact(exe);
+    const run_cmd = b.addRunArtifact(cli_exe);
+
+    const example_calc_mod = b.createModule(.{
+        .root_source_file = b.path("src/examples/calc.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = strip_debug_symbols,
+    });
+    example_calc_mod.addImport("zigjr", zigjr_mod);
+
+    const example_calc_exe = b.addExecutable(.{
+        .name = "example_calc",
+        .root_module = example_calc_mod,
+    });
+    b.installArtifact(example_calc_exe);
+
 
     run_cmd.step.dependOn(b.getInstallStep());
 
