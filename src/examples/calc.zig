@@ -8,6 +8,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const StringHashMap = std.hash_map.StringHashMap;
 
 const zigjr = @import("zigjr");
 
@@ -17,6 +18,9 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
+        var stash = Stash.init(alloc);
+        defer stash.deinit();
+
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
 
@@ -28,6 +32,8 @@ pub fn main() !void {
         try registry.register("logNum", null, logNum);      // function with no result.
         try registry.register("inc", &g_sum, increase);     // attach a context to the function.
         try registry.register("dec", &g_sum, decrease);     // attach the same context to another function.
+        try registry.register("load", &stash, Stash.load);  // handler on a struct object.
+        try registry.register("save", &stash, Stash.save);  // handler on a struct object.
 
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
@@ -86,6 +92,35 @@ fn decrease(ctx_sum: *i64, a: i64) i64 {
     ctx_sum.* -= a;
     return ctx_sum.*;
 }
+
+
+const Stash = struct {
+    alloc:  Allocator,
+    map:    StringHashMap(f64),
+
+    fn init(alloc: Allocator) @This() {
+        return .{
+            .alloc = alloc,
+            .map = StringHashMap(f64).init(alloc),
+        };
+    }
+
+    fn deinit(self: *@This()) void {
+        var iter = self.map.keyIterator();
+        while (iter.next()) |key| self.alloc.free(key.*);
+        self.map.deinit();
+    }
+
+    fn load(self: *@This(), key: []const u8) ?f64 {
+        return self.map.get(key);
+    }
+
+    fn save(self: *@This(), key: []const u8, amount: f64) !bool {
+        const existed = self.map.contains(key);
+        try self.map.put(try self.alloc.dupe(u8, key), amount);
+        return existed;
+    }
+};
 
 
 fn usage() void {
