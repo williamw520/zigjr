@@ -26,6 +26,7 @@ pub fn main() !void {
         try handlers.register("hello-name", null, helloName);
         try handlers.register("say", null, say);
 
+        // Read a JSON-RPC request JSON from StdIn.
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
             defer alloc.free(request);
