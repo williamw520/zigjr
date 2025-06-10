@@ -15,50 +15,49 @@ const zigjr = @import("zigjr");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
 
-    {
-        var stash = Stash.init(alloc);
-        defer stash.deinit();
+    try runExample(gpa.allocator());
 
-        var handlers = zigjr.RpcRegistry.init(alloc);
-        defer handlers.deinit();
+    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
+}
 
-        try handlers.register("add", null, Basic.add);      // register functions in a struct scope.
-        try handlers.register("subtract", null, Basic.subtract);
-        try handlers.register("multiply", null, Basic.multiply);
-        try handlers.register("divide", null, Basic.divide);
-        try handlers.register("pow", null, raiseToPower);   // register function from any scope.
-        try handlers.register("logNum", null, logNum);      // function with no result.
-        try handlers.register("inc", &g_sum, increase);     // attach a context to the function.
-        try handlers.register("dec", &g_sum, decrease);     // attach the same context to another function.
-        try handlers.register("load", &stash, Stash.load);  // handler on a struct object context.
-        try handlers.register("save", &stash, Stash.save);  // handler on a struct object context.
-        try handlers.register("weigh-cat", null, weighCat); // function with a struct parameter.
-        try handlers.register("make-cat", null, makeCat);   // function returns a struct parameter.
-        try handlers.register("clone-cat", null, cloneCat); // function returns an array.
-        try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
-        try handlers.register("add-weight", null, addWeight);
+fn runExample(alloc: Allocator) !void {
+    var stash = Stash.init(alloc);
+    defer stash.deinit();
 
-        const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
-        if (request.len > 0) {
-            defer alloc.free(request);
-            std.debug.print("Request:  {s}\n", .{request});
+    var handlers = zigjr.RpcRegistry.init(alloc);
+    defer handlers.deinit();
 
-            if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
-                defer alloc.free(response);
-                std.debug.print("Response: {s}\n", .{response});
-            } else {
-                std.debug.print("No response\n", .{});
-            }
+    try handlers.register("add", null, Basic.add);      // register functions in a struct scope.
+    try handlers.register("subtract", null, Basic.subtract);
+    try handlers.register("multiply", null, Basic.multiply);
+    try handlers.register("divide", null, Basic.divide);
+    try handlers.register("pow", null, raiseToPower);   // register function from any scope.
+    try handlers.register("logNum", null, logNum);      // function with no result.
+    try handlers.register("inc", &g_sum, increase);     // attach a context to the function.
+    try handlers.register("dec", &g_sum, decrease);     // attach the same context to another function.
+    try handlers.register("load", &stash, Stash.load);  // handler on a struct object context.
+    try handlers.register("save", &stash, Stash.save);  // handler on a struct object context.
+    try handlers.register("weigh-cat", null, weighCat); // function with a struct parameter.
+    try handlers.register("make-cat", null, makeCat);   // function returns a struct parameter.
+    try handlers.register("clone-cat", null, cloneCat); // function returns an array.
+    try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
+    try handlers.register("add-weight", null, addWeight);
+
+    const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
+    if (request.len > 0) {
+        defer alloc.free(request);
+        std.debug.print("Request:  {s}\n", .{request});
+
+        if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
+            defer alloc.free(response);
+            std.debug.print("Response: {s}\n", .{response});
         } else {
-            usage();
+            std.debug.print("No response\n", .{});
         }
+    } else {
+        usage();
     }
-
-    if (gpa.detectLeaks()) {
-        std.debug.print("Memory leak detected!\n", .{});
-    }    
 }
 
 const Basic = struct {
