@@ -32,8 +32,12 @@ pub fn main() !void {
         try registry.register("logNum", null, logNum);      // function with no result.
         try registry.register("inc", &g_sum, increase);     // attach a context to the function.
         try registry.register("dec", &g_sum, decrease);     // attach the same context to another function.
-        try registry.register("load", &stash, Stash.load);  // handler on a struct object.
-        try registry.register("save", &stash, Stash.save);  // handler on a struct object.
+        try registry.register("load", &stash, Stash.load);  // handler on a struct object context.
+        try registry.register("save", &stash, Stash.save);  // handler on a struct object context.
+        try registry.register("weigh-cat", null, weighCat); // function with a struct parameter.
+        try registry.register("make-cat", null, makeCat);   // function returns a struct parameter.
+        try registry.register("clone-cat", null, cloneCat); // function returns an array.
+        try registry.register("desc-cat", null, descCat);   // function returns a tuple.
 
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
@@ -123,10 +127,56 @@ const Stash = struct {
 };
 
 
+const CatInfo = struct {
+    cat_name: []const u8,
+    weight: f64,
+    eye_color: []const u8,
+};
+
+fn weighCat(cat: CatInfo) []const u8 {
+    if (std.mem.eql(u8, cat.cat_name, "Garfield")) return "Fat Cat!";
+    if (std.mem.eql(u8, cat.cat_name, "Odin")) return "Not a cat!";
+    if (0 < cat.weight and cat.weight <= 2.0) return "Tiny cat";
+    if (2.0 < cat.weight and cat.weight <= 10.0) return "Normal weight";
+    if (10.0 < cat.weight ) return "Heavy cat";
+    return "Something wrong";
+}
+
+fn makeCat(name: []const u8, eye_color: []const u8) CatInfo {
+    const seed: u64 = @truncate(name.len);
+    var prng = std.Random.DefaultPrng.init(seed);
+    return .{
+        .cat_name = name,
+        .weight = @floatFromInt(prng.random().uintAtMost(u32, 20)),
+        .eye_color = eye_color,
+    };
+}
+
+fn cloneCat(alloc: Allocator, cat: CatInfo) ![2]CatInfo {
+    return .{
+        cat,
+        CatInfo {
+            .cat_name = try std.fmt.allocPrint(alloc, "Clone of {s}", .{cat.cat_name}),
+            .weight = cat.weight * 2,
+            .eye_color = cat.eye_color,
+        },
+    };
+}
+
+fn descCat(cat: CatInfo) struct { []const u8, f64, f64, []const u8 } {
+    return .{
+        cat.cat_name,
+        cat.weight,
+        cat.weight * 2,
+        cat.eye_color,
+    };
+}
+
+
 fn usage() void {
     std.debug.print(
-        \\Usage:  example_program
-        \\Usage:  example_program < message.json
+        \\Usage:  example_calc
+        \\Usage:  example_calc < message.json
         \\
         \\The program reads from stdin.
         , .{});

@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "method": "desc-cat", "params": {"cat_name":"Cat1","weight":4.0,"eye_color":"brown"}, "id": 1}

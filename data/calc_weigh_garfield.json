@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "method": "weigh-cat", "params": {"cat_name":"Garfield","weight":1.8e1,"eye_color":"red"}, "id": 1}
