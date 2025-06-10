@@ -38,6 +38,7 @@ pub fn main() !void {
         try handlers.register("make-cat", null, makeCat);   // function returns a struct parameter.
         try handlers.register("clone-cat", null, cloneCat); // function returns an array.
         try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
+        try handlers.register("add-weight", null, addWeight);
 
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
@@ -170,6 +171,12 @@ fn descCat(cat: CatInfo) struct { []const u8, f64, f64, []const u8 } {
         cat.weight * 2,
         cat.eye_color,
     };
+}
+
+fn addWeight(weight: f64, cat: CatInfo) CatInfo {
+    var cat2 = cat;
+    cat2.weight += weight;
+    return cat2;
 }
 
 

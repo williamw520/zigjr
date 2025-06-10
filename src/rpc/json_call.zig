@@ -392,7 +392,12 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
     inline for (start_idx..tt_info.fields.len)|i| {
         const field = tt_info.fields[i];
         const value = values.items[i - start_idx];
-        @field(tuple, field.name) = try ValueAs(field.type).from(value);
+        if (isStruct(field.type)) {
+            const parsed = try std.json.parseFromValue(field.type, alloc, value, .{});
+            @field(tuple, field.name) = parsed.value;
+        } else {
+            @field(tuple, field.name) = try ValueAs(field.type).from(value);
+        }
     }
     return tuple;
 }
