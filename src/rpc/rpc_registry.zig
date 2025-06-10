@@ -62,19 +62,19 @@ pub const RpcRegistry = struct {
         }
     }
 
-    pub fn has(self: *Self, method: []const u8) bool {
+    pub fn has(self: *const Self, method: []const u8) bool {
         return self.handlers.getPtr(method) != null;
     }
 
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    pub fn dispatch(self: *Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    pub fn dispatch(self: *const Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
         var h = self.handlers.getPtr(req.method) orelse return DispatchErrors.MethodNotFound;
         return h.invoke(req.params);
     }
 
-    pub fn dispatchEnd(self: *Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *const Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
         // RpcHandler uses ArenaAllocator so no need to explicitly free the dresult.
         _=alloc;
         _=dresult;

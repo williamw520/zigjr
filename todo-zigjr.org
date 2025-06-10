@@ -28,7 +28,8 @@ TODOs
 * DONE Convert JSON to native values.
 * DONE Use ArenaAllocator for each request handling invocation to avoid complicated cleanup.
 * DONE Add dispatching registry.
-* TODO Rename directory handler to rpc.
+* DONE Rename directory handler to rpc.
+* TODO Allow struct objects in array params.
 * TODO Add CLI on running request and response and on streaming.
 * TODO Add network server and client example.
 * TODO Add request and notification message builders.

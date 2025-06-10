@@ -19,6 +19,7 @@ pub fn main() !void {
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
+
         try registry.register("add", null, Handlers.add);   // register functions in a struct scope.
         try registry.register("subtract", null, Handlers.subtract);
         try registry.register("multiply", null, Handlers.multiply);
@@ -28,12 +29,12 @@ pub fn main() !void {
         try registry.register("inc", &g_sum, increase);     // attach a context to the function.
         try registry.register("dec", &g_sum, decrease);     // attach the same context to another function.
 
-        const line = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
-        if (line.len > 0) {
-            defer alloc.free(line);
-            std.debug.print("Request:  {s}\n", .{line});
+        const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
+        if (request.len > 0) {
+            defer alloc.free(request);
+            std.debug.print("Request:  {s}\n", .{request});
 
-            if (try zigjr.msg_handler.handleRequestToJson(alloc, line, &registry)) |response| {
+            if (try zigjr.handleRequestToJson(alloc, request, registry)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {
