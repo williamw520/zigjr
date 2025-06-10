@@ -21,30 +21,30 @@ pub fn main() !void {
         var stash = Stash.init(alloc);
         defer stash.deinit();
 
-        var registry = zigjr.RpcRegistry.init(alloc);
-        defer registry.deinit();
+        var handlers = zigjr.RpcRegistry.init(alloc);
+        defer handlers.deinit();
 
-        try registry.register("add", null, Handlers.add);   // register functions in a struct scope.
-        try registry.register("subtract", null, Handlers.subtract);
-        try registry.register("multiply", null, Handlers.multiply);
-        try registry.register("divide", null, Handlers.divide);
-        try registry.register("pow", null, raiseToPower);   // register function from any scope.
-        try registry.register("logNum", null, logNum);      // function with no result.
-        try registry.register("inc", &g_sum, increase);     // attach a context to the function.
-        try registry.register("dec", &g_sum, decrease);     // attach the same context to another function.
-        try registry.register("load", &stash, Stash.load);  // handler on a struct object context.
-        try registry.register("save", &stash, Stash.save);  // handler on a struct object context.
-        try registry.register("weigh-cat", null, weighCat); // function with a struct parameter.
-        try registry.register("make-cat", null, makeCat);   // function returns a struct parameter.
-        try registry.register("clone-cat", null, cloneCat); // function returns an array.
-        try registry.register("desc-cat", null, descCat);   // function returns a tuple.
+        try handlers.register("add", null, Basic.add);      // register functions in a struct scope.
+        try handlers.register("subtract", null, Basic.subtract);
+        try handlers.register("multiply", null, Basic.multiply);
+        try handlers.register("divide", null, Basic.divide);
+        try handlers.register("pow", null, raiseToPower);   // register function from any scope.
+        try handlers.register("logNum", null, logNum);      // function with no result.
+        try handlers.register("inc", &g_sum, increase);     // attach a context to the function.
+        try handlers.register("dec", &g_sum, decrease);     // attach the same context to another function.
+        try handlers.register("load", &stash, Stash.load);  // handler on a struct object context.
+        try handlers.register("save", &stash, Stash.save);  // handler on a struct object context.
+        try handlers.register("weigh-cat", null, weighCat); // function with a struct parameter.
+        try handlers.register("make-cat", null, makeCat);   // function returns a struct parameter.
+        try handlers.register("clone-cat", null, cloneCat); // function returns an array.
+        try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
 
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
             defer alloc.free(request);
             std.debug.print("Request:  {s}\n", .{request});
 
-            if (try zigjr.handleRequestToJson(alloc, request, registry)) |response| {
+            if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {
@@ -60,7 +60,7 @@ pub fn main() !void {
     }    
 }
 
-const Handlers = struct {
+const Basic = struct {
     fn add(a: i64, b: i64) i64      { return a + b; }
     fn subtract(a: i64, b: i64) i64 { return a - b; }
     fn multiply(a: i64, b: i64) i64 { return a * b; }
@@ -175,8 +175,8 @@ fn descCat(cat: CatInfo) struct { []const u8, f64, f64, []const u8 } {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  example_calc
-        \\Usage:  example_calc < message.json
+        \\Usage:  calc
+        \\Usage:  calc < message.json
         \\
         \\The program reads from stdin.
         , .{});

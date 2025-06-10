@@ -29,6 +29,7 @@ pub fn build(b: *std.Build) void {
 
     const run_cmd = b.addRunArtifact(cli_exe);
 
+
     const example_calc_mod = b.createModule(.{
         .root_source_file = b.path("src/examples/calc.zig"),
         .target = target,
@@ -38,10 +39,24 @@ pub fn build(b: *std.Build) void {
     example_calc_mod.addImport("zigjr", zigjr_mod);
 
     const example_calc_exe = b.addExecutable(.{
-        .name = "example_calc",
+        .name = "calc",
         .root_module = example_calc_mod,
     });
     b.installArtifact(example_calc_exe);
+
+    const example_hello_mod = b.createModule(.{
+        .root_source_file = b.path("src/examples/hello.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = strip_debug_symbols,
+    });
+    example_hello_mod.addImport("zigjr", zigjr_mod);
+
+    const example_hello_exe = b.addExecutable(.{
+        .name = "hello",
+        .root_module = example_hello_mod,
+    });
+    b.installArtifact(example_hello_exe);
 
 
     run_cmd.step.dependOn(b.getInstallStep());

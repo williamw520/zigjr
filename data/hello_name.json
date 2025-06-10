@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "method": "hello-name", "params": ["Foobar"], "id": 1}
