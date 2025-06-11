@@ -21,10 +21,9 @@ pub fn main() !void {
         var args = try CmdArgs.init(alloc);
         defer args.deinit();
         args.parse() catch { usage(); return; };
-        
         try runExample(alloc, args);
     }
-    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
+    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }
 }
 
 fn runExample(alloc: Allocator, args: CmdArgs) !void {
@@ -51,13 +50,14 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     try handlers.register("add-weight", null, addWeight);
 
     if (args.by_delimiter) {
-        const streamer = zigjr.stream.DelimiterStream.init(alloc, .{});
-        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+        // Handle streaming of requests separated by a delimiter (LF).
+        const streamer = zigjr.DelimiterStream.init(alloc, .{});
         try streamer.streamRequests(std.io.getStdIn().reader(),
                                     std.io.getStdOut().writer(),
                                     handlers);
     } else if (args.by_length) {
-        const streamer = zigjr.stream.ContentLengthStream.init(alloc, .{});
+        // Handle streaming of requests separated by the Content-Length header.
+        const streamer = zigjr.ContentLengthStream.init(alloc, .{});
         try streamer.streamRequests(std.io.getStdIn().reader(),
                                     std.io.getStdOut().writer(),
                                     handlers);

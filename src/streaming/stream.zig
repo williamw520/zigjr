@@ -14,7 +14,7 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const zigjr = @import("../zigjr.zig");
 
-const msg_handler = zigjr.msg_handler;
+const msg_handler = @import("../rpc/msg_handler.zig");
 const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
 
@@ -103,7 +103,7 @@ pub const DelimiterStream = struct {
 
 };
 
-const DelimiterStreamOptions = struct {
+pub const DelimiterStreamOptions = struct {
     request_delimiter: u8 = '\n',
     response_delimiter: u8 = '\n',
     skip_blank_message: bool = true,

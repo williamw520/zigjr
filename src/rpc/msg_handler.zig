@@ -13,14 +13,14 @@ const ArrayList = std.ArrayList;
 
 const zigjr = @import("../zigjr.zig");
 
-const parseRpcRequest = zigjr.request.parseRpcRequest;
-const RpcRequest = zigjr.request.RpcRequest;
-const RpcId = zigjr.request.RpcId;
+const parseRpcRequest = zigjr.parseRpcRequest;
+const RpcRequest = zigjr.RpcRequest;
+const RpcId = zigjr.RpcId;
 
-const parseRpcResponse = zigjr.response.parseRpcResponse;
-const RpcResponse = zigjr.response.RpcResponse;
-const RpcResponseResult = zigjr.response.RpcResponseResult;
-const RpcResponseMessage = zigjr.response.RpcResponseMessage;
+const parseRpcResponse = zigjr.parseRpcResponse;
+const RpcResponse = zigjr.RpcResponse;
+const RpcResponseResult = zigjr.RpcResponseResult;
+const RpcResponseMessage = zigjr.RpcResponseMessage;
 
 const ErrorCode = zigjr.errors.ErrorCode;
 const JrErrors = zigjr.errors.JrErrors;

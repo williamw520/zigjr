@@ -14,8 +14,8 @@ const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 const DispatchResult = zigjr.DispatchResult;
-const stream = zigjr.stream;
-const frame = zigjr.frame;
+const stream = @import("../streaming/stream.zig");
+const frame = @import("../streaming/frame.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 

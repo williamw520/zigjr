@@ -16,7 +16,7 @@ const JrErrors = zigjr.JrErrors;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
-const rpc_reg = zigjr.rpc_registry;
+const rpc_reg = @import("../rpc/rpc_registry.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 

@@ -20,7 +20,7 @@ const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 
-const RpcRequest = zigjr.request.RpcRequest;
+const RpcRequest = zigjr.RpcRequest;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
