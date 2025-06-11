@@ -22,22 +22,22 @@ const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
 
-/// Uniform callback object that can be stored in a hash map.
+/// Uniform call object that can be stored in a hash map.
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 pub const RpcHandler = struct {
     arena: *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
     arena_alloc: Allocator,
     context: ?*anyopaque,
-    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult,
+    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, params_value: Value) anyerror!DispatchResult,
 
-    /// Call the handler callback fn with the arguments in the JSON value.
-    pub fn invoke(self: *RpcHandler, value_args: Value) anyerror!DispatchResult {
-        return self.call(self.context, self.arena_alloc, value_args);
+    /// Call the handler call fn with the JSON Value parameters.
+    pub fn invoke(self: *RpcHandler, params_value: Value) anyerror!DispatchResult {
+        return self.call(self.context, self.arena_alloc, params_value);
     }
 
-    /// Call the handler callback fn with the arguments in the JSON string.
-    pub fn invokeJson(self: *RpcHandler, json_args: []const u8) anyerror!DispatchResult {
-        const trimmed = std.mem.trim(u8, json_args, " ");
+    /// Call the handler call fn with the JSON string parameters, convenient method for testing.
+    pub fn invokeJson(self: *RpcHandler, params_json: []const u8) anyerror!DispatchResult {
+        const trimmed = std.mem.trim(u8, params_json, " ");
         if (trimmed.len == 0) {
             return self.call(self.context, self.arena_alloc, .{ .null = {} });
         } else {
@@ -61,59 +61,68 @@ pub const RpcHandler = struct {
 };
 
 /// Package a context, a function, its parameters, its return type, and its return error type
-/// into a RpcHandler object. This collects all the handler function's info in comptime,
+/// into a RpcHandler object. This collects all the handler function's info in comptime
 /// and maps the JSON values to the function's parameters in runtime.
 /// This allows dispatching a JSON-RPC call to arbitrary function (with some limitations).
 ///
 /// The parameter types of the handler function are limited to the JSON's data types
 /// - bool, i64, f64, string ([]const u8), and object (struct) - for the array based JSON-RPC parameters.
-/// For an object map based JSON-RPC parameter, the function parameter can be a struct type.
-/// RpcHandler will automatically convert the JSON ObjectMap to the struct value.
+/// For an ObjectMap based JSON-RPC parameter, the function parameter is the matching struct type.
+/// RpcHandler will automatically convert the JSON ObjectMap to the struct value at runtime.
 ///
-/// The return type of handler function can be any type that can be stringified to JSON.
+/// The return type of handler function is any type that can be stringified to JSON.
 /// Note that some types are converted to the JSON's data types in the result.
 ///
 /// There are a few special parameters of the handler function supported by RpcHandler.
 ///
-/// If the context object pointer is supplied (non-null), it is passed in as the first parameter
+/// If a context object pointer is supplied (non-null), it is passed in as the first parameter
 /// to the handler function. The context object can serve as the 'self' pointer for the function.
-/// The parameter type and the context type need to be the same.
+/// The first parameter's type and the context type need to be the same.
 ///
 /// If an Allocator parameter is declared as the first parameter of the handler function
 /// (or the second parameter if a context object is supplied), an allocator is passed in
 /// during invocation.  The allocator is an arena allocator so the function doesn't need
 /// to worry about freeing the memory.  The arena memory can be reset via the reset() function.
+/// The arena memory is reset for each dispatch() by higher level callers.
 ///
 /// If std.json.Value is declared as a single parameter of the handler function,
 /// the JSON-RPC parameters are passed in as a Value object without any interpretation.
-/// It's up to the function to handle the data and types in the Value object.
+/// It's up to the function to interpret the value types and extract the value data.
 /// e.g. fn h1(a: Value).
 ///
 /// If std.json.Values are declared as part of the parameters of the handler function,
 /// the JSON-RPC parameters of the correponding Value type function parameters are passed in
-/// as a Value object without any interpretation. e.g. fn h3(a: Value, b: i64, c: Value).
+/// as Value objects without any interpretation. e.g. fn h3(a: Value, b: i64, c: Value).
 ///
 pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allocator) !RpcHandler {
     const hinfo = getHandlerInfo(F, context);
     try validateHandler(hinfo);
 
     const wrapper = struct {
-        fn call(ctx: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult {
+        fn call(ctx: ?*anyopaque, arena_alloc: Allocator, params_value: Value) anyerror!DispatchResult {
+            // Function expects a single Value or a single struct object.
             if (hinfo.is_value1) {
-                return callOnValue(F, hinfo, ctx, arena_alloc, value_args);
+                return callOnValue(F, hinfo, ctx, arena_alloc, params_value);
             } else if (hinfo.is_obj1) {
-                return callOnObject(F, hinfo, ctx, arena_alloc, value_args);
+                switch (params_value) {
+                    .object => return callOnObject(F, hinfo, ctx, arena_alloc, params_value),
+                    else    => {
+                        std.debug.print("Expecting an ObjectMap but got unexpected JSON params: {any}\n", .{params_value});
+                        return DispatchErrors.InvalidParams;
+                    },
+                }
             }
-            switch (value_args) {
+            // Function expects no parameter or an array of parameters.
+            switch (params_value) {
                 .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
-                .array  => return callOnArray(F, hinfo, ctx, arena_alloc, value_args.array),
+                .array  => return callOnArray(F, hinfo, ctx, arena_alloc, params_value.array),
                 .bool, .integer, .float, .string => {
                     // JSON-RPC spec doesn't support primitive JSON types for the "params" property.
                     // Add them here for completeness.
-                    return callOnPrimitive(F, hinfo, ctx, arena_alloc, value_args);
+                    return callOnPrimitive(F, hinfo, ctx, arena_alloc, params_value);
                 },
                 else    => {
-                    std.debug.print("Unexpected JSON params: {any}\n", .{value_args});
+                    std.debug.print("Unexpected JSON params: {any}\n", .{params_value});
                     return DispatchErrors.InvalidParams;
                 },
             }
@@ -161,7 +170,8 @@ inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) Handler
     const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
     const user_idx  = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user parameter.
     const is_value1 = params.len == user_idx + 1 and isValue(params[user_idx].type);
-    const is_obj1   = params.len == user_idx + 1 and isStruct(params[user_idx].type);
+    const is_struct = params.len == user_idx + 1 and isStruct(params[user_idx].type);
+    const is_obj1   = is_struct and !is_value1;
     const obj1_type = if (is_obj1) params[user_idx].type.? else void;
 
     return .{
@@ -250,8 +260,6 @@ inline fn isValue(comptime T: ?type) bool {
 
 inline fn isStruct(comptime T: ?type) bool {
     if (T)|t| {
-        if (t == std.json.Value)
-            return false;       // Skip Value type.  Value parameter has special treatment.
         const type_info: Type = @typeInfo(t);
         switch (type_info) {
             .@"struct" =>   return true,
@@ -275,29 +283,29 @@ fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyo
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-               value_args: Value) anyerror!DispatchResult {
+               params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack the JSON params to a tuple for the F's params.
-    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, value_args);
+    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, params_value);
     return callF(F, hinfo, args, alloc);
 }
 
 fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-                obj_map: Value) anyerror!DispatchResult {
+                params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
-    // Map the incoming JSON value into a struct object.
+    // Map the incoming ObjectMap value into a struct object.
     // Alloc is an arena allocator; don't need to free the parsed result here.
-    const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, obj_map, .{});
-    const obj: hinfo.obj1_type = parsed.value;
+    const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, params_value, .{});
+    const obj1: hinfo.obj1_type = parsed.value;
 
     // Pack JSON array params to a tuple for the F's params.
-    const args: hinfo.tuple_type = objToTuple(hinfo, ctx, alloc, obj);
+    const args: hinfo.tuple_type = objectToTuple(hinfo, ctx, alloc, obj1);
     return callF(F, hinfo, args, alloc);
 }
 
@@ -332,128 +340,75 @@ fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, args: hinfo.tuple_typ
     }
 }
 
-fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-                    value: Value) hinfo.tuple_type {
-
+fn initParamTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
-    // Assign the context, alloc, and Value to the appropriate function parameter slots.
+    // Assign the context and alloc to the appropriate function parameter slots in the tuple.
     if (hinfo.has_ctx) {
         const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
         if (hinfo.has_alloc) {
-            // for fn(ctx, alloc, value)
             @field(tuple, "0") = ctx_ptr;
             @field(tuple, "1") = alloc;
-            @field(tuple, "2") = value;
         } else {
-            // for fn(ctx, value)
             @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = value;
         }
     } else {
         if (hinfo.has_alloc) {
-            // for fn(alloc, value)
             @field(tuple, "0") = alloc;
-            @field(tuple, "1") = value;
-        } else {
-            // for fn(value)
-            @field(tuple, "0") = value;
         }
     }
     return tuple;
 }
 
-fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-                    json_primitive: Value) !hinfo.tuple_type {
+fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+                    value: Value) hinfo.tuple_type {
 
-    var tuple: hinfo.tuple_type = undefined;
+    var tuple: hinfo.tuple_type = initParamTuple(hinfo, ctx, alloc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
-    const rvalue = try ValueAs(tt_info.fields[hinfo.user_idx].type).from(json_primitive);
+    const t_field = tt_info.fields[hinfo.user_idx];
+    @field(tuple, t_field.name) = value;
+    return tuple;
+}
 
-    // Assign the context, alloc, and primitive value to the appropriate function parameter slots.
-    if (hinfo.has_ctx) {
-        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
-        if (hinfo.has_alloc) {
-            // for fn(ctx, alloc, value)
-            @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = alloc;
-            @field(tuple, "2") = rvalue;
-        } else {
-            // for fn(ctx, value)
-            @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = rvalue;
-        }
-    } else {
-        if (hinfo.has_alloc) {
-            // for fn(alloc, value)
-            @field(tuple, "0") = alloc;
-            @field(tuple, "1") = rvalue;
-        } else {
-            // for fn(value)
-            @field(tuple, "0") = rvalue;
-        }
-    }
+fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+                    primitive_value: Value) !hinfo.tuple_type {
+
+    var tuple: hinfo.tuple_type = initParamTuple(hinfo, ctx, alloc);
+    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
+    const t_field = tt_info.fields[hinfo.user_idx];
+    @field(tuple, t_field.name) = try ValueAs(t_field.type).from(primitive_value);
     return tuple;
 }
 
 fn valuesToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
                  values: Array) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = undefined;
 
-    if (hinfo.has_ctx) {
-        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
-        if (hinfo.has_alloc) {
-            @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = alloc;
-        } else {
-            @field(tuple, "0") = ctx_ptr;
-        }
-    } else {
-        if (hinfo.has_alloc) {
-            @field(tuple, "0") = alloc;
-        }
-    }
-
+    var tuple: hinfo.tuple_type = initParamTuple(hinfo, ctx, alloc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const start_idx = hinfo.user_idx;
+    // Fill in the rest of the user specific parameters.
     inline for (start_idx..tt_info.fields.len) |i| {
-        const field = tt_info.fields[i];
-        const value = values.items[i - start_idx];
-        if (isValue(field.type)) {
-            @field(tuple, field.name) = value;
-        } else if (isStruct(field.type)) {
-            const parsed = try std.json.parseFromValue(field.type, alloc, value, .{});
-            @field(tuple, field.name) = parsed.value;
+        const t_field = tt_info.fields[i];
+        const j_value = values.items[i - start_idx];
+        if (isValue(t_field.type)) {
+            @field(tuple, t_field.name) = j_value;
+        } else if (isStruct(t_field.type)) {
+            const parsed = try std.json.parseFromValue(t_field.type, alloc, j_value, .{});
+            @field(tuple, t_field.name) = parsed.value;
         } else {
-            @field(tuple, field.name) = try ValueAs(field.type).from(value);
+            @field(tuple, t_field.name) = try ValueAs(t_field.type).from(j_value);
         }
     }
     return tuple;
 }
 
-fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-              obj: hinfo.obj1_type) hinfo.tuple_type {
+fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+                 object: hinfo.obj1_type) hinfo.tuple_type {
 
-    var tuple: hinfo.tuple_type = undefined;
-
-    if (hinfo.has_ctx) {
-        const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
-        if (hinfo.has_alloc) {
-            @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = alloc;
-            @field(tuple, "2") = obj;
-        } else {
-            @field(tuple, "0") = ctx_ptr;
-            @field(tuple, "1") = obj;
-        }
-    } else {
-        if (hinfo.has_alloc) {
-            @field(tuple, "0") = alloc;
-            @field(tuple, "1") = obj;
-        } else {
-            @field(tuple, "0") = obj;
-        }
-    }
+    var tuple: hinfo.tuple_type = initParamTuple(hinfo, ctx, alloc);
+    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
+    const t_field = tt_info.fields[hinfo.user_idx];
+    @field(tuple, t_field.name) = object;
     return tuple;
 }
 

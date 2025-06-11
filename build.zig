@@ -30,48 +30,65 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(cli_exe);
 
 
-    const example_hello_mod = b.createModule(.{
+    // Building examples
+
+    const hello_mod = b.createModule(.{
         .root_source_file = b.path("src/examples/hello.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip_debug_symbols,
     });
-    example_hello_mod.addImport("zigjr", zigjr_mod);
+    hello_mod.addImport("zigjr", zigjr_mod);
 
-    const example_hello_exe = b.addExecutable(.{
+    const hello_exe = b.addExecutable(.{
         .name = "hello",
-        .root_module = example_hello_mod,
+        .root_module = hello_mod,
     });
-    b.installArtifact(example_hello_exe);
+    b.installArtifact(hello_exe);
 
-    const example_calc_mod = b.createModule(.{
+    const calc_mod = b.createModule(.{
         .root_source_file = b.path("src/examples/calc.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip_debug_symbols,
     });
-    example_calc_mod.addImport("zigjr", zigjr_mod);
+    calc_mod.addImport("zigjr", zigjr_mod);
 
-    const example_calc_exe = b.addExecutable(.{
+    const calc_exe = b.addExecutable(.{
         .name = "calc",
-        .root_module = example_calc_mod,
+        .root_module = calc_mod,
     });
-    b.installArtifact(example_calc_exe);
+    b.installArtifact(calc_exe);
 
-    const example_calc_stream_mod = b.createModule(.{
+    const calc_stream_mod = b.createModule(.{
         .root_source_file = b.path("src/examples/calc_stream.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip_debug_symbols,
     });
-    example_calc_stream_mod.addImport("zigjr", zigjr_mod);
+    calc_stream_mod.addImport("zigjr", zigjr_mod);
 
-    const example_calc_stream_exe = b.addExecutable(.{
+    const calc_stream_exe = b.addExecutable(.{
         .name = "calc_stream",
-        .root_module = example_calc_stream_mod,
+        .root_module = calc_stream_mod,
     });
-    b.installArtifact(example_calc_stream_exe);
+    b.installArtifact(calc_stream_exe);
 
+    const dispatcher_hello_mod = b.createModule(.{
+        .root_source_file = b.path("src/examples/dispatcher_hello.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = strip_debug_symbols,
+    });
+    dispatcher_hello_mod.addImport("zigjr", zigjr_mod);
+
+    const dispatcher_hello_exe = b.addExecutable(.{
+        .name = "dispatcher_hello",
+        .root_module = dispatcher_hello_mod,
+    });
+    b.installArtifact(dispatcher_hello_exe);
+
+    // End of building examples
 
     run_cmd.step.dependOn(b.getInstallStep());
 
