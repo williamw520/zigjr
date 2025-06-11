@@ -108,7 +108,7 @@ pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allo
                 .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
                 .array  => return callOnArray(F, hinfo, ctx, arena_alloc, value_args.array),
                 .bool, .integer, .float, .string => {
-                    // JSON-RPC spec doesn't support primitive JSON type for the "params" property.
+                    // JSON-RPC spec doesn't support primitive JSON types for the "params" property.
                     // Add them here for completeness.
                     return callOnPrimitive(F, hinfo, ctx, arena_alloc, value_args);
                 },
@@ -213,25 +213,27 @@ inline fn getFnInfo(comptime handler_fn: anytype) Type.Fn {
     };
 }
 
+inline fn getReturnType(comptime T: ?type) ?type {
+    if (T)|t| {
+        const type_info: Type = @typeInfo(t);
+        switch (type_info) {
+            .error_union => |eu| return eu.payload, // get the type wrapped in the error union.
+            else => return t,
+        }
+    }
+    return null;
+}
+
+inline fn isVoid(comptime T: ?type) bool {
+    return getReturnType(T) == void;
+}
+
 inline fn isErrorUnion(comptime T: ?type) bool {
     if (T)|t| {
         const type_info = @typeInfo(t);
         switch (type_info) {
             .error_union => return true,    // e.g., !void, !u8, or FooErrorSet!void
             else => return false,
-        }
-    } else {
-        return false;
-    }
-}
-
-inline fn isVoid(comptime T: ?type) bool {
-    if (T)|t| {
-        const type_info: Type = @typeInfo(t);
-        switch (type_info) {
-            .error_union => |eu| return eu.payload == void, // check the type wrapped in the error union.
-            .void => return true,
-            else =>  return false,
         }
     } else {
         return false;
@@ -268,8 +270,8 @@ fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyo
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack the JSON param to a tuple for the F's params.
-    const args: hinfo.tuple_type = try valueToTuple(hinfo, ctx, alloc, json_primitive);
-    return callF(F, hinfo, alloc, args);
+    const args: hinfo.tuple_type = try primitiveToTuple(hinfo, ctx, alloc, json_primitive);
+    return callF(F, hinfo, args, alloc);
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
@@ -280,7 +282,7 @@ fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
 
     // Pack the JSON params to a tuple for the F's params.
     const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, alloc, value_args);
-    return callF(F, hinfo, alloc, args);
+    return callF(F, hinfo, args, alloc);
 }
 
 fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
@@ -296,7 +298,7 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
 
     // Pack JSON array params to a tuple for the F's params.
     const args: hinfo.tuple_type = objToTuple(hinfo, ctx, alloc, obj);
-    return callF(F, hinfo, alloc, args);
+    return callF(F, hinfo, args, alloc);
 }
 
 fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
@@ -306,81 +308,96 @@ fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
         return DispatchErrors.MismatchedParamCounts;
 
     // Pack the JSON array params to a tuple for fn params.
-    const args: hinfo.tuple_type = try valuesToTuple(hinfo, alloc, array, ctx);
-    return callF(F, hinfo, alloc, args);
+    const args: hinfo.tuple_type = try valuesToTuple(hinfo, ctx, alloc, array);
+    return callF(F, hinfo, args, alloc);
 }
 
-fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, alloc: Allocator,
-         args: hinfo.tuple_type) anyerror!DispatchResult {
+fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, args: hinfo.tuple_type,
+         alloc: Allocator) anyerror!DispatchResult {
     if (hinfo.is_void) {
-        if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
+        if (hinfo.has_err) {
+            try @call(.auto, F, args);
+        } else {
             @call(.auto, F, args);
+        }
         return DispatchResult.asNone();
     } else {
-        const res = if (hinfo.has_err)
-            try @call(.auto, F, args)
-        else
-            @call(.auto, F, args);
-        return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, res, .{}));
+        if (hinfo.has_err) {
+            const result = try @call(.auto, F, args);
+            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, result, .{}));
+        } else {
+            const result = @call(.auto, F, args);
+            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, result, .{}));
+        }
     }
 }
 
 fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
                     value: Value) hinfo.tuple_type {
+
     var tuple: hinfo.tuple_type = undefined;
 
+    // Assign the context, alloc, and Value to the appropriate function parameter slots.
     if (hinfo.has_ctx) {
         const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
         if (hinfo.has_alloc) {
+            // for fn(ctx, alloc, value)
             @field(tuple, "0") = ctx_ptr;
             @field(tuple, "1") = alloc;
             @field(tuple, "2") = value;
         } else {
+            // for fn(ctx, value)
             @field(tuple, "0") = ctx_ptr;
             @field(tuple, "1") = value;
         }
     } else {
         if (hinfo.has_alloc) {
+            // for fn(alloc, value)
             @field(tuple, "0") = alloc;
             @field(tuple, "1") = value;
         } else {
+            // for fn(value)
             @field(tuple, "0") = value;
         }
     }
     return tuple;
 }
 
-fn valueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
-                value: Value) !hinfo.tuple_type {
+fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+                    json_primitive: Value) !hinfo.tuple_type {
+
     var tuple: hinfo.tuple_type = undefined;
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
-    const rvalue = try ValueAs(tt_info.fields[hinfo.user_idx].type).from(value);
+    const rvalue = try ValueAs(tt_info.fields[hinfo.user_idx].type).from(json_primitive);
 
+    // Assign the context, alloc, and primitive value to the appropriate function parameter slots.
     if (hinfo.has_ctx) {
         const ctx_ptr: hinfo.ctx_type = @ptrCast(@alignCast(ctx.?));
         if (hinfo.has_alloc) {
+            // for fn(ctx, alloc, value)
             @field(tuple, "0") = ctx_ptr;
             @field(tuple, "1") = alloc;
             @field(tuple, "2") = rvalue;
         } else {
+            // for fn(ctx, value)
             @field(tuple, "0") = ctx_ptr;
             @field(tuple, "1") = rvalue;
         }
     } else {
         if (hinfo.has_alloc) {
+            // for fn(alloc, value)
             @field(tuple, "0") = alloc;
             @field(tuple, "1") = rvalue;
         } else {
+            // for fn(value)
             @field(tuple, "0") = rvalue;
         }
     }
     return tuple;
 }
 
-fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
-                 values: Array, ctx: ?*anyopaque) !hinfo.tuple_type {
+fn valuesToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+                 values: Array) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     if (hinfo.has_ctx) {
@@ -399,7 +416,7 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
 
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const start_idx = hinfo.user_idx;
-    inline for (start_idx..tt_info.fields.len)|i| {
+    inline for (start_idx..tt_info.fields.len) |i| {
         const field = tt_info.fields[i];
         const value = values.items[i - start_idx];
         if (isValue(field.type)) {
@@ -414,7 +431,9 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
     return tuple;
 }
 
-fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, obj: hinfo.obj1_type) hinfo.tuple_type {
+fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
+              obj: hinfo.obj1_type) hinfo.tuple_type {
+
     var tuple: hinfo.tuple_type = undefined;
 
     if (hinfo.has_ctx) {
@@ -448,11 +467,14 @@ fn ValueAs(comptime V: type) type {
     switch (vinfo) {
         .bool => {},
         .int => {
-            if (vinfo.int.signedness == .unsigned) @compileError("Required signed integer, at least i64.");
-            if (vinfo.int.bits < 64) @compileError("Required at least i64 for integer.");
+            if (vinfo.int.signedness == .unsigned)
+                @compileError("Required signed integer, at least i64.");
+            if (vinfo.int.bits < 64)
+                @compileError("Required at least i64 for integer.");
         },
         .float => {
-            if (vinfo.float.bits < 64) @compileError("Required at least f64 for floating point number.");
+            if (vinfo.float.bits < 64)
+                @compileError("Required at least f64 for floating point number.");
         },
         .pointer => {
             if (vinfo.pointer.child != u8)
