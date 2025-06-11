@@ -1,0 +1,32 @@
+{"jsonrpc": "2.0", "method": "add", "params": [12, 30], "id": 1}
+{"jsonrpc": "2.0", "method": "subtract", "params": [12, 30], "id": 2}
+{"jsonrpc": "2.0", "method": "multiply", "params": [6, 7], "id": 3}
+{"jsonrpc": "2.0", "method": "divide", "params": [42, 6], "id": 4}
+{"jsonrpc": "2.0", "method": "divide", "params": [42, 0], "id": 5}
+{"jsonrpc": "2.0", "method": "divide", "params": [99, 2], "id": 6}
+{"jsonrpc": "2.0", "method": "pow", "params": [2.5, 2], "id": 7}
+{"jsonrpc": "2.0", "method": "pow", "params": [2.5, 2.0], "id": 8}
+
+{"jsonrpc": "2.0", "method": "logNum", "params": [123], "id": 9}
+
+{"jsonrpc": "2.0", "method": "inc", "params": [5], "id": 11}
+{"jsonrpc": "2.0", "method": "inc", "params": [1], "id": 12}
+{"jsonrpc": "2.0", "method": "inc", "params": [1], "id": 13}
+{"jsonrpc": "2.0", "method": "dec", "params": [1], "id": 14}
+{"jsonrpc": "2.0", "method": "dec", "params": [1], "id": 15}
+[{"jsonrpc": "2.0", "method": "inc", "params": [2], "id": 16}, {"jsonrpc": "2.0", "method": "inc", "params": [1], "id": 17}, {"jsonrpc": "2.0", "method": "inc", "params": [3], "id": 18}]
+
+{"jsonrpc": "2.0", "method": "load", "params": ["foo"], "id": 21}
+{"jsonrpc": "2.0", "method": "save", "params": ["foo", 15.6], "id": 22}
+{"jsonrpc": "2.0", "method": "load", "params": ["foo"], "id": 23}
+[{"jsonrpc": "2.0", "method": "load", "params": ["foo"], "id": 24}, {"jsonrpc": "2.0", "method": "save", "params": ["foo", 15.6], "id": 25}, {"jsonrpc": "2.0", "method": "load", "params": ["foo"], "id": 26}]
+
+{"jsonrpc": "2.0", "method": "make-cat", "params": ["Garfield", "red"], "id": 31}
+{"jsonrpc": "2.0", "method": "add-weight", "params": [2.2, {"cat_name":"Garfield","weight":18.0,"eye_color":"red"}], "id": 32}
+{"jsonrpc": "2.0", "method": "clone-cat", "params": {"cat_name":"Cat1","weight":4.0,"eye_color":"brown"}, "id": 33}
+{"jsonrpc": "2.0", "method": "desc-cat", "params": {"cat_name":"Cat1","weight":4.0,"eye_color":"brown"}, "id": 34}
+{"jsonrpc": "2.0", "method": "weigh-cat", "params": {"cat_name":"cat1","weight":7.5,"eye_color":"brown"}, "id": 35}
+{"jsonrpc": "2.0", "method": "weigh-cat", "params": {"cat_name":"cat2","weight":14.0,"eye_color":"brown"}, "id": 36}
+{"jsonrpc": "2.0", "method": "weigh-cat", "params": {"cat_name":"Garfield","weight":18.0,"eye_color":"red"}, "id": 37}
+{"jsonrpc": "2.0", "method": "weigh-cat", "params": {"cat_name":"Odin","weight":11.0,"eye_color":"pink"}, "id": 38}
+

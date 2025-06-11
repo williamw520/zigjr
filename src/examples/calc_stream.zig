@@ -8,6 +8,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ParseOptions = std.json.ParseOptions;
 const StringHashMap = std.hash_map.StringHashMap;
 
 const zigjr = @import("zigjr");
@@ -15,13 +16,18 @@ const zigjr = @import("zigjr");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-
-    try runExample(gpa.allocator());
-
+    {
+        const alloc = gpa.allocator();
+        var args = try CmdArgs.init(alloc);
+        defer args.deinit();
+        args.parse() catch { usage(); return; };
+        
+        try runExample(alloc, args);
+    }
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
 }
 
-fn runExample(alloc: Allocator) !void {
+fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
@@ -44,17 +50,17 @@ fn runExample(alloc: Allocator) !void {
     try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
     try handlers.register("add-weight", null, addWeight);
 
-    const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
-    if (request.len > 0) {
-        defer alloc.free(request);
-        std.debug.print("Request:  {s}\n", .{request});
-
-        if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
-            defer alloc.free(response);
-            std.debug.print("Response: {s}\n", .{response});
-        } else {
-            std.debug.print("No response\n", .{});
-        }
+    if (args.by_delimiter) {
+        const streamer = zigjr.stream.DelimiterStream.init(alloc, .{});
+        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+        try streamer.streamRequests(std.io.getStdIn().reader(),
+                                    std.io.getStdOut().writer(),
+                                    handlers);
+    } else if (args.by_length) {
+        const streamer = zigjr.stream.ContentLengthStream.init(alloc, .{});
+        try streamer.streamRequests(std.io.getStdIn().reader(),
+                                    std.io.getStdOut().writer(),
+                                    handlers);
     } else {
         usage();
     }
@@ -179,12 +185,45 @@ fn addWeight(weight: f64, cat: CatInfo) CatInfo {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  calc
-        \\Usage:  calc < message.json
+        \\Usage:  calc_stream --by-delimiter < messages_by_lf.json
+        \\Usage:  calc_stream --by-length < messages_by_length.json
         \\
         \\The program reads from stdin.
         , .{});
 }
 
+// Poorman's quick and dirty command line argument parsing.
+const CmdArgs = struct {
+    const Self = @This();
+
+    arg_itr:        std.process.ArgIterator,
+    by_delimiter:   bool = false,
+    by_length:      bool = false,
+
+    fn init(allocator: Allocator) !CmdArgs {
+        var args = CmdArgs {
+            .arg_itr = try std.process.argsWithAllocator(allocator),
+        };
+        _ = args.arg_itr.next();
+        return args;
+    }
+
+    fn deinit(self: *CmdArgs) void {
+        self.arg_itr.deinit();
+    }
+
+    fn parse(self: *Self) !void {
+        var argv = self.arg_itr;
+        while (argv.next())|argz| {
+            const arg = std.mem.sliceTo(argz, 0);
+            if (std.mem.eql(u8, arg, "--by-delimiter")) {
+                self.by_delimiter = true;
+            } else if (std.mem.eql(u8, arg, "--by-length")) {
+                self.by_length = true;
+            }
+        }
+    }
+
+};
 
 

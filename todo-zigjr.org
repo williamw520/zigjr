@@ -32,8 +32,7 @@ TODOs
 * DONE Allow struct objects in array params.
 * DONE Add Hello example for a simple start.
 * DONE Add Calc example for various function handlers, parameter types, and return types.
-* TODO Add streaming example.
-* TODO Add CLI on running request and response and on streaming.
+* DONE Add streaming example.
 * TODO Add network server and client example.
 * TODO Add request and notification message builders.
 

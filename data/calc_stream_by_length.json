@@ -1,0 +1,34 @@
+Content-Length: 64
+
+{"jsonrpc": "2.0", "method": "add", "params": [12, 30], "id": 1}
+Content-Length: 69
+
+{"jsonrpc": "2.0", "method": "subtract", "params": [12, 30], "id": 2}
+Content-Length: 67
+
+{"jsonrpc": "2.0", "method": "multiply", "params": [6, 7], "id": 3}
+Content-Length: 66
+
+{"jsonrpc": "2.0", "method": "divide", "params": [42, 6], "id": 4}
+Content-Length: 66
+
+{"jsonrpc": "2.0", "method": "divide", "params": [42, 0], "id": 5}
+Content-Length: 66
+
+{"jsonrpc": "2.0", "method": "divide", "params": [99, 2], "id": 6}
+
+
+
+Content-Length: 64
+
+{"jsonrpc": "2.0", "method": "pow", "params": [2.5, 2], "id": 7}
+Content-Length: 66
+
+{"jsonrpc": "2.0", "method": "pow", "params": [2.5, 2.0], "id": 8}
+
+
+
+Content-Length: 186
+
+[{"jsonrpc": "2.0", "method": "inc", "params": [2], "id": 16}, {"jsonrpc": "2.0", "method": "inc", "params": [1], "id": 17}, {"jsonrpc": "2.0", "method": "inc", "params": [3], "id": 18}]
+

@@ -1,2 +1,1 @@
 {"jsonrpc": "2.0", "method": "add-weight", "params": [2.2, {"cat_name":"Garfield","weight":18.0,"eye_color":"red"}], "id": 1}
-

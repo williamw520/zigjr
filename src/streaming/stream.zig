@@ -60,7 +60,7 @@ pub const DelimiterStream = struct {
                 }
             };
 
-            const request_json = std.mem.trim(u8, frame_buf.items, " \t");
+            const request_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
             if (self.options.skip_blank_message and request_json.len == 0) continue;
 
             self.options.logger("receive request", request_json);
@@ -90,7 +90,7 @@ pub const DelimiterStream = struct {
                 }
             };
 
-            const response_json = std.mem.trim(u8, frame_buf.items, " \t");
+            const response_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger("receive response", response_json);
