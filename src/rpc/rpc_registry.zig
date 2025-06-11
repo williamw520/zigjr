@@ -52,6 +52,13 @@ pub const RpcRegistry = struct {
 
     pub fn register(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
         try validateMethod(method);
+
+        // Free any existing handler of the same method name.
+        if (self.handlers.fetchRemove(method))|entry| {
+            var rpc_handler = entry.value;
+            rpc_handler.deinit();
+        }
+
         if (@typeInfo(@TypeOf(context)) == .null) {
             var nul_context = {};                   // empty struct for no context.
             const h = try json_call.makeRpcHandler(&nul_context, handler_fn, self.alloc);

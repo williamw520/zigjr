@@ -169,7 +169,7 @@ fn fn_cat(name: []const u8, weight: f64, color: []const u8) CatInfo {
 }
 
 fn fn_cat_value(json_value: std.json.Value) CatInfo {
-    // std.debug.print("fn_cat_value() called\n", .{});
+    std.debug.print("fn_cat_value() called\n", .{});
     return .{
         .cat_name = json_value.object.get("cat_name").?.string,
         .weight = json_value.object.get("weight").?.float,
@@ -201,6 +201,26 @@ fn fn_cat_struct_alloc(alloc: Allocator, cat: CatInfo) !CatInfo {
         .weight = cat.weight + 1,
         .eye_color = try allocPrint(alloc, "double {s}", .{cat.eye_color}),
     };
+}
+
+fn fn_json_value1(value1: std.json.Value) bool {
+    std.debug.print("fn_json_value1() called {any}\n", .{value1});
+    return true;
+}
+
+fn fn_json_value2(value1: std.json.Value, value2: std.json.Value) bool {
+    std.debug.print("fn_json_value2() called {any}, {any}\n", .{value1, value2});
+    return true;
+}
+
+fn fn_json_value_int(value1: std.json.Value, b: i64) bool {
+    std.debug.print("fn_json_value_int() called {any}, {}\n", .{value1, b});
+    return true;
+}
+
+fn fn_json_value_int_value(value1: std.json.Value, b: i64, value3: std.json.Value) bool {
+    std.debug.print("fn_json_value_int_value() called {any}, {}, {any}\n", .{value1, b, value3});
+    return true;
 }
 
 
@@ -699,6 +719,121 @@ test "rpc_registry passing in an ObjectMap Value as a parameter, with a context,
             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
             try testing.expectEqual(parsed_cat.value.weight, 5);
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in a single JSON Value as parameter" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_json_value1", null, fn_json_value1);
+        {
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
+        }
+
+        try registry.register("fn_json_value1", null, fn_json_value1);
+        {
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in two JSON Values as parameters" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_json_value2", null, fn_json_value2);
+        {
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in one JSON Value and one primitive as parameters" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_json_value_int", null, fn_json_value_int);
+        {
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
+        }
+
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry passing in one JSON Value, one primitive, and one Value as parameters" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+
+        try registry.register("fn_json_value_int_value", null, fn_json_value_int_value);
+        {
+            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
         }
 
     }

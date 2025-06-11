@@ -22,7 +22,7 @@ const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
 
-/// Uniform callback object that can be stored in the hash map.
+/// Uniform callback object that can be stored in a hash map.
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 pub const RpcHandler = struct {
     arena: *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
@@ -65,9 +65,9 @@ pub const RpcHandler = struct {
 /// and maps the JSON values to the function's parameters in runtime.
 /// This allows dispatching a JSON-RPC call to arbitrary function (with some limitations).
 ///
-/// The handler function parameter types are limited to the JSON's data types
-/// - bool, i64, f64, string ([]const u8) - for the array based JSON-RPC parameters.
-/// For an object map based JSON-RPC parameter, the handler function parameter can be a struct type.
+/// The parameter types of the handler function are limited to the JSON's data types
+/// - bool, i64, f64, string ([]const u8), and object (struct) - for the array based JSON-RPC parameters.
+/// For an object map based JSON-RPC parameter, the function parameter can be a struct type.
 /// RpcHandler will automatically convert the JSON ObjectMap to the struct value.
 ///
 /// The return type of handler function can be any type that can be stringified to JSON.
@@ -84,39 +84,49 @@ pub const RpcHandler = struct {
 /// during invocation.  The allocator is an arena allocator so the function doesn't need
 /// to worry about freeing the memory.  The arena memory can be reset via the reset() function.
 ///
-/// If std.json.Value is declared as a parameter of the handler function,
+/// If std.json.Value is declared as a single parameter of the handler function,
 /// the JSON-RPC parameters are passed in as a Value object without any interpretation.
 /// It's up to the function to handle the data and types in the Value object.
+/// e.g. fn h1(a: Value).
+///
+/// If std.json.Values are declared as part of the parameters of the handler function,
+/// the JSON-RPC parameters of the correponding Value type function parameters are passed in
+/// as a Value object without any interpretation. e.g. fn h3(a: Value, b: i64, c: Value).
+///
 pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allocator) !RpcHandler {
-    const arena_ptr = try backing_alloc.create(ArenaAllocator);
-    arena_ptr.* = ArenaAllocator.init(backing_alloc);
-
     const hinfo = getHandlerInfo(F, context);
     try validateHandler(hinfo);
 
+    const wrapper = struct {
+        fn call(ctx: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult {
+            if (hinfo.is_value1) {
+                return callOnValue(F, hinfo, ctx, arena_alloc, value_args);
+            } else if (hinfo.is_obj1) {
+                return callOnObject(F, hinfo, ctx, arena_alloc, value_args);
+            }
+            switch (value_args) {
+                .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
+                .array  => return callOnArray(F, hinfo, ctx, arena_alloc, value_args.array),
+                .bool, .integer, .float, .string => {
+                    // JSON-RPC spec doesn't support primitive JSON type for the "params" property.
+                    // Add them here for completeness.
+                    return callOnPrimitive(F, hinfo, ctx, arena_alloc, value_args);
+                },
+                else    => {
+                    std.debug.print("Unexpected JSON params: {any}\n", .{value_args});
+                    return DispatchErrors.InvalidParams;
+                },
+            }
+        }
+    };
+
+    const arena_ptr = try backing_alloc.create(ArenaAllocator);
+    arena_ptr.* = ArenaAllocator.init(backing_alloc);
     return .{
         .arena = arena_ptr,
         .arena_alloc = arena_ptr.allocator(),
         .context = if (hinfo.has_ctx) context else null,
-        .call = &struct {
-            fn call_wrapper(ctx: ?*anyopaque, arena_alloc: Allocator, value_args: Value) anyerror!DispatchResult {
-                if (hinfo.is_value) {
-                    return callOnValue(F, hinfo, ctx, arena_alloc, value_args);
-                } else if (hinfo.is_obj) {
-                    return callOnObject(F, hinfo, ctx, arena_alloc, value_args);
-                }
-                switch (value_args) {
-                    .null   => return callOnArray(F, hinfo, ctx, arena_alloc, Array.init(arena_alloc)),
-                    .array  => return callOnArray(F, hinfo, ctx, arena_alloc, value_args.array),
-                    .bool, .integer, .float, .string =>
-                        return callOnPrimitive(F, hinfo, ctx, arena_alloc, value_args),
-                    else    => {
-                        std.debug.print("Unexpected JSON params: {any}\n", .{value_args});
-                        return DispatchErrors.InvalidParams;
-                    },
-                }
-            }
-        }.call_wrapper,
+        .call = wrapper.call,
     };
 }
 
@@ -135,9 +145,9 @@ const HandlerInfo = struct {
     has_ctx:        bool,                   // Handler is registered with a context object.
     has_alloc:      bool,                   // The first parameter of the handler is an Allocator.
     user_idx:       usize,                  // The index of the first user parameter of the handler.
-    is_value:       bool,                   // The first user parameter is a std.json.Value.
-    is_obj:         bool,                   // The first user parameter is an object of a struct type.
-    obj_type:       type,                   // The struct type of the object.
+    is_value1:      bool,                   // The only user parameter is a std.json.Value.
+    is_obj1:        bool,                   // The only user parameter is an object of a struct type.
+    obj1_type:      type,                   // The struct type of the object.
     has_err:        bool,                   // The handler function has a error union in the return type.
     is_void:        bool,                   // The handler function has a void return type.
 };
@@ -150,9 +160,9 @@ inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) Handler
     const alloc_idx = if (has_ctx) 1 else 0;                // alloc parameter index is after context
     const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
     const user_idx  = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user parameter.
-    const is_value  = params.len > user_idx and isValue(params[user_idx].type);
-    const is_obj    = params.len > user_idx and isStruct(params[user_idx].type);
-    const obj_type  = if (is_obj) params[user_idx].type.? else void;
+    const is_value1 = params.len == user_idx + 1 and isValue(params[user_idx].type);
+    const is_obj1   = params.len == user_idx + 1 and isStruct(params[user_idx].type);
+    const obj1_type = if (is_obj1) params[user_idx].type.? else void;
 
     return .{
         .fn_info    = fn_info,
@@ -162,9 +172,9 @@ inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) Handler
         .has_ctx    = has_ctx,
         .has_alloc  = has_alloc,
         .user_idx   = user_idx,
-        .is_value   = is_value,
-        .is_obj     = is_obj,
-        .obj_type   = obj_type,
+        .is_value1  = is_value1,
+        .is_obj1    = is_obj1,
+        .obj1_type  = obj1_type,
         .has_err    = isErrorUnion(fn_info.return_type),
         .is_void    = isVoid(fn_info.return_type),
     };
@@ -281,8 +291,8 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
 
     // Map the incoming JSON value into a struct object.
     // Alloc is an arena allocator; don't need to free the parsed result here.
-    const parsed = try std.json.parseFromValue(hinfo.obj_type, alloc, obj_map, .{});
-    const obj: hinfo.obj_type = parsed.value;
+    const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, obj_map, .{});
+    const obj: hinfo.obj1_type = parsed.value;
 
     // Pack JSON array params to a tuple for the F's params.
     const args: hinfo.tuple_type = objToTuple(hinfo, ctx, alloc, obj);
@@ -392,7 +402,9 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
     inline for (start_idx..tt_info.fields.len)|i| {
         const field = tt_info.fields[i];
         const value = values.items[i - start_idx];
-        if (isStruct(field.type)) {
+        if (isValue(field.type)) {
+            @field(tuple, field.name) = value;
+        } else if (isStruct(field.type)) {
             const parsed = try std.json.parseFromValue(field.type, alloc, value, .{});
             @field(tuple, field.name) = parsed.value;
         } else {
@@ -402,7 +414,7 @@ fn valuesToTuple(comptime hinfo: HandlerInfo, alloc: Allocator,
     return tuple;
 }
 
-fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, obj: hinfo.obj_type) hinfo.tuple_type {
+fn objToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator, obj: hinfo.obj1_type) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     if (hinfo.has_ctx) {
