@@ -1,0 +1,7 @@
+{"jsonrpc": "2.0", "method": "hello", "id": 1}
+{"jsonrpc": "2.0", "method": "hello-name", "params": ["Foo"], "id": 2}
+{"jsonrpc": "2.0", "method": "hello-name", "params": ["Bar"], "id": 3}
+{"jsonrpc": "2.0", "method": "hello-name", "params": ["Baz"], "id": 4}
+{"jsonrpc": "2.0", "method": "say", "params": ["Logging message without returning result."], "id": 5}
+{"jsonrpc": "2.0", "method": "say", "params": ["Good day."], "id": 6}
+{"jsonrpc": "2.0", "method": "hello", "id": 7}

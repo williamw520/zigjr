@@ -41,6 +41,8 @@ pub const DelimiterStream = struct {
 
     /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
     /// handle each one with the dispatcher, and write the JSON responses to the writer.
+    /// The writer is buffered internally.  The reader is not buffered.
+    /// Caller might want to wrap a buffered reader around it.
     pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON request is a frame.
         defer frame_buf.deinit();
