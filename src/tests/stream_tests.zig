@@ -90,7 +90,8 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         const writer = write_buffer.writer();
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
-        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
+        // var logger = stream.DbgLogger{};
+        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.Logger.init(&logger) });
 
         try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -135,7 +136,8 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         const writer = write_buffer.writer();
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
-        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
+        // var logger = stream.DbgLogger{};
+        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.Logger.init(&logger) });
         try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
@@ -173,7 +175,6 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
         const writer = write_buffer.writer();
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
-        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
         try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -209,7 +210,6 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
         const writer = write_buffer.writer();
 
         const streamer = stream.DelimiterStream.init(alloc, .{ .skip_blank_message = false });
-        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
         try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -276,7 +276,6 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         const writer = write_buffer.writer();
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
-        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
         try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
@@ -312,7 +311,6 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         const writer = write_buffer.writer();
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
-        // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.debugLogger });
 
         try streamer.streamRequests(reader, writer, EchoDispatcher);
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -371,7 +369,6 @@ test "responsesByLength on JSON responses, single param, id" {
         const writer = write_buffer.writer();
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
-        // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.debugLogger });
         try streamer.streamRequests(reader, writer, &dispatcher);
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 

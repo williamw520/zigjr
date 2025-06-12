@@ -40,6 +40,10 @@ pub const DelimiterStream = stream.DelimiterStream;
 pub const DelimiterStreamOptions = stream.DelimiterStreamOptions;
 pub const ContentLengthStream = stream.ContentLengthStream;
 pub const ContentLengthStreamOptions = stream.ContentLengthStreamOptions;
+pub const Logger = stream.Logger;
+pub const NopLogger = stream.NopLogger;
+pub const DbgLogger = stream.DbgLogger;
+
 
 pub const RpcRegistry = rpc_registry.RpcRegistry;
 pub const RegistrationErrors = rpc_registry.RegistrationErrors;

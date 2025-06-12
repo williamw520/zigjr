@@ -33,6 +33,8 @@ pub const DelimiterStream = struct {
     /// Initialize a stream struct.
     /// The logger option takes in a callback function to log the incoming and outgoing messages.
     pub fn init(alloc: Allocator, options: DelimiterStreamOptions) Self {
+        
+        
         return .{
             .alloc = alloc,
             .options = options,
@@ -65,13 +67,13 @@ pub const DelimiterStream = struct {
             const request_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
             if (self.options.skip_blank_message and request_json.len == 0) continue;
 
-            self.options.logger("receive request", request_json);
+            self.options.logger.log("receive request", request_json);
             response_buf.clearRetainingCapacity();
             if (try msg_handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try output_writer.writeAll(response_buf.items);
                 try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
-                self.options.logger("return response", response_buf.items);
+                self.options.logger.log("return response", response_buf.items);
             }
         }
     }
@@ -95,7 +97,7 @@ pub const DelimiterStream = struct {
             const response_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
-            self.options.logger("receive response", response_json);
+            self.options.logger.log("receive response", response_json);
             msg_handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
                 stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
@@ -109,17 +111,8 @@ pub const DelimiterStreamOptions = struct {
     request_delimiter: u8 = '\n',
     response_delimiter: u8 = '\n',
     skip_blank_message: bool = true,
-    logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
+    logger: Logger = Logger.init(&nopLogger),
 };
-
-/// A do-nothing logger that can be passed to the stream options.logger.
-pub fn nopLogger(_: []const u8, _: []const u8) void {
-}
-
-/// A logger that logs to the std.debug.  It can be passed to the stream options.logger.
-pub fn debugLogger(operation: []const u8, message: []const u8) void {
-    std.debug.print("{s}: {s}\n", .{operation, message});
-}
 
 
 /// Provides frame level support for JSON-RPC streaming based on Content-Length header.
@@ -173,12 +166,12 @@ pub const ContentLengthStream = struct {
             const request_json = std.mem.trim(u8, frame_buf.items, " \t");
             if (self.options.skip_blank_message and request_json.len == 0) continue;
 
-            self.options.logger("receive request", request_json);
+            self.options.logger.log("receive request", request_json);
             response_buf.clearRetainingCapacity();
             if (try msg_handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
-                self.options.logger("return response", response_buf.items);
+                self.options.logger.log("return response", response_buf.items);
             }
         }
     }
@@ -200,7 +193,7 @@ pub const ContentLengthStream = struct {
             const response_json = std.mem.trim(u8, frame_buf.items, " \t");
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
-            self.options.logger("receive response", response_json);
+            self.options.logger.log("receive response", response_json);
             msg_handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
                 stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
@@ -213,7 +206,52 @@ pub const ContentLengthStream = struct {
 pub const ContentLengthStreamOptions = struct {
     recover_on_missing_header: bool = true,
     skip_blank_message: bool = true,
-    logger: *const fn(operation: []const u8, message: []const u8) void = nopLogger,
+    logger: Logger = Logger.init(&nopLogger),
 };
+
+
+/// Logger interface
+pub const Logger = struct {
+    context: *anyopaque,
+    log_fn: *const fn(context: *anyopaque, operation: []const u8, message: []const u8) void,
+
+    pub fn init(context: anytype) Logger {
+        const ctx_type = @TypeOf(context);
+
+        const wrapper = struct {
+            fn log_fn(ctx: *anyopaque, operation: []const u8, message: []const u8) void {
+                const ctx_ptr: ctx_type = @ptrCast(@alignCast(ctx));
+                ctx_ptr.log(operation, message);
+            }
+        };
+        return .{
+            .context = context,
+            .log_fn = wrapper.log_fn,
+        };
+    }
+
+    fn log(self: @This(), operation: []const u8, message: []const u8) void {
+        self.log_fn(self.context, operation, message);
+    }
+
+};
+
+
+/// A do-nothing logger that can be passed to the stream options.logger.
+pub const NopLogger = struct {
+    pub fn log(_: @This(), _: []const u8, _: []const u8) void {}
+};
+
+var nopLogger = NopLogger{};
+
+
+/// A logger that prints to std.dbg.
+pub const DbgLogger = struct {
+    pub fn log(_: @This(), operation: []const u8, message: []const u8) void {
+        std.debug.print("{s} - {s}\n", .{operation, message});
+    }
+};
+
+var dbgLogger = DbgLogger{};
 
 
