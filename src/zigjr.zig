@@ -43,6 +43,7 @@ pub const ContentLengthStreamOptions = stream.ContentLengthStreamOptions;
 pub const Logger = stream.Logger;
 pub const NopLogger = stream.NopLogger;
 pub const DbgLogger = stream.DbgLogger;
+pub const FileLogger = stream.FileLogger;
 
 
 pub const RpcRegistry = rpc_registry.RpcRegistry;

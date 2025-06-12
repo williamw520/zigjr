@@ -74,6 +74,12 @@ pub fn build(b: *std.Build) void {
     dispatcher_counter_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "dispatcher_counter", .root_module = dispatcher_counter_mod }));
 
+    var mcp_hello_opt = commonOptions;
+    mcp_hello_opt.root_source_file = b.path("src/examples/mcp_hello.zig");
+    const mcp_hello_mod = b.createModule(mcp_hello_opt);
+    mcp_hello_mod.addImport("zigjr", zigjr_mod);
+    b.installArtifact(b.addExecutable(.{ .name = "mcp_hello", .root_module = mcp_hello_mod }));
+
 
     // End of building examples
 

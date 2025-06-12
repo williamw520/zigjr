@@ -53,7 +53,7 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
         // Handle streaming of requests separated by a delimiter (LF).
         var logger = MyLogger{};
         const streamer = zigjr.DelimiterStream.init(alloc, .{
-            .logger = zigjr.Logger.init(&logger),
+            .logger = zigjr.Logger.by(&logger),
         });
         try streamer.streamRequests(std.io.getStdIn().reader(),
                                     std.io.getStdOut().writer(),
@@ -189,10 +189,13 @@ fn addWeight(weight: f64, cat: CatInfo) CatInfo {
 const MyLogger = struct {
     count: usize = 0,
     
-    pub fn log(self: *@This(), operation: []const u8, message: []const u8) void {
+    pub fn start(_: @This(), _: []const u8) void {}
+    pub fn log(self: *@This(), source:[] const u8, operation: []const u8, message: []const u8) void {
         self.count += 1;
-        std.debug.print("LOG {}: {s} - {s}\n", .{self.count, operation, message});
+        std.debug.print("LOG {}: {s} - {s} - {s}\n", .{self.count, source, operation, message});
     }
+    pub fn stop(_: @This(), _: []const u8) void {}
+    
 };
 
 
