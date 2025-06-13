@@ -304,8 +304,8 @@ pub const FileLogger = struct {
     writer: std.fs.File.Writer,
 
     pub fn init(file_path: []const u8) !FileLogger {
-        const file = try std.fs.cwd().openFile(file_path, .{ .mode = .write_only });
-        try file.seekFromEnd(0);
+        const file = try fileOpenIf(file_path);
+        try file.seekFromEnd(0);    // seek to end for appending to file.
         return .{
             .file = file,
             .writer = file.writer(),
@@ -333,6 +333,17 @@ pub const FileLogger = struct {
         self.writer.print("Timestamp {d} - {s}\n\n", .{ts_sec, message})
             catch |err| std.debug.print("Error while printing in stop(). {any}\n", .{err});
     }
+
+    fn fileOpenIf(file_path: []const u8) !std.fs.File {
+        return std.fs.cwd().openFile(file_path, .{ .mode = .write_only }) catch |err| {
+            if (err == error.FileNotFound) {
+                return try std.fs.cwd().createFile(file_path, .{ .read = false });
+            } else {
+                return err;
+            }
+        };
+    }
+    
 };
 
 
