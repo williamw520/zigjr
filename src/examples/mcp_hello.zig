@@ -8,6 +8,7 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayHashMap = std.json.ArrayHashMap;
 
 const zigjr = @import("zigjr");
 const DelimiterStream = zigjr.DelimiterStream;
@@ -46,11 +47,22 @@ pub fn main() !void {
 }
 
 
-fn mcp_initialize(request: InitializeRequest) InitializeResult {
-    std.debug.print("mcp_initialize, request: {any}\n", .{request});
+fn mcp_initialize(params: InitializeRequest_Params) InitializeResult {
+    _=params;
     return .{
-        .protocolVersion = "2025-03-26",
-        .capabilities = ServerCapabilities {},
+        .protocolVersion = "2025-03-26",    // https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26
+        .capabilities = ServerCapabilities {
+            .prompts = .{
+                .listChanged = false,
+            },
+            .resources = .{
+                .listChanged = false,
+                .subscribe = false,
+            },
+            .tools = .{
+                .listChanged = false,
+            },
+        },
         .serverInfo = Implementation {
             .name = "zigjr mcp_hello",
             .version = "1.0.0",
@@ -75,11 +87,6 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator, request: ListTool
             .properties = .{
             },
             .required = null,
-            .additionalProperties = false,
-            .@"$defs" = .{
-            },
-            .definitions = .{
-            },
         },
     });
     return .{
@@ -116,32 +123,50 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: std.json.
     }
 }
 
-const InitializeRequest = struct {
+/// See MCP message schema for detail.
+/// https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26
+
+const InitializeRequest_Params = struct {
     protocolVersion:    []const u8,
     capabilities:       ClientCapabilities,
     clientInfo:         Implementation,
 };
 
+const Implementation = struct {
+    name:               []const u8,
+    version:            []const u8,
+};
+
+const ClientCapabilities = struct {
+    experimental:       ?ArrayHashMap([]const u8) = null,
+    roots:              ?struct {
+        listChanged:        bool,
+    } = null,
+    sampling:           ?ArrayHashMap([]const u8) = null,
+};
+
 const InitializeResult = struct {
+    _meta:              ?ArrayHashMap([]const u8) = null,
     protocolVersion:    []const u8,
     capabilities:       ServerCapabilities,
     serverInfo:         Implementation,
     instructions:       ?[]const u8,
 };
 
-const Implementation = struct {
-    name: []const u8,
-    version: []const u8,
-};
-
-const ClientCapabilities = struct {
-    // experimental:       ?std.json.ObjectMap,
-    // roots:              ?std.json.ObjectMap,
-    // sampling:           ?std.json.ObjectMap,
-};
-
 const ServerCapabilities = struct {
-
+    completions:        ?ArrayHashMap([]const u8) = null,
+    experimental:       ?ArrayHashMap([]const u8) = null,
+    logging:            ?ArrayHashMap([]const u8) = null,
+    prompts:            ?struct {
+        listChanged:        bool,
+    } = null,
+    resources:          ?struct {
+        listChanged:        bool,
+        subscribe:          bool,
+    } = null,
+    tools:              ?struct {
+        listChanged:        bool,
+    } = null,
 };
 
 const ListToolsRequest = struct {
@@ -152,12 +177,9 @@ const ListToolsRequest = struct {
 };
 
 const ListToolsResult = struct {
-    _meta:  ?struct {
-        additionalProperties: struct {
-        },
-    } = null,
+    _meta:      ?ArrayHashMap([]const u8) = null,
     nextCursor: ?[]const u8 = null,
-    tools:  []Tool,
+    tools:      []Tool,
 };
 
 const Tool = struct {
@@ -170,14 +192,8 @@ const Tool = struct {
 const InputSchema = struct {
     // @"type":        []u8 = .{ 'o', 'b', 'j', 'e', 'c', 't' },
     @"type":        []const u8,
-    properties:     ?struct {
-    },
+    properties:     ArrayHashMap([]const u8),
     required:       ?[][]const u8 = null,
-    additionalProperties: bool = false,
-    @"$defs":       ?struct {
-    },
-    definitions:    ?struct {
-    },
 };
 
 const CallToolResult = struct {
