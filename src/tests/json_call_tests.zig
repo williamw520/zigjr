@@ -7,8 +7,6 @@ const StringHashMap = std.hash_map.StringHashMap;
 const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 const json_call = @import("../rpc/json_call.zig");
@@ -35,6 +33,12 @@ fn fn0_return_value() []const u8 {
 fn fn0_return_value_with_err() ![]const u8 {
     std.debug.print("fn0_return_value_with_err() called\n", .{});
     return "Hello";
+}
+
+fn fn0_return_json_str() json_call.JsonStr {
+    return .{
+        .json = "{ \"foobar\": 42 }",
+    };
 }
 
 fn fn0_alloc(alloc: Allocator) !void {
@@ -100,6 +104,19 @@ test "Test rpc call on fn0." {
         _ = try h.invoke(.{ .null = {} });
         h.reset();
         _ = try h.invoke(.{ .null = {} });
+        h.reset();
+    }
+
+    {
+        var ctx = {};
+        var h = try json_call.makeRpcHandler(&ctx, fn0_return_json_str, alloc);
+        defer h.deinit();
+        _ = try h.invoke(.{ .null = {} });
+        _ = try h.invoke(.{ .null = {} });
+        _ = try h.invokeJson("");
+        const dresult = try h.invoke(.{ .null = {} });
+        // std.debug.print("result {s}\n", .{dresult.result});
+        try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
         h.reset();
     }
 

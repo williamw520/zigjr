@@ -5,8 +5,6 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 const RpcRequestMessage = zigjr.RpcRequestMessage;

@@ -14,9 +14,6 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const StringHashMap = std.hash_map.StringHashMap;
 const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
-const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 

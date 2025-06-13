@@ -5,8 +5,6 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 const RpcRequestMessage = zigjr.RpcRequestMessage;
@@ -690,7 +688,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
 }
 
 
-test "rpc_registry passing in an ObjectMap Value as a parameter, with a context, parsing the Value to a struct" {
+test "rpc_registry passing in a Value(.object) as a parameter, with a context, parsing the Value to a struct" {
     const alloc = gpa.allocator();
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);

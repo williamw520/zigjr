@@ -4,8 +4,6 @@ const allocPrint = std.fmt.allocPrint;
 const Allocator = std.mem.Allocator;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
-const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 const stringifyAlloc = std.json.stringifyAlloc;
 
 const zigjr = @import("../zigjr.zig");

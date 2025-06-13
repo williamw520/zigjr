@@ -14,7 +14,6 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const allocPrint = std.fmt.allocPrint;
 const Value = std.json.Value;
 const Array = std.json.Array;
-const ObjectMap = std.json.ObjectMap;
 
 const zigjr = @import("../zigjr.zig");
 const JrErrors = zigjr.JrErrors;
@@ -67,11 +66,8 @@ pub const RpcHandler = struct {
 ///
 /// The parameter types of the handler function are limited to the JSON's data types
 /// - bool, i64, f64, string ([]const u8), and object (struct) - for the array based JSON-RPC parameters.
-/// For an ObjectMap based JSON-RPC parameter, the function parameter is the matching struct type.
-/// RpcHandler will automatically convert the JSON ObjectMap to the struct value at runtime.
-///
-/// The return type of handler function is any type that can be stringified to JSON.
-/// Note that some types are converted to the JSON's data types in the result.
+/// For an object based JSON-RPC parameter, the function parameter is the matching struct type.
+/// RpcHandler will automatically convert the JSON object to the struct value at runtime.
 ///
 /// There are a few special parameters of the handler function supported by RpcHandler.
 ///
@@ -94,6 +90,11 @@ pub const RpcHandler = struct {
 /// the JSON-RPC parameters of the correponding Value type function parameters are passed in
 /// as Value objects without any interpretation. e.g. fn h3(a: Value, b: i64, c: Value).
 ///
+/// The return type of handler function can be void, JsonStr, or any type that can be
+/// stringified to JSON.  The function can just return a value and it will be automatically
+/// stringified to JSON.  If the function has already built its own JSON string, it can
+/// return it in a JsonStr struct, which prevents it from being stringified again.
+/// 
 pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allocator) !RpcHandler {
     const hinfo = getHandlerInfo(F, context);
     try validateHandler(hinfo);
@@ -107,7 +108,7 @@ pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allo
                 switch (params_value) {
                     .object => return callOnObject(F, hinfo, ctx, arena_alloc, params_value),
                     else    => {
-                        std.debug.print("Expecting an ObjectMap but got unexpected JSON params: {any}\n", .{params_value});
+                        std.debug.print("Expecting an Value(.object) but got unexpected JSON params: {any}\n", .{params_value});
                         return DispatchErrors.InvalidParams;
                     },
                 }
@@ -143,7 +144,10 @@ fn validateHandler(comptime hinfo: HandlerInfo) !void {
     _=hinfo;
 }
 
-// Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
+/// Wrapper struct on a JSON string, for tagging a string with JSON data.
+pub const JsonStr = struct {
+    json:   []const u8
+};
 
 // This is a comptime struct capturing the needed comptime info to do the call on the handler.
 const HandlerInfo = struct {
@@ -157,36 +161,40 @@ const HandlerInfo = struct {
     is_value1:      bool,                   // The only user parameter is a std.json.Value.
     is_obj1:        bool,                   // The only user parameter is an object of a struct type.
     obj1_type:      type,                   // The struct type of the object.
-    has_err:        bool,                   // The handler function has a error union in the return type.
-    is_void:        bool,                   // The handler function has a void return type.
+    has_ret_err:    bool,                   // The function has a error union in the return type.
+    is_ret_void:    bool,                   // The function has a void return type.
+    is_ret_json:    bool,                   // The function has a JsonStr return type.
 };
 
+// Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
+
 inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) HandlerInfo {
-    const fn_info   = getFnInfo(handler_fn);
-    const params    = fn_info.params;
-    const ctx_type  = @TypeOf(context);
-    const has_ctx   = ctx_type != void and ctx_type != *void;
-    const alloc_idx = if (has_ctx) 1 else 0;                // alloc parameter index is after context
-    const has_alloc = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
-    const user_idx  = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user parameter.
-    const is_value1 = params.len == user_idx + 1 and isValue(params[user_idx].type);
-    const is_struct = params.len == user_idx + 1 and isStruct(params[user_idx].type);
-    const is_obj1   = is_struct and !is_value1;
-    const obj1_type = if (is_obj1) params[user_idx].type.? else void;
+    const fn_info       = getFnInfo(handler_fn);
+    const params        = fn_info.params;
+    const ctx_type      = @TypeOf(context);
+    const has_ctx       = ctx_type != void and ctx_type != *void;
+    const alloc_idx     = if (has_ctx) 1 else 0;                // the alloc param index is after ctx
+    const has_alloc     = params.len > alloc_idx and params[alloc_idx].type.? == std.mem.Allocator;
+    const user_idx      = alloc_idx + if (has_alloc) 1 else 0;  // index of the first user param.
+    const is_value1     = params.len == user_idx + 1 and isValue(params[user_idx].type);
+    const is_struct     = params.len == user_idx + 1 and isStruct(params[user_idx].type);
+    const is_obj1       = is_struct and !is_value1;
+    const obj1_type     = if (is_obj1) params[user_idx].type.? else void;
 
     return .{
-        .fn_info    = fn_info,
-        .params     = params,
-        .tuple_type = ParamTupleType(params),
-        .ctx_type   = ctx_type,
-        .has_ctx    = has_ctx,
-        .has_alloc  = has_alloc,
-        .user_idx   = user_idx,
-        .is_value1  = is_value1,
-        .is_obj1    = is_obj1,
-        .obj1_type  = obj1_type,
-        .has_err    = isErrorUnion(fn_info.return_type),
-        .is_void    = isVoid(fn_info.return_type),
+        .fn_info        = fn_info,
+        .params         = params,
+        .tuple_type     = ParamTupleType(params),
+        .ctx_type       = ctx_type,
+        .has_ctx        = has_ctx,
+        .has_alloc      = has_alloc,
+        .user_idx       = user_idx,
+        .is_value1      = is_value1,
+        .is_obj1        = is_obj1,
+        .obj1_type      = obj1_type,
+        .has_ret_err    = isErrorUnion(fn_info.return_type),
+        .is_ret_void    = isVoid(fn_info.return_type),
+        .is_ret_json    = fn_info.return_type == JsonStr,
     };
 }
 
@@ -251,11 +259,7 @@ inline fn isErrorUnion(comptime T: ?type) bool {
 }
 
 inline fn isValue(comptime T: ?type) bool {
-    if (T)|t| {
-        return t == std.json.Value;
-    } else {
-        return false;
-    }
+    return T == std.json.Value;
 }
 
 inline fn isStruct(comptime T: ?type) bool {
@@ -299,7 +303,7 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
     if (hinfo.params.len != hinfo.user_idx + 1)
         return DispatchErrors.MismatchedParamCounts;
 
-    // Map the incoming ObjectMap value into a struct object.
+    // Map the incoming Value(.object) into a struct object.
     // Alloc is an arena allocator; don't need to free the parsed result here.
     const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, params_value, .{});
     const obj1: hinfo.obj1_type = parsed.value;
@@ -322,21 +326,29 @@ fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
 
 fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, args: hinfo.tuple_type,
          alloc: Allocator) anyerror!DispatchResult {
-    if (hinfo.is_void) {
-        if (hinfo.has_err) {
+    if (hinfo.is_ret_void) {
+        if (hinfo.has_ret_err) {
             try @call(.auto, F, args);
         } else {
             @call(.auto, F, args);
         }
         return DispatchResult.asNone();
     } else {
-        if (hinfo.has_err) {
+        if (hinfo.has_ret_err) {
             const result = try @call(.auto, F, args);
-            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, result, .{}));
+            return DispatchResult.withResult(try resultToJson(hinfo, alloc, result));
         } else {
             const result = @call(.auto, F, args);
-            return DispatchResult.withResult(try std.json.stringifyAlloc(alloc, result, .{}));
+            return DispatchResult.withResult(try resultToJson(hinfo, alloc, result));
         }
+    }
+}
+
+fn resultToJson(comptime hinfo: HandlerInfo, alloc: Allocator, result: anytype) ![]const u8 {
+    if (hinfo.is_ret_json) {
+        return result.json;     // result is already in JSON; just return it.
+    } else {
+        return try std.json.stringifyAlloc(alloc, result, .{});
     }
 }
 

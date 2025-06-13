@@ -12,6 +12,7 @@ pub const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 const msg_handler = @import("rpc/msg_handler.zig");
 const rpc_registry = @import("rpc/rpc_registry.zig");
+const json_call = @import("rpc/json_call.zig");
 const stream = @import("streaming/stream.zig");
 
 pub const parseRpcRequest = request.parseRpcRequest;
@@ -45,6 +46,7 @@ pub const NopLogger = stream.NopLogger;
 pub const DbgLogger = stream.DbgLogger;
 pub const FileLogger = stream.FileLogger;
 
+pub const JsonStr = json_call.JsonStr;
 
 pub const RpcRegistry = rpc_registry.RpcRegistry;
 pub const RegistrationErrors = rpc_registry.RegistrationErrors;
