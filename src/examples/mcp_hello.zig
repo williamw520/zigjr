@@ -17,6 +17,13 @@ const DelimiterStream = zigjr.DelimiterStream;
 const Logger = zigjr.Logger;
 
 
+/// A simple MCP server example implements:
+/// - MCP handshake
+/// - MCP tool discovery
+/// - MCP tool call
+/// - Two sample tools:
+///     hello: replies "Hello World!" when called.
+///     hello-name: replies "Hello 'NAME'!" when called with the name.
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
