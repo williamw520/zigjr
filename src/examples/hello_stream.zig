@@ -26,8 +26,8 @@ pub fn main() !void {
         try handlers.register("hello-name", null, helloName);
         try handlers.register("say", null, say);
 
-        // Read a stream of JSON requests from the reader, handle each with handlers,
-        // and write JSON responses to the writer.  Request frames are delimited by '\n'.
+        // Read requests from stdin, dispatch to handlers, and write responses to stdout.
+        // Request frames are delimited by '\n'.
         const streamer = zigjr.DelimiterStream.init(alloc, .{});
         try streamer.streamRequests(std.io.getStdIn().reader(),
                                     std.io.getStdOut().writer(),
@@ -40,14 +40,19 @@ pub fn main() !void {
 }
 
 
+// A handler with no parameter and returns a string.
 fn hello() []const u8 {
     return "Hello world";
 }
 
+// A handler takes in a string parameter and returns a string with error.
+// It also asks the library for an allocator, which is passed in automatically.
+// Allocated memory is freed automatically, making memory usage simple.
 fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
 }
 
+// A handler takes in a string and has no return value, for RPC notification.
 fn say(msg: [] const u8) void {
     std.debug.print("Message to say: {s}\n", .{msg});
 }

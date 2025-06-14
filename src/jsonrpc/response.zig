@@ -89,7 +89,7 @@ pub const RpcResponseMessage = union(enum) {
 
 pub const RpcResponse = struct {
     const Self = @This();
-    jsonrpc:    [3]u8 = .{ '0', '.', '0' }, // default to fail validation.
+    jsonrpc:    [3]u8 = "0.0".*,            // default to fail validation.
     id:         RpcId = .{ .null = {} },    // default for optional field.
     result:     Value = .{ .null = {} },    // default for optional field.
     @"error":   RpcResponseError = .{},     // parse error and validation error.

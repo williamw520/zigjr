@@ -13,23 +13,6 @@ pub fn build(b: *std.Build) void {
         .strip = strip_debug_symbols,
     });
 
-    const cli_exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/zigjr-cli.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = strip_debug_symbols,
-    });
-    cli_exe_mod.addImport("zigjr", zigjr_mod);
-
-    const cli_exe = b.addExecutable(.{
-        .name = "zigjr-cli",
-        .root_module = cli_exe_mod,
-    });
-    b.installArtifact(cli_exe);
-
-    const run_cmd = b.addRunArtifact(cli_exe);
-
-
     // Building examples
 
     const commonOptions = std.Build.Module.CreateOptions {
@@ -80,17 +63,7 @@ pub fn build(b: *std.Build) void {
     mcp_hello_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "mcp_hello", .root_module = mcp_hello_mod }));
 
-
     // End of building examples
-
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
 
     const lib_unit_tests = b.addTest(.{
         .root_module = zigjr_mod,
@@ -98,13 +71,6 @@ pub fn build(b: *std.Build) void {
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
-    const exe_unit_tests = b.addTest(.{
-        .root_module = cli_exe_mod,
-    });
-
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
-
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
-    test_step.dependOn(&run_exe_unit_tests.step);
 }
