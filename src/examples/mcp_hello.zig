@@ -8,7 +8,8 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayHashMap = std.json.ArrayHashMap;
+const Value = std.json.Value;
+const allocPrint = std.fmt.allocPrint;
 
 const zigjr = @import("zigjr");
 const DelimiterStream = zigjr.DelimiterStream;
@@ -20,21 +21,22 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
+        // Use a file-based logger so we can save the RPC messages to a file
+        // as the executable is run in a mcp host as a subprocess and cannot log to stdout.
         var logger = try zigjr.FileLogger.init("log.txt");
         defer logger.deinit();
 
-        // Create a registry for the JSON-RPC handlers.
         var handlers = zigjr.RpcRegistry.init(alloc);
         defer handlers.deinit();
 
-        // Register each RPC method with a handling function.
+        // Register the MCP RPC methods.
+        // Pass the logger in as context so each handler can also log to the log file.
         try handlers.register("initialize", null, mcp_initialize);
         try handlers.register("notifications/initialized", &logger, mcp_notifications_initialized);
         try handlers.register("tools/list", &logger, mcp_tools_list);
         try handlers.register("tools/call", &logger, mcp_tools_call);
 
-        // Read a stream of JSON requests from the reader, handle each with handlers,
-        // and write JSON responses to the writer.  Request frames are delimited by '\n'.
+        // Starts the JSON stream pipeline on stdin and stdout.
         const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.by(&logger) });
         try streamer.streamRequests(std.io.getStdIn().reader(),
                                     std.io.getStdOut().writer(),
@@ -46,59 +48,70 @@ pub fn main() !void {
     }    
 }
 
+// The MCP message handlers
 
-fn mcp_initialize(params: InitializeRequest_Params) InitializeResult {
+fn mcp_initialize(params: InitializeRequest_params) InitializeResult {
     _=params;
     return .{
         .protocolVersion = "2025-03-26",    // https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26
-        .capabilities = ServerCapabilities {
-            .prompts = .{
-                .listChanged = false,
-            },
-            .resources = .{
-                .listChanged = false,
-                .subscribe = false,
-            },
-            .tools = .{
-                .listChanged = false,
-            },
-        },
         .serverInfo = Implementation {
             .name = "zigjr mcp_hello",
             .version = "1.0.0",
         },
         .instructions = "Hello world",
+        .capabilities = ServerCapabilities {
+            .tools = .{
+            },
+        },
     };
 }
 
-fn mcp_notifications_initialized(logger: *zigjr.FileLogger, _: struct {}) void {
-    logger.log("mcp_notifications_initialized", "method called", "notification/initialized");
+fn mcp_notifications_initialized(logger: *zigjr.FileLogger, alloc: Allocator,
+                                 params: InitializedNotification_params) !void {
+    const msg = try allocPrint(alloc, "params: {any}", .{params});
+    logger.log("mcp_notifications_initialized", "notifications/initialized", msg);
 }
 
-fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator, request: ListToolsRequest) !ListToolsResult {
-    const msg = try std.fmt.allocPrint(alloc, "tools/list. request: {any}", .{request});
-    logger.log("mcp_tools_list", "method called", msg);
+fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
+                  params: ListToolsRequest_params) !ListToolsResult {
+    const msg = try allocPrint(alloc, "params: {any}", .{params});
+    logger.log("mcp_tools_list", "tools/list", msg);
     var tools = std.ArrayList(Tool).init(alloc);
     try tools.append(Tool {
         .name = "hello",
-        .description = "Reply hello world.",
+        .description = "Replying a 'Hello World' when called.",
         .inputSchema = .{
-            .@"type" = "object",
-            .properties = .{
-            },
-            .required = null,
+            .properties = try jsonObject(alloc),
+            .required = &.{},       // empty array.
         },
     });
+
+    var helloNameParam = try jsonObject(alloc);
+    try helloNameParam.object.put("type", Value { .string = "string" });
+    try helloNameParam.object.put("description", Value { .string = "The name to say hello to" });
+    var helloNameInput = try jsonObject(alloc);
+    try helloNameInput.object.put("name", helloNameParam);
+
+    var helloNameInputRequired = std.ArrayList([]const u8).init(alloc);
+    try helloNameInputRequired.append("name");
+    try tools.append(Tool {
+        .name = "hello-name",
+        .description = "Replying a 'Hello NAME' when called with the NAME.",
+        .inputSchema = .{
+            .properties = helloNameInput,
+            .required = helloNameInputRequired.items,
+        },
+    });
+
     return .{
         .tools = tools.items,
     };
 }
 
-fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: std.json.Value) !CallToolResult {
+fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !CallToolResult {
     const tool = params.object.get("name").?.string;
-    // const arguments = params.object.get("arguments").?.object;
-    const msg = try std.fmt.allocPrint(alloc, "name: {s}", .{tool});
-    logger.log("mcp_tools_call", "method called", msg);
+    const msg = try allocPrint(alloc, "name: {s}", .{tool});
+    logger.log("mcp_tools_call", "tools/call", msg);
 
     if (std.mem.eql(u8, tool, "hello")) {
         var contents = std.ArrayList(Content).init(alloc);
@@ -110,10 +123,23 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: std.json.
             .content = contents.items,
             .isError = false,
         };
+    } else if (std.mem.eql(u8, tool, "hello-name")) {
+        const arguments = params.object.get("arguments").?.object;
+        const name = arguments.get("name") orelse Value{ .string = "not set" };
+        logger.log("mcp_tools_call", "arguments", name.string);
+        var contents = std.ArrayList(Content).init(alloc);
+        try contents.append(.{
+            .text = try allocPrint(alloc, "Hello '{s}'!", .{name.string}),
+            .@"type" = "text",
+        });
+        return .{
+            .content = contents.items,
+            .isError = false,
+        };
     } else {
         var contents = std.ArrayList(Content).init(alloc);
         try contents.append(.{
-            .text = try std.fmt.allocPrint(alloc, "Tool {s} not found", .{tool}),
+            .text = try allocPrint(alloc, "Tool {s} not found", .{tool}),
             .@"type" = "text",
         });
         return .{
@@ -126,7 +152,7 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: std.json.
 /// See MCP message schema for detail.
 /// https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26
 
-const InitializeRequest_Params = struct {
+const InitializeRequest_params = struct {
     protocolVersion:    []const u8,
     capabilities:       ClientCapabilities,
     clientInfo:         Implementation,
@@ -138,62 +164,70 @@ const Implementation = struct {
 };
 
 const ClientCapabilities = struct {
-    experimental:       ?ArrayHashMap([]const u8) = null,
     roots:              ?struct {
         listChanged:        bool,
     } = null,
-    sampling:           ?ArrayHashMap([]const u8) = null,
+    sampling:           ?Value = null,
+    experimental:       ?Value = null,
 };
 
 const InitializeResult = struct {
-    _meta:              ?ArrayHashMap([]const u8) = null,
+    _meta:              ?Value = null,
     protocolVersion:    []const u8,
     capabilities:       ServerCapabilities,
     serverInfo:         Implementation,
     instructions:       ?[]const u8,
 };
 
+const InitializedNotification_params = struct {
+    _meta:              ?Value = null,
+};
+
 const ServerCapabilities = struct {
-    completions:        ?ArrayHashMap([]const u8) = null,
-    experimental:       ?ArrayHashMap([]const u8) = null,
-    logging:            ?ArrayHashMap([]const u8) = null,
+    completions:        ?Value = null,
+    experimental:       ?Value = null,
+    logging:            ?Value = null,
     prompts:            ?struct {
-        listChanged:        bool,
+        listChanged:        ?bool = false,
     } = null,
     resources:          ?struct {
-        listChanged:        bool,
-        subscribe:          bool,
+        listChanged:        ?bool = false,
+        subscribe:          ?bool = false,
     } = null,
     tools:              ?struct {
-        listChanged:        bool,
+        listChanged:        ?bool = false,
     } = null,
 };
 
-const ListToolsRequest = struct {
-    params: ?struct {
-        cursor:   ?[]const u8 = null,
-    } = null,
-
+const ListToolsRequest_params = struct {
+    cursor:     ?[]const u8 = null,
 };
 
 const ListToolsResult = struct {
-    _meta:      ?ArrayHashMap([]const u8) = null,
+    _meta:      ?Value = null,
     nextCursor: ?[]const u8 = null,
     tools:      []Tool,
 };
 
 const Tool = struct {
     name:           []const u8,
-    description:    []const u8,
+    description:    ?[]const u8 = null,
     inputSchema:    InputSchema,
-    // annotations:    ?ToolAnnotations,
+    annotations:    ?ToolAnnotations = null,
 };
 
 const InputSchema = struct {
-    // @"type":        []u8 = .{ 'o', 'b', 'j', 'e', 'c', 't' },
-    @"type":        []const u8,
-    properties:     ArrayHashMap([]const u8),
+    @"type":        [6]u8 = "object".*,
+    properties:     ?Value = null,
     required:       ?[][]const u8 = null,
+};
+
+const ToolAnnotations = struct {
+    destructiveHint:    bool = false,
+    idempotentHint:     bool = false,
+    openWorldHint:      bool = false,
+    readOnlyHint:       bool = false,
+    title:              []const u8,
 };
 
 const CallToolResult = struct {
@@ -206,4 +240,9 @@ const Content = struct {
     @"type":        []const u8,
 };
 
+
+
+fn jsonObject(alloc: Allocator) !Value {
+    return Value { .object = std.json.ObjectMap.init(alloc) };
+}
 
