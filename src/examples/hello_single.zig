@@ -26,12 +26,22 @@ pub fn main() !void {
         try handlers.register("hello-name", null, helloName);
         try handlers.register("say", null, say);
 
-        // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-        // Request frames are delimited by '\n'.
-        const streamer = zigjr.DelimiterStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    handlers);
+        // Read a JSON-RPC request JSON from StdIn.
+        const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
+        if (request.len > 0) {
+            defer alloc.free(request);
+            std.debug.print("Request:  {s}\n", .{request});
+
+            // Dispatch the JSON-RPC request to the handler, with result in response JSON.
+            if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
+                defer alloc.free(response);
+                std.debug.print("Response: {s}\n", .{response});
+            } else {
+                std.debug.print("No response\n", .{});
+            }
+        } else {
+            usage();
+        }
     }
 
     if (gpa.detectLeaks()) {
@@ -40,19 +50,14 @@ pub fn main() !void {
 }
 
 
-// A handler with no parameter and returns a string.
 fn hello() []const u8 {
     return "Hello world";
 }
 
-// A handler takes in a string parameter and returns a string with error.
-// It also asks the library for an allocator, which is passed in automatically.
-// Allocated memory is freed automatically, making memory usage simple.
 fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
 }
 
-// A handler takes in a string and has no return value, for RPC notification.
 fn say(msg: [] const u8) void {
     std.debug.print("Message to say: {s}\n", .{msg});
 }
@@ -60,8 +65,8 @@ fn say(msg: [] const u8) void {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  hello_stream
-        \\Usage:  hello_stream < messages.json
+        \\Usage:  hello_single
+        \\Usage:  hello_single < message.json
         \\
         \\The program reads from stdin.
         , .{});
