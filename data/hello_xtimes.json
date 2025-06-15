@@ -1,0 +1,1 @@
+{"jsonrpc": "2.0", "method": "hello-xtimes", "params": ["Foobar", 5], "id": 1}

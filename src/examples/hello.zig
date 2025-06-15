@@ -24,6 +24,7 @@ pub fn main() !void {
         // Register each RPC method with a handling function.
         try handlers.register("hello", null, hello);
         try handlers.register("hello-name", null, helloName);
+        try handlers.register("hello-xtimes", null, helloXTimes);
         try handlers.register("say", null, say);
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
@@ -50,6 +51,15 @@ fn hello() []const u8 {
 // Allocated memory is freed automatically, making memory usage simple.
 fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
+}
+
+// This one takes one more parameter. Note that i64 is JSON's integer type.
+fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
+    const repeat: usize = if (0 < times and times < 100) @intCast(times) else 1;
+    var buf = std.ArrayList(u8).init(alloc);
+    var writer = buf.writer();
+    for (0..repeat) |_| try writer.print("Hello {s}! ", .{name});
+    return buf.items;
 }
 
 // A handler takes in a string and has no return value, for RPC notification.

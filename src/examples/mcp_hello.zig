@@ -92,10 +92,17 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
     const helloTool = Tool.init(alloc, "hello", "Replying a 'Hello World' when called.");
     try tools.append(helloTool);
 
-    var helloNameTool = Tool.init(alloc, "hello-name", "Replying a 'Hello NAME' when called with the NAME.");
+    var helloNameTool = Tool.init(alloc, "hello-name", "Replying a 'Hello NAME' when called with a NAME.");
     try helloNameTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloNameTool.inputSchema.addRequired("name");
     try tools.append(helloNameTool);
+
+    var helloXTimesTool = Tool.init(alloc, "hello-xtimes", "Replying a 'Hello NAME' repeated X times when called with a NAME and a number.");
+    try helloXTimesTool.inputSchema.addProperty("name", "string", "The name to say hello to");
+    try helloXTimesTool.inputSchema.addRequired("name");
+    try helloXTimesTool.inputSchema.addProperty("times", "integer", "The number of times to repeat");
+    try helloXTimesTool.inputSchema.addRequired("times");
+    try tools.append(helloXTimesTool);
 
     return .{
         .tools = tools,
@@ -118,6 +125,17 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !C
 
         var ctr = CallToolResult.init(alloc);
         try ctr.addTextContent(try allocPrint(alloc, "Hello '{s}'!", .{name.string}));
+        return ctr;
+    } else if (std.mem.eql(u8, tool, "hello-xtimes")) {
+        const arguments = params.object.get("arguments").?.object;
+        const name = arguments.get("name") orelse Value{ .string = "not set" };
+        const times = arguments.get("times") orelse Value{ .integer = 1 };
+        const repeat: usize = if (0 < times.integer and times.integer < 100) @intCast(times.integer) else 1;
+        var buf = std.ArrayList(u8).init(alloc);
+        var writer = buf.writer();
+        for (0..repeat) |_| try writer.print("Hello {s}! ", .{name.string});
+        var ctr = CallToolResult.init(alloc);
+        try ctr.addTextContent(buf.items);
         return ctr;
     } else {
         var ctr = CallToolResult.init(alloc);
