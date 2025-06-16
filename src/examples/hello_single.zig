@@ -24,7 +24,11 @@ pub fn main() !void {
         // Register each RPC method with a handling function.
         try handlers.register("hello", null, hello);
         try handlers.register("hello-name", null, helloName);
+        try handlers.register("hello-xtimes", null, helloXTimes);
         try handlers.register("say", null, say);
+
+        // RequestDispatcher interface implemented by the 'handlers' registry.
+        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
 
         // Read a JSON-RPC request JSON from StdIn.
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
@@ -33,7 +37,7 @@ pub fn main() !void {
             std.debug.print("Request:  {s}\n", .{request});
 
             // Dispatch the JSON-RPC request to the handler, with result in response JSON.
-            if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
+            if (try zigjr.handleRequestToJson(alloc, request, dispatcher)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {
@@ -56,6 +60,14 @@ fn hello() []const u8 {
 
 fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
+}
+
+fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
+    const repeat: usize = if (0 < times and times < 100) @intCast(times) else 1;
+    var buf = std.ArrayList(u8).init(alloc);
+    var writer = buf.writer();
+    for (0..repeat) |_| try writer.print("Hello {s}! ", .{name});
+    return buf.items;
 }
 
 fn say(msg: [] const u8) void {

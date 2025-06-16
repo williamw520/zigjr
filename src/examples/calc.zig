@@ -40,12 +40,13 @@ pub fn main() !void {
         try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
         try handlers.register("add-weight", null, addWeight);
 
+        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
             defer alloc.free(request);
             std.debug.print("Request:  {s}\n", .{request});
 
-            if (try zigjr.handleRequestToJson(alloc, request, handlers)) |response| {
+            if (try zigjr.handleRequestToJson(alloc, request, dispatcher)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {

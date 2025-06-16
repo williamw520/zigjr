@@ -49,21 +49,20 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
     try handlers.register("add-weight", null, addWeight);
 
+    // RequestDispatcher interface implemented by the 'handlers' registry.
+    const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
         var logger = MyLogger{};
         const streamer = zigjr.DelimiterStream.init(alloc, .{
             .logger = zigjr.Logger.by(&logger),
         });
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    handlers);
+        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     } else if (args.by_length) {
         // Handle streaming of requests separated by the Content-Length header.
         const streamer = zigjr.ContentLengthStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    handlers);
+        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     } else {
         usage();
     }

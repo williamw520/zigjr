@@ -18,7 +18,7 @@ const frame = @import("../streaming/frame.zig");
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 const EchoDispatcher = struct {
-    pub fn dispatch(alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn dispatch(_: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 1 or params.items[0] != .string) {
@@ -29,7 +29,7 @@ const EchoDispatcher = struct {
         };
     }
 
-    pub fn dispatchEnd(alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => |json| alloc.free(json),
@@ -73,6 +73,8 @@ const ResponseDispatcher = struct {
 test "DelimiterStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
     {
+        var dispatcher = EchoDispatcher{};
+
         const req_jsons = 
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b"}
@@ -91,7 +93,7 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         // var logger = stream.DbgLogger{};
         // const streamer = stream.DelimiterStream.init(alloc, .{ .logger = stream.Logger.init(&logger) });
 
-        try streamer.streamRequests(reader, writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -136,7 +138,7 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         const streamer = stream.ContentLengthStream.init(alloc, .{});
         // var logger = stream.DbgLogger{};
         // const streamer = stream.ContentLengthStream.init(alloc, .{ .logger = stream.Logger.init(&logger) });
-        try streamer.streamRequests(reader, writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -156,6 +158,8 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
 test "DelimiterStream.streamRequests on JSON requests, recover from error" {
     const alloc = gpa.allocator();
     {
+        var dispatcher = EchoDispatcher{};
+
         const req_jsons = 
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
             \\garbage abc
@@ -174,7 +178,7 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
 
-        try streamer.streamRequests(reader, writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -191,6 +195,8 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
 test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, recover from error" {
     const alloc = gpa.allocator();
     {
+        var dispatcher = EchoDispatcher{};
+
         const req_jsons = 
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
             \\garbage abc
@@ -209,7 +215,7 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
 
         const streamer = stream.DelimiterStream.init(alloc, .{ .skip_blank_message = false });
 
-        try streamer.streamRequests(reader, writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -274,7 +280,7 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         const writer = write_buffer.writer();
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
-        try streamer.streamRequests(reader, writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -294,6 +300,8 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
 test "DelimiterStream.streamResponses on JSON responses, single param, id" {
     const alloc = gpa.allocator();
     {
+        var dispatcher = EchoDispatcher{};
+
         const req_jsons = 
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["xyz"],  "id": "5b" }
@@ -310,7 +318,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
 
         const streamer = stream.DelimiterStream.init(alloc, .{});
 
-        try streamer.streamRequests(reader, writer, EchoDispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -367,7 +375,7 @@ test "responsesByLength on JSON responses, single param, id" {
         const writer = write_buffer.writer();
 
         const streamer = stream.ContentLengthStream.init(alloc, .{});
-        try streamer.streamRequests(reader, writer, &dispatcher);
+        try streamer.streamRequests(reader, writer, zigjr.RequestDispatcher.by(&dispatcher));
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,

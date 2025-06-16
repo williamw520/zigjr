@@ -15,6 +15,7 @@ const bufferedWriter = std.io.bufferedWriter;
 const zigjr = @import("../zigjr.zig");
 
 const msg_handler = @import("../rpc/msg_handler.zig");
+const RequestDispatcher = msg_handler.RequestDispatcher;
 const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
 
@@ -43,7 +44,7 @@ pub const DelimiterStream = struct {
     /// handle each one with the dispatcher, and write the JSON responses to the writer.
     /// The writer is buffered internally.  The reader is not buffered.
     /// Caller might want to wrap a buffered reader around it.
-    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: RequestDispatcher) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON request is a frame.
         defer frame_buf.deinit();
         const frame_writer = frame_buf.writer();
@@ -143,7 +144,7 @@ pub const ContentLengthStream = struct {
 
     /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
     /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
-    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: anytype) !void {
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: RequestDispatcher) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc);
         defer frame_buf.deinit();
         var response_buf = std.ArrayList(u8).init(self.alloc);

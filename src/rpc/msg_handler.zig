@@ -97,6 +97,47 @@ pub const DispatchErrors = error {
 };
 
 
+/// RequestDispatcher interface
+pub const RequestDispatcher = struct {
+    impl_ptr:       *anyopaque,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult,
+    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void,
+
+    // Interface is implemented by the 'impl' object.
+    pub fn by(impl: anytype) RequestDispatcher {
+        const ImplType = @TypeOf(impl);
+
+        const Thunk = struct {
+            fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
+                return implementation.dispatch(alloc, req);
+            }
+
+            fn dispatchEnd(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
+                return implementation.dispatchEnd(alloc, req, dresult);
+            }
+        };
+
+        return .{
+            .impl_ptr = impl,
+            .dispatch_fn = Thunk.dispatch,
+            .dispatchEnd_fn = Thunk.dispatchEnd,
+        };
+    }
+
+    fn dispatch(self: @This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        return self.dispatch_fn(self.impl_ptr, alloc, req);
+    }
+
+    fn dispatchEnd(self: @This(), alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+        return self.dispatchEnd_fn(self.impl_ptr, alloc, req, dresult);
+    }
+};
+
+pub const HandlePipeline = struct {
+};
+
 /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
 /// and write the JSON-RPC response(s) to the writer.
 /// The JSON request message can contain a single request or a batch of requests.
@@ -107,7 +148,7 @@ pub const DispatchErrors = error {
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
 pub fn handleJsonRequest(alloc: Allocator, request_json: []const u8, writer: anytype,
-                         dispatcher: anytype) AllocError!bool {
+                         dispatcher: RequestDispatcher) AllocError!bool {
     var parsed_result = parseRpcRequest(alloc, request_json);
     defer parsed_result.deinit();
     switch (parsed_result.request_msg) {
@@ -129,7 +170,7 @@ pub fn handleJsonRequest(alloc: Allocator, request_json: []const u8, writer: any
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: anytype) AllocError!?[]const u8 {
+pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) AllocError!?[]const u8 {
     var response_buf = ArrayList(u8).init(alloc);
     if (try handleJsonRequest(alloc, request_json, response_buf.writer(), dispatcher)) {
         return try response_buf.toOwnedSlice();
@@ -144,7 +185,7 @@ pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatche
 /// Usually after handling the request, the JSON-RPC response message is sent back to the client.
 /// The client then parses the JSON-RPC response message.  This skips all those and directly
 /// parses the JSON-RPC response message in one shot.  This is mainly for testing.
-pub fn handleRequestToResponse(alloc: Allocator, request_json: []const u8, dispatcher: anytype) !RpcResponseResult {
+pub fn handleRequestToResponse(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) !RpcResponseResult {
     const response_json = try handleRequestToJson(alloc, request_json, dispatcher) orelse "";
     defer alloc.free(response_json);
     return try parseRpcResponse(alloc, response_json);
@@ -179,8 +220,8 @@ pub fn handleJsonResponse(alloc: Allocator, response_json: ?[]const u8, dispatch
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
-                        prefix: []const u8, suffix: []const u8, req_dispatcher: anytype) AllocError!bool {
+fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
+                    prefix: []const u8, suffix: []const u8, dispatcher: RequestDispatcher) AllocError!bool {
     if (req.hasError()) {
         // Return an error response for the parsing or validation error on the request.
         try messages.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
@@ -189,14 +230,14 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
 
     // Call the request dispatcher to handle the request.
     const dresult: DispatchResult = call: {
-        break :call req_dispatcher.dispatch(alloc, req) catch |err| {
+        break :call dispatcher.dispatch(alloc, req) catch |err| {
             // Turn dispatching error into DispatchResult.err.
             // Handle errors here so dispatchers don't have to worry about error handling.
             break :call DispatchResult.withAnyErr(err);
         };
     };
     // Do clean up on the result at the end of dispatching.
-    defer req_dispatcher.dispatchEnd(alloc, req, dresult);
+    defer dispatcher.dispatchEnd(alloc, req, dresult);
 
     switch (dresult) {
         .none => {
@@ -233,8 +274,8 @@ pub fn handleRpcRequest(alloc: Allocator, req: RpcRequest, writer: anytype,
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRpcRequests(alloc: Allocator, batch: []const RpcRequest, dispatcher: anytype,
-                         writer: anytype) AllocError!void {
+fn handleRpcRequests(alloc: Allocator, batch: []const RpcRequest, dispatcher: RequestDispatcher,
+                     writer: anytype) AllocError!void { // TODO: swap dispatcher and writer
     var count: usize = 0;
     try writer.writeAll("[");
     for (batch) |req| {

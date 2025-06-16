@@ -11,6 +11,7 @@ const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
+const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
@@ -268,7 +269,7 @@ test "rpc_registry fn0" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -293,7 +294,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -303,7 +304,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -313,7 +314,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -325,7 +326,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -337,7 +338,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -364,7 +365,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -376,7 +377,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -388,7 +389,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -399,7 +400,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -410,7 +411,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -436,7 +437,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -445,7 +446,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -454,7 +455,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -465,7 +466,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -476,7 +477,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -503,7 +504,7 @@ test "rpc_registry with context" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -515,7 +516,7 @@ test "rpc_registry with context" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -524,7 +525,7 @@ test "rpc_registry with context" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -533,7 +534,7 @@ test "rpc_registry with context" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
-            , &registry) orelse "";
+                , RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
 
@@ -543,7 +544,8 @@ test "rpc_registry with context" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-            , &registry) orelse "";
+                            , RequestDispatcher.by(&registry)) orelse "";
+
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -567,7 +569,8 @@ test "rpc_registry fn with array params returning struct value" {
         {
             const res_json = try zigjr.handleRequestToJson(alloc,
                 \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
-            , &registry) orelse "";
+                            , RequestDispatcher.by(&registry)) orelse "";
+
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -601,7 +604,7 @@ test "rpc_registry fn with built array params returning struct value" {
             defer alloc.free(req_json);
             std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json, &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
 
@@ -635,7 +638,7 @@ test "rpc_registry passing in an Value as a parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -668,7 +671,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -704,7 +707,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -736,7 +739,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -751,7 +754,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
         }
@@ -773,7 +776,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -799,7 +802,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -825,7 +828,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -853,7 +856,7 @@ test "rpc_registry passing in a struct object as a parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -887,7 +890,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -923,7 +926,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -959,7 +962,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -996,7 +999,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_on", null, .none);
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
         }
@@ -1005,7 +1008,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -1018,7 +1021,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_off", null, .none);
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
         }
 
@@ -1026,7 +1029,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -1038,7 +1041,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.handleRequestToJson(alloc, req_json , &registry) orelse "";
+            const res_json = try zigjr.handleRequestToJson(alloc, req_json, RequestDispatcher.by(&registry)) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 

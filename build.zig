@@ -39,11 +39,11 @@ pub fn build(b: *std.Build) void {
     calc_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "calc", .root_module = calc_mod }));
 
-    var calc_stream_opt = commonOptions;
-    calc_stream_opt.root_source_file = b.path("src/examples/calc_stream.zig");
-    const calc_stream_mod = b.createModule(calc_stream_opt);
-    calc_stream_mod.addImport("zigjr", zigjr_mod);
-    b.installArtifact(b.addExecutable(.{ .name = "calc_stream", .root_module = calc_stream_mod }));
+    var stream_calc_opt = commonOptions;
+    stream_calc_opt.root_source_file = b.path("src/examples/stream_calc.zig");
+    const stream_calc_mod = b.createModule(stream_calc_opt);
+    stream_calc_mod.addImport("zigjr", zigjr_mod);
+    b.installArtifact(b.addExecutable(.{ .name = "stream_calc", .root_module = stream_calc_mod }));
 
     var dispatcher_hello_opt = commonOptions;
     dispatcher_hello_opt.root_source_file = b.path("src/examples/dispatcher_hello.zig");

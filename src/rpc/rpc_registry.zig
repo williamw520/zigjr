@@ -18,6 +18,7 @@ const allocPrint = std.fmt.allocPrint;
 const zigjr = @import("../zigjr.zig");
 
 const RpcRequest = zigjr.RpcRequest;
+const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 

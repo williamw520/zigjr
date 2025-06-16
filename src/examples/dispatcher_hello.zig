@@ -21,10 +21,12 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
+        // RequestDispatcher interface implemented by the custom dispatcher.
+        var dispatcher_impl = HelloDispatcher{};
+        const dispatcher = zigjr.RequestDispatcher.by(&dispatcher_impl);
+
         const streamer = zigjr.DelimiterStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    HelloDispatcher);
+        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     }
 
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
@@ -33,7 +35,7 @@ pub fn main() !void {
 
 const HelloDispatcher = struct {
     // The JSON-RPC request has been parsed into a RpcRequest.  Dispatch on it here.
-    pub fn dispatch(alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn dispatch(_: @This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             // Result needs to be in JSON.
             return DispatchResult.withResult(try stringifyAlloc(alloc, "Hello World", .{}));
@@ -42,6 +44,17 @@ const HelloDispatcher = struct {
                 const items = req.params.array.items;
                 if (items.len > 0 and items[0] == .string) {
                     const result = try std.fmt.allocPrint(alloc, "Hello {s}", .{ items[0].string });
+                    defer alloc.free(result);
+                    return DispatchResult.withResult(try stringifyAlloc(alloc, result, .{}));
+                }
+            }
+            return DispatchResult.withErr(ErrorCode.InvalidParams, "Invalid params.");
+        } else if (std.mem.eql(u8, req.method, "hello-xtimes")) {
+            if (req.params == .array) {
+                const items = req.params.array.items;
+                if (items.len > 1 and items[0] == .string and items[1] == .integer) {
+                    const result = try std.fmt.allocPrint(alloc, "Hello {s} X {} times",
+                                                          .{ items[0].string, items[1].integer });
                     defer alloc.free(result);
                     return DispatchResult.withResult(try stringifyAlloc(alloc, result, .{}));
                 }
@@ -61,7 +74,7 @@ const HelloDispatcher = struct {
     }
 
     // The result has been processed; this call is the chance to clean up DispatchResult.
-    pub fn dispatchEnd(alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(_: @This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         // If alloc passed in to handleRequestToJson() above is set up as an ArenaAllocator,
         // no need to free memory here.
         switch (dresult) {

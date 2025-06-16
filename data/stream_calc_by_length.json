@@ -26,8 +26,6 @@ Content-Length: 66
 
 {"jsonrpc": "2.0", "method": "pow", "params": [2.5, 2.0], "id": 8}
 
-
-
 Content-Length: 186
 
 [{"jsonrpc": "2.0", "method": "inc", "params": [2], "id": 16}, {"jsonrpc": "2.0", "method": "inc", "params": [1], "id": 17}, {"jsonrpc": "2.0", "method": "inc", "params": [3], "id": 18}]

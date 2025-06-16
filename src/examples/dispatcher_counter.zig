@@ -21,11 +21,12 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = CounterDispatcher{};
+        // RequestDispatcher interface implemented by the custom dispatcher.
+        var dispatcher_impl = CounterDispatcher{};
+        const dispatcher = zigjr.RequestDispatcher.by(&dispatcher_impl);
+
         const streamer = zigjr.DelimiterStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    &dispatcher);
+        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     }
 
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }

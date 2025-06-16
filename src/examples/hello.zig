@@ -27,12 +27,12 @@ pub fn main() !void {
         try handlers.register("hello-xtimes", null, helloXTimes);
         try handlers.register("say", null, say);
 
+        // RequestDispatcher interface implemented by the 'handlers' registry.
+        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-        // Request frames are delimited by '\n'.
-        const streamer = zigjr.DelimiterStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(),
-                                    std.io.getStdOut().writer(),
-                                    handlers);
+        const streamer = zigjr.DelimiterStream.init(alloc, .{});    // Requests delimited by '\n'.
+        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     }
 
     if (gpa.detectLeaks()) {
