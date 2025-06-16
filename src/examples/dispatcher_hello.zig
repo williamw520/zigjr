@@ -23,7 +23,7 @@ pub fn main() !void {
     {
         // RequestDispatcher interface implemented by the custom dispatcher.
         var dispatcher_impl = HelloDispatcher{};
-        const dispatcher = zigjr.RequestDispatcher.by(&dispatcher_impl);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&dispatcher_impl);
 
         const streamer = zigjr.DelimiterStream.init(alloc, .{});
         try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);

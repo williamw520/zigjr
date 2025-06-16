@@ -116,7 +116,7 @@ pub const DelimiterStreamOptions = struct {
     request_delimiter: u8 = '\n',
     response_delimiter: u8 = '\n',
     skip_blank_message: bool = true,
-    logger: Logger = Logger.by(&nopLogger),
+    logger: Logger = Logger.impl_by(&nopLogger),
 };
 
 
@@ -217,7 +217,7 @@ pub const ContentLengthStream = struct {
 pub const ContentLengthStreamOptions = struct {
     recover_on_missing_header: bool = true,
     skip_blank_message: bool = true,
-    logger: Logger = Logger.by(&nopLogger),
+    logger: Logger = Logger.impl_by(&nopLogger),
 };
 
 
@@ -229,7 +229,7 @@ pub const Logger = struct {
     stop_fn:    *const fn(impl_ptr: *anyopaque, message: []const u8) void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn by(impl: anytype) Logger {
+    pub fn impl_by(impl: anytype) Logger {
         const ImplType = @TypeOf(impl);
 
         const Thunk = struct {

@@ -28,7 +28,7 @@ pub fn main() !void {
         try handlers.register("say", null, say);
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
-        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         const streamer = zigjr.DelimiterStream.init(alloc, .{});    // Requests delimited by '\n'.

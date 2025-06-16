@@ -28,7 +28,7 @@ pub fn main() !void {
         try handlers.register("say", null, say);
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
-        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
         // Read a JSON-RPC request JSON from StdIn.
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);

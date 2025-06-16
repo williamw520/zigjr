@@ -45,10 +45,10 @@ pub fn main() !void {
         try handlers.register("tools/call", &logger, mcp_tools_call);
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
-        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
         // Starts the JSON stream pipeline on stdin and stdout.
-        const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.by(&logger) });
+        const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.impl_by(&logger) });
         try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     }
 

@@ -40,7 +40,7 @@ pub fn main() !void {
         try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
         try handlers.register("add-weight", null, addWeight);
 
-        const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
             defer alloc.free(request);

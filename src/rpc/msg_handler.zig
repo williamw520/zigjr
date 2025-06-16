@@ -104,7 +104,7 @@ pub const RequestDispatcher = struct {
     dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn by(impl: anytype) RequestDispatcher {
+    pub fn impl_by(impl: anytype) RequestDispatcher {
         const ImplType = @TypeOf(impl);
 
         const Thunk = struct {

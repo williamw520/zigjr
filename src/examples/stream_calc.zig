@@ -50,13 +50,13 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     try handlers.register("add-weight", null, addWeight);
 
     // RequestDispatcher interface implemented by the 'handlers' registry.
-    const dispatcher = zigjr.RequestDispatcher.by(&handlers);
+    const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
         var logger = MyLogger{};
         const streamer = zigjr.DelimiterStream.init(alloc, .{
-            .logger = zigjr.Logger.by(&logger),
+            .logger = zigjr.Logger.impl_by(&logger),
         });
         try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
     } else if (args.by_length) {
