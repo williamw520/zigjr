@@ -14,9 +14,7 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const zigjr = @import("../zigjr.zig");
 
-// const msg_handler = @import("../rpc/msg_handler.zig");
-// const RequestDispatcher = msg_handler.RequestDispatcher;
-const RequestDispatcher = @import("../rpc/dispatcher.zig").RequestDispatcher;
+const RequestDispatcher = zigjr.RequestDispatcher;
 const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
 
@@ -30,13 +28,15 @@ pub const DelimiterStream = struct {
     const Self = @This();
 
     alloc:      Allocator,
+    pipeline:   zigjr.RequestPipeline,
     options:    DelimiterStreamOptions,
 
     /// Initialize a stream struct.
     /// The logger option takes in a callback function to log the incoming and outgoing messages.
-    pub fn init(alloc: Allocator, options: DelimiterStreamOptions) Self {
+    pub fn init(alloc: Allocator, dispatcher: RequestDispatcher, options: DelimiterStreamOptions) Self {
         return .{
             .alloc = alloc,
+            .pipeline = zigjr.RequestPipeline.init(alloc, dispatcher),
             .options = options,
         };
     }
@@ -45,7 +45,7 @@ pub const DelimiterStream = struct {
     /// handle each one with the dispatcher, and write the JSON responses to the writer.
     /// The writer is buffered internally.  The reader is not buffered.
     /// Caller might want to wrap a buffered reader around it.
-    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: RequestDispatcher) !void {
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc); // Each JSON request is a frame.
         defer frame_buf.deinit();
         const frame_writer = frame_buf.writer();
@@ -72,7 +72,7 @@ pub const DelimiterStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try zigjr.runRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try self.pipeline.runRequest(request_json, response_writer)) {
                 try output_writer.writeAll(response_buf.items);
                 try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
@@ -132,20 +132,22 @@ pub const ContentLengthStream = struct {
     const Self = @This();
 
     alloc:      Allocator,
+    pipeline:   zigjr.RequestPipeline,
     options:    ContentLengthStreamOptions,
 
     /// Initialize a stream struct.
     /// The logger param takes in a callback function to log the incoming and outgoing messages.
-    pub fn init(alloc: Allocator, options: ContentLengthStreamOptions) Self {
+    pub fn init(alloc: Allocator, dispatcher: RequestDispatcher, options: ContentLengthStreamOptions) Self {
         return .{
             .alloc = alloc,
+            .pipeline = zigjr.RequestPipeline.init(alloc, dispatcher),
             .options = options,
         };
     }
 
     /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
     /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
-    pub fn streamRequests(self: Self, reader: anytype, writer: anytype, dispatcher: RequestDispatcher) !void {
+    pub fn streamRequests(self: Self, reader: anytype, writer: anytype) !void {
         var frame_buf = std.ArrayList(u8).init(self.alloc);
         defer frame_buf.deinit();
         var response_buf = std.ArrayList(u8).init(self.alloc);
@@ -177,7 +179,7 @@ pub const ContentLengthStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try zigjr.runRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try self.pipeline.runRequest(request_json, response_writer)) {
                 try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
                 self.options.logger.log("streamRequests", "return response", response_buf.items);

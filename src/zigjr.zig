@@ -35,7 +35,8 @@ pub const ResponseDispatcher = dispatcher.ResponseDispatcher;
 pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
 
-pub const runRequest = msg_handler.runRequest;
+pub const RequestPipeline = pipeline.RequestPipeline;
+
 pub const runRequestToJson = msg_handler.runRequestToJson;
 pub const runRequestToResponse = msg_handler.runRequestToResponse;
 pub const handleJsonResponse = msg_handler.handleJsonResponse;
@@ -59,12 +60,12 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
+    _ = @import("tests/request_tests.zig");
     _ = @import("tests/response_tests.zig");
-    // _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/rpc_registry_tests.zig");
-    // _ = @import("tests/json_call_tests.zig");
-    // _ = @import("tests/tests.zig");
+    _ = @import("tests/stream_tests.zig");
+    _ = @import("tests/rpc_registry_tests.zig");
+    _ = @import("tests/json_call_tests.zig");
+    _ = @import("tests/tests.zig");
 }
 
 
