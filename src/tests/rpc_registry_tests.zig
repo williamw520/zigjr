@@ -263,13 +263,14 @@ test "rpc_registry fn0" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn0", null, fn0);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -284,6 +285,7 @@ test "rpc_registry fn0 variants" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn0", null, fn0);
         try registry.register("fn0_with_err", null, fn0_with_err);
@@ -292,9 +294,9 @@ test "rpc_registry fn0 variants" {
         try registry.register("fn0_alloc", null, fn0_alloc);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -302,9 +304,9 @@ test "rpc_registry fn0 variants" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -312,9 +314,9 @@ test "rpc_registry fn0 variants" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -324,9 +326,9 @@ test "rpc_registry fn0 variants" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -336,9 +338,9 @@ test "rpc_registry fn0 variants" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -355,6 +357,7 @@ test "rpc_registry fn1" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn1", null, fn1);
         try registry.register("fn1_with_err", null, fn1_with_err);
@@ -363,9 +366,9 @@ test "rpc_registry fn1" {
         try registry.register("fn1_alloc_with_err", null, fn1_alloc_with_err);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -375,9 +378,9 @@ test "rpc_registry fn1" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -387,9 +390,9 @@ test "rpc_registry fn1" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -398,9 +401,9 @@ test "rpc_registry fn1" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -409,9 +412,9 @@ test "rpc_registry fn1" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -427,6 +430,7 @@ test "rpc_registry fn2" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn2", null, fn2);
         try registry.register("fn2_with_err", null, fn2_with_err);
@@ -435,27 +439,27 @@ test "rpc_registry fn2" {
         try registry.register("fn2_alloc_with_err", null, fn2_alloc_with_err);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -464,9 +468,9 @@ test "rpc_registry fn2" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -475,9 +479,9 @@ test "rpc_registry fn2" {
         }
         
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -493,6 +497,7 @@ test "rpc_registry with context" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         var ctx = Ctx { .count = 0 };
 
@@ -502,9 +507,9 @@ test "rpc_registry with context" {
         try registry.register("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -514,27 +519,27 @@ test "rpc_registry with context" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
-                , RequestDispatcher.impl_by(&registry)) orelse "";
+                ) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
 
@@ -542,9 +547,9 @@ test "rpc_registry with context" {
         }
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-                            , RequestDispatcher.impl_by(&registry)) orelse "";
+                            ) orelse "";
 
             defer alloc.free(res_json);
 
@@ -563,13 +568,14 @@ test "rpc_registry fn with array params returning struct value" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat", null, fn_cat);
 
         {
-            const res_json = try zigjr.runRequestToJson(alloc,
+            const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
-                            , RequestDispatcher.impl_by(&registry)) orelse "";
+                            ) orelse "";
 
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
@@ -595,6 +601,7 @@ test "rpc_registry fn with built array params returning struct value" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat", null, fn_cat);
 
@@ -604,7 +611,7 @@ test "rpc_registry fn with built array params returning struct value" {
             defer alloc.free(req_json);
             std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             std.debug.print("response: {s}\n", .{res_json});
 
@@ -629,6 +636,7 @@ test "rpc_registry passing in an Value as a parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat_value", null, fn_cat_value);
 
@@ -638,7 +646,7 @@ test "rpc_registry passing in an Value as a parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -663,6 +671,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
@@ -671,7 +680,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -696,6 +705,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         var ctx = Ctx { .count = 0 };
 
@@ -707,7 +717,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -732,6 +742,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_json_value1", null, fn_json_value1);
         {
@@ -739,7 +750,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -754,7 +765,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
         }
@@ -769,6 +780,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_json_value2", null, fn_json_value2);
         {
@@ -776,7 +788,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -795,6 +807,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_json_value_int", null, fn_json_value_int);
         {
@@ -802,7 +815,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -821,6 +834,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_json_value_int_value", null, fn_json_value_int_value);
         {
@@ -828,7 +842,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -847,6 +861,7 @@ test "rpc_registry passing in a struct object as a parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat_struct", null, fn_cat_struct);
 
@@ -856,7 +871,7 @@ test "rpc_registry passing in a struct object as a parameter" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -881,6 +896,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         try registry.register("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
 
@@ -890,7 +906,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -915,6 +931,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         var ctx = Ctx { .count = 0 };
 
@@ -926,7 +943,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -951,6 +968,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         var ctx = Ctx { .count = 0 };
 
@@ -962,7 +980,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -987,6 +1005,7 @@ test "rpc_registry register standalone functions on standalone object." {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
+        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry));
 
         var s = Standalone{};
 
@@ -999,7 +1018,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_on", null, .none);
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
         }
@@ -1008,7 +1027,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -1021,7 +1040,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_off", null, .none);
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
         }
 
@@ -1029,7 +1048,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
@@ -1041,7 +1060,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
-            const res_json = try zigjr.runRequestToJson(alloc, req_json, RequestDispatcher.impl_by(&registry)) orelse "";
+            const res_json = try pipeline.runRequestToJson(req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 

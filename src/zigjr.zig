@@ -37,8 +37,6 @@ pub const DispatchErrors = dispatcher.DispatchErrors;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
 
-pub const runRequestToJson = msg_handler.runRequestToJson;
-pub const runRequestToResponse = msg_handler.runRequestToResponse;
 pub const handleJsonResponse = msg_handler.handleJsonResponse;
 
 pub const DelimiterStream = stream.DelimiterStream;
