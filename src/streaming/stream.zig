@@ -14,8 +14,9 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const zigjr = @import("../zigjr.zig");
 
-const msg_handler = @import("../rpc/msg_handler.zig");
-const RequestDispatcher = msg_handler.RequestDispatcher;
+// const msg_handler = @import("../rpc/msg_handler.zig");
+// const RequestDispatcher = msg_handler.RequestDispatcher;
+const RequestDispatcher = @import("../rpc/dispatcher.zig").RequestDispatcher;
 const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
 
@@ -71,7 +72,7 @@ pub const DelimiterStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try msg_handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try zigjr.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try output_writer.writeAll(response_buf.items);
                 try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
@@ -103,7 +104,7 @@ pub const DelimiterStream = struct {
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger.log("streamResponses", "receive response", response_json);
-            msg_handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
+            zigjr.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
                 stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
             };
@@ -176,7 +177,7 @@ pub const ContentLengthStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try msg_handler.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try zigjr.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
                 self.options.logger.log("streamRequests", "return response", response_buf.items);
@@ -205,7 +206,7 @@ pub const ContentLengthStream = struct {
             if (self.options.skip_blank_message and response_json.len == 0) continue;
 
             self.options.logger.log("streamResponses", "receive response", response_json);
-            msg_handler.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
+            zigjr.handleJsonResponse(self.alloc, response_json, dispatcher) catch |err| {
                 const stderr = std.io.getStdErr().writer();
                 stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
             };

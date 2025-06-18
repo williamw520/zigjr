@@ -26,117 +26,13 @@ const ErrorCode = zigjr.errors.ErrorCode;
 const JrErrors = zigjr.errors.JrErrors;
 const AllocError = zigjr.errors.AllocError;
 
+const RequestDispatcher = zigjr.RequestDispatcher;
+const ResponseDispatcher = zigjr.ResponseDispatcher;
+const DispatchResult = zigjr.DispatchResult;
+const DispatchErrors = zigjr.DispatchErrors;
+
 const messages = zigjr.messages;
 
-
-/// The returning result from dispatcher.dispatch(), expected by handleRpcRequest() below.
-/// For the result JSON string and the err.data JSON string, it's best that they're produced by
-/// std.json.stringifyAlloc() to ensure a valid JSON string.
-/// The DispatchResult object is cleaned up at the dispatchEnd() stage.
-pub const DispatchResult = union(enum) {
-    const Self = @This();
-
-    none:           void,               // No result, for notification call.
-    result:         []const u8,         // JSON string for result value.
-    err:            struct {
-        code:       ErrorCode,
-        msg:        []const u8 = "",    // Error text string.
-        data:       ?[]const u8 = null, // JSON string for additional error data value.
-    },
-
-    pub fn asNone() Self {
-        return .{ .none = {} };
-    }
-
-    pub fn withResult(result: []const u8) Self {
-        return .{ .result = result };
-    }
-
-    pub fn withErr(code: ErrorCode, msg: []const u8) Self {
-        return .{
-            .err = .{
-                .code = code,
-                .msg = msg,
-            }
-        };
-    }
-
-    pub fn withRequestErr(req: RpcRequest) Self {
-        return .{
-            .err = .{
-                .code = req.err().code,
-                .msg = req.err().err_msg,
-            },
-        };
-    }
-
-    fn withAnyErr(err: anyerror) Self {
-        return switch (err) {
-            DispatchErrors.MethodNotFound => Self.withErr(
-                ErrorCode.MethodNotFound, "Method not found."),
-            DispatchErrors.InvalidParams => Self.withErr(
-                ErrorCode.InvalidParams, "Invalid parameters."),
-            DispatchErrors.NoHandlerForObjectParam => Self.withErr(
-                ErrorCode.InvalidParams, "Handler expecting an object parameter but got non-object parameters."),
-            DispatchErrors.MismatchedParamCounts => Self.withErr(
-                ErrorCode.InvalidParams, "The number of parameters of the request does not match the parameter count of the handler."),
-            else => Self.withErr(ErrorCode.ServerError, @errorName(err)),
-        };
-    }
-
-};
-
-pub const DispatchErrors = error {
-    NoHandlerForArrayParam,
-    NoHandlerForObjectParam,
-    MismatchedParamCounts,
-    MethodNotFound,
-    InvalidParams,
-    WrongRequestParamTypeForRawParams,
-    OutOfMemory,
-};
-
-
-/// RequestDispatcher interface
-pub const RequestDispatcher = struct {
-    impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult,
-    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void,
-
-    // Interface is implemented by the 'impl' object.
-    pub fn impl_by(impl: anytype) RequestDispatcher {
-        const ImplType = @TypeOf(impl);
-
-        const Thunk = struct {
-            fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return implementation.dispatch(alloc, req);
-            }
-
-            fn dispatchEnd(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return implementation.dispatchEnd(alloc, req, dresult);
-            }
-        };
-
-        return .{
-            .impl_ptr = impl,
-            .dispatch_fn = Thunk.dispatch,
-            .dispatchEnd_fn = Thunk.dispatchEnd,
-        };
-    }
-
-    fn dispatch(self: @This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        return self.dispatch_fn(self.impl_ptr, alloc, req);
-    }
-
-    fn dispatchEnd(self: @This(), alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-        return self.dispatchEnd_fn(self.impl_ptr, alloc, req, dresult);
-    }
-};
-
-pub const HandlePipeline = struct {
-};
 
 /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
 /// and write the JSON-RPC response(s) to the writer.
