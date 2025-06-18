@@ -54,7 +54,7 @@ pub const RequestPipeline = struct {
     ///
     /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
     /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-    pub fn handleJsonRequest(self: @This(), request_json: []const u8, writer: anytype) AllocError!bool {
+    pub fn runRequest(self: @This(), request_json: []const u8, writer: anytype) AllocError!bool {
         var parsed_result = parseRpcRequest(self.alloc, request_json);
         defer parsed_result.deinit();
         switch (parsed_result.request_msg) {
@@ -84,9 +84,9 @@ pub const RequestPipeline = struct {
     ///
     /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
     /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-    pub fn handleRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
+    pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
         var response_buf = ArrayList(u8).init(self.alloc);
-        if (try self.handleJsonRequest(request_json, response_buf.writer())) {
+        if (try self.runRequest(request_json, response_buf.writer())) {
             return try response_buf.toOwnedSlice();
         } else {
             response_buf.deinit();
@@ -99,8 +99,8 @@ pub const RequestPipeline = struct {
     /// Usually after handling the request, the JSON-RPC response message is sent back to the client.
     /// The client then parses the JSON-RPC response message.  This skips all those and directly
     /// parses the JSON-RPC response message in one shot.  This is mainly for testing.
-    pub fn handleRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
-        const response_json = try self.handleRequestToJson(request_json) orelse "";
+    pub fn runRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
+        const response_json = try self.runRequestToJson(request_json) orelse "";
         defer self.alloc.free(response_json);
         return try parseRpcResponse(self.alloc, response_json);
     }

@@ -43,7 +43,7 @@ const messages = zigjr.messages;
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleJsonRequest(alloc: Allocator, request_json: []const u8, writer: anytype,
+pub fn runRequest(alloc: Allocator, request_json: []const u8, writer: anytype,
                          dispatcher: RequestDispatcher) AllocError!bool {
     var parsed_result = parseRpcRequest(alloc, request_json);
     defer parsed_result.deinit();
@@ -66,9 +66,9 @@ pub fn handleJsonRequest(alloc: Allocator, request_json: []const u8, writer: any
 ///
 /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
 /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) AllocError!?[]const u8 {
+pub fn runRequestToJson(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) AllocError!?[]const u8 {
     var response_buf = ArrayList(u8).init(alloc);
-    if (try handleJsonRequest(alloc, request_json, response_buf.writer(), dispatcher)) {
+    if (try runRequest(alloc, request_json, response_buf.writer(), dispatcher)) {
         return try response_buf.toOwnedSlice();
     } else {
         response_buf.deinit();
@@ -81,8 +81,8 @@ pub fn handleRequestToJson(alloc: Allocator, request_json: []const u8, dispatche
 /// Usually after handling the request, the JSON-RPC response message is sent back to the client.
 /// The client then parses the JSON-RPC response message.  This skips all those and directly
 /// parses the JSON-RPC response message in one shot.  This is mainly for testing.
-pub fn handleRequestToResponse(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) !RpcResponseResult {
-    const response_json = try handleRequestToJson(alloc, request_json, dispatcher) orelse "";
+pub fn runRequestToResponse(alloc: Allocator, request_json: []const u8, dispatcher: RequestDispatcher) !RpcResponseResult {
+    const response_json = try runRequestToJson(alloc, request_json, dispatcher) orelse "";
     defer alloc.free(response_json);
     return try parseRpcResponse(alloc, response_json);
 }

@@ -46,7 +46,7 @@ pub fn main() !void {
             defer alloc.free(request);
             std.debug.print("Request:  {s}\n", .{request});
 
-            if (try zigjr.handleRequestToJson(alloc, request, dispatcher)) |response| {
+            if (try zigjr.runRequestToJson(alloc, request, dispatcher)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {

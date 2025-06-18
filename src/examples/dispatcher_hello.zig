@@ -75,7 +75,7 @@ const HelloDispatcher = struct {
 
     // The result has been processed; this call is the chance to clean up DispatchResult.
     pub fn dispatchEnd(_: @This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        // If alloc passed in to handleRequestToJson() above is set up as an ArenaAllocator,
+        // If alloc passed in to runRequestToJson() above is set up as an ArenaAllocator,
         // no need to free memory here.
         switch (dresult) {
             .none => {},

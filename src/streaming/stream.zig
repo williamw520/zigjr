@@ -72,7 +72,7 @@ pub const DelimiterStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try zigjr.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try zigjr.runRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try output_writer.writeAll(response_buf.items);
                 try output_writer.writeByte(self.options.response_delimiter);
                 try buffered_writer.flush();
@@ -177,7 +177,7 @@ pub const ContentLengthStream = struct {
 
             self.options.logger.log("streamRequests", "receive request", request_json);
             response_buf.clearRetainingCapacity();
-            if (try zigjr.handleJsonRequest(self.alloc, request_json, response_writer, dispatcher)) {
+            if (try zigjr.runRequest(self.alloc, request_json, response_writer, dispatcher)) {
                 try frame.writeContentLengthFrame(output_writer, response_buf.items);
                 try buffered_writer.flush();
                 self.options.logger.log("streamRequests", "return response", response_buf.items);

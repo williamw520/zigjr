@@ -11,7 +11,7 @@ const response = @import("jsonrpc/response.zig");
 pub const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
 const msg_handler = @import("rpc/msg_handler.zig");
-pub const pipeline = @import("rpc/pipeline.zig");
+pub const pipeline = @import("rpc/rpc_pipeline.zig");
 const dispatcher = @import("rpc/dispatcher.zig");
 const rpc_registry = @import("rpc/rpc_registry.zig");
 const json_call = @import("rpc/json_call.zig");
@@ -35,9 +35,9 @@ pub const ResponseDispatcher = dispatcher.ResponseDispatcher;
 pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
 
-pub const handleJsonRequest = msg_handler.handleJsonRequest;
-pub const handleRequestToJson = msg_handler.handleRequestToJson;
-pub const handleRequestToResponse = msg_handler.handleRequestToResponse;
+pub const runRequest = msg_handler.runRequest;
+pub const runRequestToJson = msg_handler.runRequestToJson;
+pub const runRequestToResponse = msg_handler.runRequestToResponse;
 pub const handleJsonResponse = msg_handler.handleJsonResponse;
 
 pub const DelimiterStream = stream.DelimiterStream;

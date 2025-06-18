@@ -37,7 +37,7 @@ pub fn main() !void {
             std.debug.print("Request:  {s}\n", .{request});
 
             // Dispatch the JSON-RPC request to the handler, with result in response JSON.
-            if (try zigjr.handleRequestToJson(alloc, request, dispatcher)) |response| {
+            if (try zigjr.runRequestToJson(alloc, request, dispatcher)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {
