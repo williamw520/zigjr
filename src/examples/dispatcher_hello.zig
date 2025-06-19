@@ -24,9 +24,10 @@ pub fn main() !void {
         // RequestDispatcher interface implemented by the custom dispatcher.
         var dispatcher_impl = HelloDispatcher{};
         const dispatcher = zigjr.RequestDispatcher.impl_by(&dispatcher_impl);
-
-        const streamer = zigjr.DelimiterStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        try zigjr.stream.requestsByDelimiter(alloc,
+                                             std.io.getStdIn().reader(),
+                                             std.io.getStdOut().writer(),
+                                             dispatcher, .{});
     }
 
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    

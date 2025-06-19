@@ -41,12 +41,14 @@ pub fn main() !void {
         try handlers.register("add-weight", null, addWeight);
 
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
+        const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
+        
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
             defer alloc.free(request);
             std.debug.print("Request:  {s}\n", .{request});
 
-            if (try zigjr.runRequestToJson(alloc, request, dispatcher)) |response| {
+            if (try pipeline.runRequestToJson(request)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {

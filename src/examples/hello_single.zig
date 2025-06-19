@@ -29,6 +29,7 @@ pub fn main() !void {
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
+        const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
 
         // Read a JSON-RPC request JSON from StdIn.
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
@@ -37,7 +38,7 @@ pub fn main() !void {
             std.debug.print("Request:  {s}\n", .{request});
 
             // Dispatch the JSON-RPC request to the handler, with result in response JSON.
-            if (try zigjr.runRequestToJson(alloc, request, dispatcher)) |response| {
+            if (try pipeline.runRequestToJson(request)) |response| {
                 defer alloc.free(response);
                 std.debug.print("Response: {s}\n", .{response});
             } else {

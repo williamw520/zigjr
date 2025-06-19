@@ -55,14 +55,16 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
         var logger = MyLogger{};
-        const streamer = zigjr.DelimiterStream.init(alloc, .{
-            .logger = zigjr.Logger.impl_by(&logger),
-        });
-        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        try zigjr.stream.requestsByDelimiter(alloc,
+                                             std.io.getStdIn().reader(),
+                                             std.io.getStdOut().writer(),
+                                             dispatcher, .{ .logger = zigjr.Logger.impl_by(&logger) });
     } else if (args.by_length) {
         // Handle streaming of requests separated by the Content-Length header.
-        const streamer = zigjr.ContentLengthStream.init(alloc, .{});
-        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        try zigjr.stream.requestsByContentLength(alloc,
+                                                 std.io.getStdIn().reader(),
+                                                 std.io.getStdOut().writer(),
+                                                 dispatcher, .{});
     } else {
         usage();
     }

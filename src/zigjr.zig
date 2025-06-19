@@ -36,13 +36,10 @@ pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
+pub const ResponsePipeline = pipeline.ResponsePipeline;
 
 pub const handleJsonResponse = msg_handler.handleJsonResponse;
 
-pub const DelimiterStream = stream.DelimiterStream;
-pub const DelimiterOptions = stream.DelimiterOptions;
-pub const ContentLengthStream = stream.ContentLengthStream;
-pub const ContentLengthOptions = stream.ContentLengthOptions;
 pub const Logger = stream.Logger;
 pub const NopLogger = stream.NopLogger;
 pub const DbgLogger = stream.DbgLogger;
@@ -58,12 +55,12 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
-    // _ = @import("tests/response_tests.zig");
+    _ = @import("tests/request_tests.zig");
+    _ = @import("tests/response_tests.zig");
     _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/rpc_registry_tests.zig");
-    // _ = @import("tests/json_call_tests.zig");
-    // _ = @import("tests/tests.zig");
+    _ = @import("tests/rpc_registry_tests.zig");
+    _ = @import("tests/json_call_tests.zig");
+    _ = @import("tests/tests.zig");
 }
 
 

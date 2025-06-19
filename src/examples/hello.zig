@@ -31,8 +31,10 @@ pub fn main() !void {
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-        const streamer = zigjr.DelimiterStream.init(alloc, .{});    // Requests delimited by '\n'.
-        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        try zigjr.stream.requestsByDelimiter(alloc,
+                                             std.io.getStdIn().reader(),
+                                             std.io.getStdOut().writer(),
+                                             dispatcher, .{});
     }
 
     if (gpa.detectLeaks()) {

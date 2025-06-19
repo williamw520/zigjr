@@ -48,8 +48,12 @@ pub fn main() !void {
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
 
         // Starts the JSON stream pipeline on stdin and stdout.
-        const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.impl_by(&logger) });
-        try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        // const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.impl_by(&logger) });
+        // try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        try zigjr.stream.requestsByDelimiter(alloc,
+                                             std.io.getStdIn().reader(),
+                                             std.io.getStdOut().writer(),
+                                             dispatcher, .{ .logger = Logger.impl_by(&logger) });
     }
 
     if (gpa.detectLeaks()) {
