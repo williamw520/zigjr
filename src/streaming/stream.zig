@@ -66,10 +66,12 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
 
 // Runs a loop to read a stream of JSON response messages (frames) from the reader,
 // and handle each one with the dispatcher.
-pub fn responsesByDelimiter(alloc: Allocator, reader: anytype, dispatcher: anytype, options: DelimiterOptions) !void {
+pub fn responsesByDelimiter(alloc: Allocator, reader: anytype,
+                            dispatcher: ResponseDispatcher, options: DelimiterOptions) !void {
     var frame_buf = std.ArrayList(u8).init(alloc);  // Each JSON response is one frame.
     defer frame_buf.deinit();
     const frame_writer = frame_buf.writer();
+    const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
     options.logger.start("[streamResponses] Logging starts");
     defer { options.logger.stop("[streamResponses] Logging stops"); }
@@ -87,7 +89,7 @@ pub fn responsesByDelimiter(alloc: Allocator, reader: anytype, dispatcher: anyty
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("streamResponses", "receive response", response_json);
-        zigjr.handleJsonResponse(alloc, response_json, dispatcher) catch |err| {
+        pipeline.handleJsonResponse(response_json) catch |err| {
             const stderr = std.io.getStdErr().writer();
             stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
         };
@@ -217,6 +219,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
                                 dispatcher: ResponseDispatcher, options: ContentLengthOptions) !void {
     var frame_buf = std.ArrayList(u8).init(alloc);
     defer frame_buf.deinit();
+    const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
     options.logger.start("[streamResponses] Logging starts");
     defer { options.logger.stop("[streamResponses] Logging stops"); }
@@ -233,7 +236,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("streamResponses", "receive response", response_json);
-        zigjr.handleJsonResponse(alloc, response_json, dispatcher) catch |err| {
+        pipeline.handleJsonResponse(response_json) catch |err| {
             const stderr = std.io.getStdErr().writer();
             stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
         };

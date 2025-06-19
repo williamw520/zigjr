@@ -10,7 +10,6 @@ const request = @import("jsonrpc/request.zig");
 const response = @import("jsonrpc/response.zig");
 pub const errors = @import("jsonrpc/errors.zig");
 pub const messages = @import("jsonrpc/messages.zig");
-const msg_handler = @import("rpc/msg_handler.zig");
 pub const pipeline = @import("rpc/rpc_pipeline.zig");
 const dispatcher = @import("rpc/dispatcher.zig");
 const rpc_registry = @import("rpc/rpc_registry.zig");
@@ -37,8 +36,6 @@ pub const DispatchErrors = dispatcher.DispatchErrors;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;
-
-pub const handleJsonResponse = msg_handler.handleJsonResponse;
 
 pub const Logger = stream.Logger;
 pub const NopLogger = stream.NopLogger;
