@@ -607,7 +607,7 @@ test "rpc_registry fn with built array params returning struct value" {
 
         {
             const params = .{"cat1", 9, "blue"};
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
             defer alloc.free(req_json);
             std.debug.print("request: {s}\n", .{req_json});
 
@@ -642,7 +642,7 @@ test "rpc_registry passing in an Value as a parameter" {
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -676,7 +676,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
         try registry.add("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -713,7 +713,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -746,7 +746,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
 
         try registry.add("fn_json_value1", null, fn_json_value1);
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -761,7 +761,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
 
         try registry.add("fn_json_value1", null, fn_json_value1);
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -784,7 +784,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
 
         try registry.add("fn_json_value2", null, fn_json_value2);
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -811,7 +811,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
 
         try registry.add("fn_json_value_int", null, fn_json_value_int);
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -838,7 +838,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
 
         try registry.add("fn_json_value_int_value", null, fn_json_value_int_value);
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -867,7 +867,7 @@ test "rpc_registry passing in a struct object as a parameter" {
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -902,7 +902,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
 
         {
             const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -939,7 +939,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -976,7 +976,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
             defer alloc.free(req_json);
             // std.debug.print("request: {s}\n", .{req_json});
 
@@ -1015,7 +1015,7 @@ test "rpc_registry register standalone functions on standalone object." {
         try registry.add("fn_standalone_msg", &s, fn_standalone_msg);
 
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_on", null, .none);
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_on", null, .none);
             defer alloc.free(req_json);
 
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
@@ -1024,7 +1024,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
@@ -1037,7 +1037,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_off", null, .none);
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_off", null, .none);
             defer alloc.free(req_json);
 
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
@@ -1045,7 +1045,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
@@ -1057,7 +1057,7 @@ test "rpc_registry register standalone functions on standalone object." {
         }
 
         {
-            const req_json = try zigjr.messages.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
             defer alloc.free(req_json);
 
             const res_json = try pipeline.runRequestToJson(req_json) orelse "";

@@ -26,7 +26,7 @@ const ErrorCode = zigjr.errors.ErrorCode;
 const JrErrors = zigjr.errors.JrErrors;
 const AllocError = zigjr.errors.AllocError;
 
-const messages = zigjr.messages;
+const messages = zigjr.composer;
 
 const dispatcher =  @import ("dispatcher.zig");
 const RequestDispatcher = dispatcher.RequestDispatcher;

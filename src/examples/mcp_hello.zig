@@ -34,18 +34,18 @@ pub fn main() !void {
         var logger = try zigjr.FileLogger.init("log.txt");
         defer logger.deinit();
 
-        var handlers = zigjr.RpcRegistry.init(alloc);
-        defer handlers.deinit();
+        var registry = zigjr.RpcRegistry.init(alloc);
+        defer registry.deinit();
 
         // Register the MCP RPC methods.
         // Pass the logger in as context so each handler can also log to the log file.
-        try handlers.add("initialize", &logger, mcp_initialize);
-        try handlers.add("notifications/initialized", &logger, mcp_notifications_initialized);
-        try handlers.add("tools/list", &logger, mcp_tools_list);
-        try handlers.add("tools/call", &logger, mcp_tools_call);
+        try registry.add("initialize", &logger, mcp_initialize);
+        try registry.add("notifications/initialized", &logger, mcp_notifications_initialized);
+        try registry.add("tools/list", &logger, mcp_tools_list);
+        try registry.add("tools/call", &logger, mcp_tools_call);
 
-        // RequestDispatcher interface implemented by the 'handlers' registry.
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
+        // RequestDispatcher interface implemented by the 'registry' registry.
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
 
         // Starts the JSON stream pipeline on stdin and stdout.
         // const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.impl_by(&logger) });

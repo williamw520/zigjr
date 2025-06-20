@@ -18,24 +18,20 @@ pub fn main() !void {
 
     {
         // Create a registry for the JSON-RPC handlers.
-        var handlers = zigjr.RpcRegistry.init(alloc);
-        defer handlers.deinit();
+        var registry = zigjr.RpcRegistry.init(alloc);
+        defer registry.deinit();
 
         // Register each RPC method with a handling function.
-        try handlers.add("hello", null, hello);
-        try handlers.add("hello-name", null, helloName);
-        try handlers.add("hello-xtimes", null, helloXTimes);
-        try handlers.add("substr", null, substr);
-        try handlers.add("say", null, say);
-
-        // RequestDispatcher interface implemented by the 'handlers' registry.
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
+        try registry.add("hello", null, hello);
+        try registry.add("hello-name", null, helloName);
+        try registry.add("hello-xtimes", null, helloXTimes);
+        try registry.add("substr", null, substr);
+        try registry.add("say", null, say);
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
-                                             std.io.getStdIn().reader(),
-                                             std.io.getStdOut().writer(),
-                                             dispatcher, .{});
+            std.io.getStdIn().reader(), std.io.getStdOut().writer(),
+            zigjr.RequestDispatcher.impl_by(&registry), .{});
     }
 
     if (gpa.detectLeaks()) {

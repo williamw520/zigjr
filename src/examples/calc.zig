@@ -21,26 +21,26 @@ pub fn main() !void {
         var stash = Stash.init(alloc);
         defer stash.deinit();
 
-        var handlers = zigjr.RpcRegistry.init(alloc);
-        defer handlers.deinit();
+        var registry = zigjr.RpcRegistry.init(alloc);
+        defer registry.deinit();
 
-        try handlers.add("add", null, Basic.add);       // register functions in a struct scope.
-        try handlers.add("subtract", null, Basic.subtract);
-        try handlers.add("multiply", null, Basic.multiply);
-        try handlers.add("divide", null, Basic.divide);
-        try handlers.add("pow", null, raiseToPower);    // register function from any scope.
-        try handlers.add("logNum", null, logNum);       // function with no result.
-        try handlers.add("inc", &g_sum, increase);      // attach a context to the function.
-        try handlers.add("dec", &g_sum, decrease);      // attach the same context to another function.
-        try handlers.add("load", &stash, Stash.load);   // handler on a struct object context.
-        try handlers.add("save", &stash, Stash.save);   // handler on a struct object context.
-        try handlers.add("weigh-cat", null, weighCat);  // function with a struct parameter.
-        try handlers.add("make-cat", null, makeCat);    // function returns a struct parameter.
-        try handlers.add("clone-cat", null, cloneCat);  // function returns an array.
-        try handlers.add("desc-cat", null, descCat);    // function returns a tuple.
-        try handlers.add("add-weight", null, addWeight);
+        try registry.add("add", null, Basic.add);       // register functions in a struct scope.
+        try registry.add("subtract", null, Basic.subtract);
+        try registry.add("multiply", null, Basic.multiply);
+        try registry.add("divide", null, Basic.divide);
+        try registry.add("pow", null, raiseToPower);    // register function from any scope.
+        try registry.add("logNum", null, logNum);       // function with no result.
+        try registry.add("inc", &g_sum, increase);      // attach a context to the function.
+        try registry.add("dec", &g_sum, decrease);      // attach the same context to another function.
+        try registry.add("load", &stash, Stash.load);   // handler on a struct object context.
+        try registry.add("save", &stash, Stash.save);   // handler on a struct object context.
+        try registry.add("weigh-cat", null, weighCat);  // function with a struct parameter.
+        try registry.add("make-cat", null, makeCat);    // function returns a struct parameter.
+        try registry.add("clone-cat", null, cloneCat);  // function returns an array.
+        try registry.add("desc-cat", null, descCat);    // function returns a tuple.
+        try registry.add("add-weight", null, addWeight);
 
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
+        const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
         const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
         
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);

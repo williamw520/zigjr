@@ -9,7 +9,7 @@
 const request = @import("jsonrpc/request.zig");
 const response = @import("jsonrpc/response.zig");
 pub const errors = @import("jsonrpc/errors.zig");
-pub const messages = @import("jsonrpc/messages.zig");
+pub const composer = @import("jsonrpc/composer.zig");
 pub const pipeline = @import("rpc/rpc_pipeline.zig");
 const dispatcher = @import("rpc/dispatcher.zig");
 const rpc_registry = @import("rpc/rpc_registry.zig");
