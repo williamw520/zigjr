@@ -22,10 +22,10 @@ pub fn main() !void {
         defer handlers.deinit();
 
         // Register each RPC method with a handling function.
-        try handlers.register("hello", null, hello);
-        try handlers.register("hello-name", null, helloName);
-        try handlers.register("hello-xtimes", null, helloXTimes);
-        try handlers.register("say", null, say);
+        try handlers.add("hello", null, hello);
+        try handlers.add("hello-name", null, helloName);
+        try handlers.add("hello-xtimes", null, helloXTimes);
+        try handlers.add("say", null, say);
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);

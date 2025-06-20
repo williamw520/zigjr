@@ -22,10 +22,11 @@ pub fn main() !void {
         defer handlers.deinit();
 
         // Register each RPC method with a handling function.
-        try handlers.register("hello", null, hello);
-        try handlers.register("hello-name", null, helloName);
-        try handlers.register("hello-xtimes", null, helloXTimes);
-        try handlers.register("say", null, say);
+        try handlers.add("hello", null, hello);
+        try handlers.add("hello-name", null, helloName);
+        try handlers.add("hello-xtimes", null, helloXTimes);
+        try handlers.add("substr", null, substr);
+        try handlers.add("say", null, say);
 
         // RequestDispatcher interface implemented by the 'handlers' registry.
         const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
@@ -62,6 +63,12 @@ fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
     var writer = buf.writer();
     for (0..repeat) |_| try writer.print("Hello {s}! ", .{name});
     return buf.items;
+}
+
+fn substr(name: [] const u8, start: i64, len: i64) ![]const u8 {
+    const s: usize = @intCast(start);
+    const l: usize = @intCast(len);
+    return name[s..l];
 }
 
 // A handler takes in a string and has no return value, for RPC notification.

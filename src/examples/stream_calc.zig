@@ -33,21 +33,21 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var handlers = zigjr.RpcRegistry.init(alloc);
     defer handlers.deinit();
 
-    try handlers.register("add", null, Basic.add);      // register functions in a struct scope.
-    try handlers.register("subtract", null, Basic.subtract);
-    try handlers.register("multiply", null, Basic.multiply);
-    try handlers.register("divide", null, Basic.divide);
-    try handlers.register("pow", null, raiseToPower);   // register function from any scope.
-    try handlers.register("logNum", null, logNum);      // function with no result.
-    try handlers.register("inc", &g_sum, increase);     // attach a context to the function.
-    try handlers.register("dec", &g_sum, decrease);     // attach the same context to another function.
-    try handlers.register("load", &stash, Stash.load);  // handler on a struct object context.
-    try handlers.register("save", &stash, Stash.save);  // handler on a struct object context.
-    try handlers.register("weigh-cat", null, weighCat); // function with a struct parameter.
-    try handlers.register("make-cat", null, makeCat);   // function returns a struct parameter.
-    try handlers.register("clone-cat", null, cloneCat); // function returns an array.
-    try handlers.register("desc-cat", null, descCat);   // function returns a tuple.
-    try handlers.register("add-weight", null, addWeight);
+    try handlers.add("add", null, Basic.add);       // register functions in a struct scope.
+    try handlers.add("subtract", null, Basic.subtract);
+    try handlers.add("multiply", null, Basic.multiply);
+    try handlers.add("divide", null, Basic.divide);
+    try handlers.add("pow", null, raiseToPower);    // register function from any scope.
+    try handlers.add("logNum", null, logNum);       // function with no result.
+    try handlers.add("inc", &g_sum, increase);      // attach a context to the function.
+    try handlers.add("dec", &g_sum, decrease);      // attach the same context to another function.
+    try handlers.add("load", &stash, Stash.load);   // handler on a struct object context.
+    try handlers.add("save", &stash, Stash.save);   // handler on a struct object context.
+    try handlers.add("weigh-cat", null, weighCat);  // function with a struct parameter.
+    try handlers.add("make-cat", null, makeCat);    // function returns a struct parameter.
+    try handlers.add("clone-cat", null, cloneCat);  // function returns an array.
+    try handlers.add("desc-cat", null, descCat);    // function returns a tuple.
+    try handlers.add("add-weight", null, addWeight);
 
     // RequestDispatcher interface implemented by the 'handlers' registry.
     const dispatcher = zigjr.RequestDispatcher.impl_by(&handlers);
