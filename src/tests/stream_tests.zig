@@ -80,9 +80,9 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        // var logger = stream.DbgLogger{};
+        // var logger = zigjr.DbgLogger{};
         // try stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher),
-        //                            .{ .logger = stream.Logger.impl_by(&logger) });
+        //                            .{ .logger = zigjr.Logger.impl_by(&logger) });
         try stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
 
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -126,9 +126,9 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        // var logger = stream.DbgLogger{};
+        // var logger = zigjr.DbgLogger{};
         // try stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher),
-        //                                    .{ .logger = stream.Logger.impl_by(&logger) });
+        //                                    .{ .logger = zigjr.Logger.impl_by(&logger) });
         try stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 

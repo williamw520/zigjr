@@ -15,6 +15,7 @@ const dispatcher = @import("rpc/dispatcher.zig");
 const rpc_registry = @import("rpc/rpc_registry.zig");
 const json_call = @import("rpc/json_call.zig");
 pub const stream = @import("streaming/stream.zig");
+const logger = @import("rpc/logger.zig");
 
 pub const parseRpcRequest = request.parseRpcRequest;
 pub const RpcRequestResult = request.RpcRequestResult;
@@ -37,10 +38,10 @@ pub const DispatchErrors = dispatcher.DispatchErrors;
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;
 
-pub const Logger = stream.Logger;
-pub const NopLogger = stream.NopLogger;
-pub const DbgLogger = stream.DbgLogger;
-pub const FileLogger = stream.FileLogger;
+pub const Logger = logger.Logger;
+pub const NopLogger = logger.NopLogger;
+pub const DbgLogger = logger.DbgLogger;
+pub const FileLogger = logger.FileLogger;
 
 pub const JsonStr = json_call.JsonStr;
 
