@@ -26,39 +26,43 @@ const ErrorCode = zigjr.errors.ErrorCode;
 const JrErrors = zigjr.errors.JrErrors;
 const AllocError = zigjr.errors.AllocError;
 
-const messages = zigjr.composer;
+const composer = zigjr.composer;
 
 const dispatcher =  @import ("dispatcher.zig");
 const RequestDispatcher = dispatcher.RequestDispatcher;
 const ResponseDispatcher = dispatcher.ResponseDispatcher;
 const DispatchResult = dispatcher.DispatchResult;
+var nopLogger = zigjr.NopLogger{};
 
 
 pub const RequestPipeline = struct {
     alloc:          Allocator,
     req_dispatcher: RequestDispatcher,
+    logger:         zigjr.Logger,
 
-    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher) @This() {
+    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
         return .{
             .alloc = alloc,
             .req_dispatcher = req_dispatcher,
+            .logger = if (logger)|l| l else zigjr.Logger.impl_by(&nopLogger),
         };
     }
 
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
-    /// and write the JSON-RPC response(s) to the writer.
+    /// and write the JSON-RPC response(s) to the response_buf.
     /// The JSON request message can contain a single request or a batch of requests.
     /// Error is turned into a JSON-RPC error response message.
     /// The function returns a boolean flag indicating whether any responses have been written,
     /// as notification requests have no response.
-    ///
-    /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
-    /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
-    pub fn runRequest(self: @This(), request_json: []const u8, writer: anytype) AllocError!bool {
+    pub fn runRequest(self: @This(), request_json: []const u8, response_buf: *ArrayList(u8)) AllocError!bool {
+        self.logger.log("runRequest", "request_json ", request_json);
         var parsed_result = parseRpcRequest(self.alloc, request_json);
         defer parsed_result.deinit();
+        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
+        const writer = response_buf.writer();
         switch (parsed_result.request_msg) {
             .request    => |req| {
+                defer self.logger.log("runRequest", "response_json", response_buf.items);
                 return try self.runRpcRequest(req, writer, "");
             },
             .batch      => |reqs| {
@@ -71,6 +75,7 @@ pub const RequestPipeline = struct {
                     }
                 }
                 try writer.writeAll("]");
+                self.logger.log("runRequest", "response_json", response_buf.items);
                 return true;
             },
         }
@@ -86,7 +91,7 @@ pub const RequestPipeline = struct {
     /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
     pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
         var response_buf = ArrayList(u8).init(self.alloc);
-        if (try self.runRequest(request_json, response_buf.writer())) {
+        if (try self.runRequest(request_json, &response_buf)) {
             return try response_buf.toOwnedSlice();
         } else {
             response_buf.deinit();
@@ -114,7 +119,7 @@ pub const RequestPipeline = struct {
     fn runRpcRequest(self: @This(), req: RpcRequest, writer: anytype, prefix: []const u8) AllocError!bool {
         if (req.hasError()) {
             // Return an error response for the parsing or validation error on the request.
-            try messages.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
+            try composer.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
             return true;
         }
 
@@ -138,15 +143,15 @@ pub const RequestPipeline = struct {
                     return false;
                 }
                 try writer.writeAll(prefix);
-                try messages.writeResponseJson(req.id, json, writer);
+                try composer.writeResponseJson(req.id, json, writer);
                 return true;
             },
             .err => |err| {
                 try writer.writeAll(prefix);
                 if (err.data)|data_json| {
-                    try messages.writeErrorDataResponseJson(req.id, err.code, err.msg, data_json, writer);
+                    try composer.writeErrorDataResponseJson(req.id, err.code, err.msg, data_json, writer);
                 } else {
-                    try messages.writeErrorResponseJson(req.id, err.code, err.msg, writer);
+                    try composer.writeErrorResponseJson(req.id, err.code, err.msg, writer);
                 }
                 return true;
             },

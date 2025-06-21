@@ -32,10 +32,10 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
     const frame_writer = frame_buf.writer();
     var response_buf = std.ArrayList(u8).init(alloc);
     defer response_buf.deinit();
-    const response_writer = response_buf.writer();
+    // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
-    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
+    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
 
     options.logger.start("[requestsByDelimiter] Logging starts");
     defer { options.logger.stop("[requestsByDelimiter] Logging stops"); }
@@ -53,8 +53,8 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         options.logger.log("requestsByDelimiter", "receive request", request_json);
-        response_buf.clearRetainingCapacity();
-        if (try pipeline.runRequest(request_json, response_writer)) {
+        // response_buf.clearRetainingCapacity();
+        if (try pipeline.runRequest(request_json, &response_buf)) {
             try output_writer.writeAll(response_buf.items);
             try output_writer.writeByte(options.response_delimiter);
             try buffered_writer.flush();
@@ -112,10 +112,10 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
     defer frame_buf.deinit();
     var response_buf = std.ArrayList(u8).init(alloc);
     defer response_buf.deinit();
-    const response_writer = response_buf.writer();
+    // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
-    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
+    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
 
     options.logger.start("[requestsByContentLength] Logging starts");
     defer { options.logger.stop("[requestsByContentLength] Logging stops"); }
@@ -139,8 +139,8 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         options.logger.log("requestsByContentLength", "receive request", request_json);
-        response_buf.clearRetainingCapacity();
-        if (try pipeline.runRequest(request_json, response_writer)) {
+        // response_buf.clearRetainingCapacity();
+        if (try pipeline.runRequest(request_json, &response_buf)) {
             try frame.writeContentLengthFrame(output_writer, response_buf.items);
             try buffered_writer.flush();
             options.logger.log("requestsByContentLength", "return response", response_buf.items);

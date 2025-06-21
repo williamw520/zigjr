@@ -41,7 +41,7 @@ pub fn main() !void {
         try registry.add("add-weight", null, addWeight);
 
         const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
-        const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher);
+        const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
         
         const request = try std.io.getStdIn().reader().readAllAlloc(alloc, 64*1024);
         if (request.len > 0) {
