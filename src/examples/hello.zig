@@ -48,7 +48,7 @@ fn hello() []const u8 {
 // A handler takes in a string parameter and returns a string with error.
 // It also asks the library for an allocator, which is passed in automatically.
 // Allocated memory is freed automatically, making memory usage simple.
-fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
+fn helloName(alloc: Allocator, name: [] const u8) std.fmt.AllocPrintError![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
 }
 
@@ -61,7 +61,7 @@ fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
     return buf.items;
 }
 
-fn substr(name: [] const u8, start: i64, len: i64) ![]const u8 {
+fn substr(name: [] const u8, start: i64, len: i64) []const u8 {
     return name[@intCast(start) .. @intCast(len)];
 }
 

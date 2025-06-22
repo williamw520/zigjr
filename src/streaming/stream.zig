@@ -35,7 +35,8 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
     // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
-    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    defer pipeline.deinit();
 
     options.logger.start("[requestsByDelimiter] Logging starts");
     defer { options.logger.stop("[requestsByDelimiter] Logging stops"); }
@@ -115,7 +116,8 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
     // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
-    const pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    defer pipeline.deinit();
 
     options.logger.start("[requestsByContentLength] Logging starts");
     defer { options.logger.stop("[requestsByContentLength] Logging stops"); }

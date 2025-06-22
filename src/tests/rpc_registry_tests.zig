@@ -263,7 +263,8 @@ test "rpc_registry fn0" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.add("fn0", fn0);
 
@@ -285,7 +286,8 @@ test "rpc_registry fn0 variants" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.add("fn0", fn0);
         try registry.add("fn0_with_err", fn0_with_err);
@@ -357,7 +359,8 @@ test "rpc_registry fn1" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.add("fn1", fn1);
         try registry.add("fn1_with_err", fn1_with_err);
@@ -430,7 +433,8 @@ test "rpc_registry fn2" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.add("fn2", fn2);
         try registry.add("fn2_with_err", fn2_with_err);
@@ -497,7 +501,8 @@ test "rpc_registry with context" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         var ctx = Ctx { .count = 0 };
 
@@ -568,7 +573,8 @@ test "rpc_registry fn with array params returning struct value" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat", null, fn_cat);
 
@@ -601,7 +607,8 @@ test "rpc_registry fn with built array params returning struct value" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat", null, fn_cat);
 
@@ -636,7 +643,8 @@ test "rpc_registry passing in an Value as a parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat_value", null, fn_cat_value);
 
@@ -671,7 +679,8 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
@@ -705,7 +714,8 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         var ctx = Ctx { .count = 0 };
 
@@ -742,7 +752,8 @@ test "rpc_registry passing in a single JSON Value as parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_json_value1", null, fn_json_value1);
         {
@@ -780,7 +791,8 @@ test "rpc_registry passing in two JSON Values as parameters" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_json_value2", null, fn_json_value2);
         {
@@ -807,7 +819,8 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_json_value_int", null, fn_json_value_int);
         {
@@ -834,7 +847,8 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_json_value_int_value", null, fn_json_value_int_value);
         {
@@ -861,7 +875,8 @@ test "rpc_registry passing in a struct object as a parameter" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat_struct", null, fn_cat_struct);
 
@@ -896,7 +911,8 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         try registry.addCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
 
@@ -931,7 +947,8 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         var ctx = Ctx { .count = 0 };
 
@@ -968,7 +985,8 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         var ctx = Ctx { .count = 0 };
 
@@ -1005,7 +1023,8 @@ test "rpc_registry register standalone functions on standalone object." {
     {
         var registry = rpc_reg.RpcRegistry.init(alloc);
         defer registry.deinit();
-        const pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
 
         var s = Standalone{};
 

@@ -41,11 +41,17 @@ pub const RequestPipeline = struct {
     logger:         zigjr.Logger,
 
     pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
+        const l = logger orelse zigjr.Logger.impl_by(&nopLogger);
+        l.start("[RequestPipeline] Logging starts");
         return .{
             .alloc = alloc,
             .req_dispatcher = req_dispatcher,
-            .logger = if (logger)|l| l else zigjr.Logger.impl_by(&nopLogger),
+            .logger = l,
         };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        self.logger.stop("[RequestPipeline] Logging stops");
     }
 
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
