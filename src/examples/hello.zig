@@ -22,11 +22,11 @@ pub fn main() !void {
         defer registry.deinit();
 
         // Register each RPC method with a handling function.
-        try registry.add("hello", null, hello);
-        try registry.add("hello-name", null, helloName);
-        try registry.add("hello-xtimes", null, helloXTimes);
-        try registry.add("substr", null, substr);
-        try registry.add("say", null, say);
+        try registry.add("hello", hello);
+        try registry.add("hello-name", helloName);
+        try registry.add("hello-xtimes", helloXTimes);
+        try registry.add("substr", substr);
+        try registry.add("say", say);
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
@@ -62,9 +62,7 @@ fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
 }
 
 fn substr(name: [] const u8, start: i64, len: i64) ![]const u8 {
-    const s: usize = @intCast(start);
-    const l: usize = @intCast(len);
-    return name[s..l];
+    return name[@intCast(start) .. @intCast(len)];
 }
 
 // A handler takes in a string and has no return value, for RPC notification.

@@ -48,7 +48,11 @@ pub const RpcRegistry = struct {
         self.handlers.deinit();
     }
 
-    pub fn add(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
+    pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) !void {
+        return self.addCtx(method, null, handler_fn);
+    }    
+
+    pub fn addCtx(self: *Self, method: []const u8, context: anytype, comptime handler_fn: anytype) !void {
         try validateMethod(method);
 
         // Free any existing handler of the same method name.

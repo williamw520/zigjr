@@ -39,10 +39,10 @@ pub fn main() !void {
 
         // Register the MCP RPC methods.
         // Pass the logger in as context so each handler can also log to the log file.
-        try registry.add("initialize", &logger, mcp_initialize);
-        try registry.add("notifications/initialized", &logger, mcp_notifications_initialized);
-        try registry.add("tools/list", &logger, mcp_tools_list);
-        try registry.add("tools/call", &logger, mcp_tools_call);
+        try registry.addCtx("initialize", &logger, mcp_initialize);
+        try registry.addCtx("notifications/initialized", &logger, mcp_notifications_initialized);
+        try registry.addCtx("tools/list", &logger, mcp_tools_list);
+        try registry.addCtx("tools/call", &logger, mcp_tools_call);
 
         // RequestDispatcher interface implemented by the 'registry' registry.
         const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);

@@ -22,10 +22,10 @@ pub fn main() !void {
         defer registry.deinit();
 
         // Register each RPC method with a handling function.
-        try registry.add("hello", null, hello);
-        try registry.add("hello-name", null, helloName);
-        try registry.add("hello-xtimes", null, helloXTimes);
-        try registry.add("say", null, say);
+        try registry.add("hello", hello);
+        try registry.add("hello-name", helloName);
+        try registry.add("hello-xtimes", helloXTimes);
+        try registry.add("say", say);
 
         // RequestDispatcher interface implemented by the 'registry' registry.
         const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
