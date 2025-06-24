@@ -1,36 +1,54 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
-ZigJR is a Zig library for building applications using the JSON-RPC 2.0 protocol.
-It has implemented the full spec of the JSON-RPC 2.0 for low level communication.
-It also supports message streaming at message frame level.
-In addition it has a smart function dispatcher that can dispatch RPC requests to 
-Zig functions in native data types, making development of message handlers easy.
+ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
+with message streaming on top, and a smart function dispatcher that turns native Zig functions 
+into RPC handlers. It aims to make building JSON-RPC applications in Zig simple and straightforward.
 
 This small library is packed with the following features:
 
 * Parsing and composing JSON-RPC 2.0 messages.
-* Support Request, Response, Notification, and Error in JSON-RPC 2.0.
-* Support batch requests and batch responses in JSON-RPC 2.0.
-* Message streaming via delimiter based stream ('\n' or others).
-* Message streaming via Content-Length header based stream.
-* RPC pipeline to process request to response, vice versa.
-* Dispatcher to dispatch messages to Zig functions in native types.
-* Logging mechanism for inspecting the JSON-RPC messages.
+* Support for Request, Response, Notification, and Error JSON-RPC 2.0 messages.
+* Support for batch requests and batch responses in JSON-RPC 2.0.
+* Message streaming via delimiter based streams (`\n`, etc.).
+* Message streaming via `Content-Length` header-based streams.
+* RPC pipeline to process the full request-to-response lifecycle.
+* Native Zig functions as message handlers with automatic type mapping.
+* Flexible logging mechanism for inspecting the JSON-RPC messages.
 
 ## Content
 
+* [Quick Usage](#quick-usage)
 * [Installation](#installation)
 * [Usage](#usage)
-  * [Memory Ownership](#memory-ownership)
-  * [Configuration](#configuration)
-  * [More Usage](#more-usage)
-* [CLI Tool](#command-line-tool)
+   * [Streaming API](#streaming-api)
+   * [RPC Pipeline](#rpc-pipeline)
+   * [Parse JSON-RPC Messages](#parse-json-rpc-messages)
+   * [Compose JSON-RPC Messages](#compose-json-rpc-messages)
+* [Dispatcher](#dispatcher)
+* [RpcRegistry](#rpcregistry)
+* [Custom Dispatcher](#custom-dispatcher)
+* [Invocation and Cleanup](#invocation-and-cleanup)
+* [Handler Function](#handler-function)
+   * [Scopes](#scopes)
+   * [Parameters](#parameters)
+   * [Special Parameters](#special-parameters)
+   * [Return Value](#return-value)
+   * [Error](#error)
+   * [Memory Management](#memory-management)
+   * [Logging](#logging)
+* [Standalone Build](#standalone-build)
+* [Running the Examples](#running-the-examples)
+   * [Interactive Run](#interactive-run)
+   * [Run with Data Files](#run-with-data-files)
 * [License](#license)
+* [References](#references)
+
 
 ## Quick Usage
-The following example shows a JSON-RPC server registering Zig functions 
-as RPC handlers with a registry, creating a dispatcher from the registry,
-and streaming JSON-RPC messages from stdin to stdout on it.
+
+The following example shows a JSON-RPC server that registers native Zig functions 
+as RPC handlers in a registry, creates a dispatcher from the registry,
+and uses it to stream JSON-RPC messages from `stdin` to `stdout`.
 
 The functions take in native Zig data types and return native result values or errors.
 
@@ -71,49 +89,47 @@ fn weigh(cat: CatInfo) f64 {
 ```
 
 
-## Installation  
+## Installation
 
-Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page.
-Identify the file asset URL for the selected version. 
-E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.0.0.tar.gz
+Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page,
+and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.0.0.tar.gz
 
-Use `zig fetch` to add the ZigJR package to your Zig project. 
+Use `zig fetch` to add the ZigJR package to your project's dependencies. Replace `<VERSION>` with the version you selected.
 ```shell
-  zig fetch --save https://github.com/williamw520/zigjr/archive/refs/tags/<VERSION>.tar.gz
+zig fetch --save https://github.com/williamw520/zigjr/archive/refs/tags/<VERSION>.tar.gz
 ```
 
-`zig fetch` updates your `build.zig.zon` file with the URL with file hash added in the .dependency section of the file.
+This command updates your `build.zig.zon` file, adding ZigJR to the `dependencies` section with its URL and content hash.
 
-   ```diff
-   .{
-       .name = "my-project",
-       ...
-       .dependencies = .{
-   +       .zigjr = .{
-   +           .url = "zig fetch https://github.com/williamw520/zigjr/archive/refs/tags/<VERSION>.tar.gz",
-   +           .hash = "zigjr-...",
-   +       },
-       },
-   }
-   ```
+ ```diff
+ .{
+    .name = "my-project",
+    ...
+    .dependencies = .{
+ +       .zigjr = .{
+ +           .url = "zig fetch https://github.com/williamw520/zigjr/archive/refs/tags/<VERSION>.tar.gz",
+ +           .hash = "zigjr-...",
+ +       },
+    },
+ }
+ ```
 
-Update your `build.zig` with the following marked lines to include the zigjr library.
+Next, update your `build.zig` to add the ZigJR module to your executable.
 
-  ```diff
-    pub fn build(b: *std.Build) void {
-        ...
- +     const opts = .{ .target = target, .optimize = optimize };
- +     const zigjr_module = b.dependency("zigjr", opts).module("zigjr");
-        ...
-        const exe = b.addExecutable(.{
-            .name = "my_project",
-            .root_module = exe_mod,
-        });
- +     exe.root_module.addImport("zigjr", zigjr_module);
+```diff
+pub fn build(b: *std.Build) void {
+    ...
++  const opts = .{ .target = target, .optimize = optimize };
++  const zigjr_module = b.dependency("zigjr", opts).module("zigjr");
+    ...
+    const exe = b.addExecutable(.{
+        .name = "my_project",
+        .root_module = exe_mod,
+    });
++  exe.root_module.addImport("zigjr", zigjr_module);
 ```
 
-The `.addImport("zigjr")` call let you import the module into your Zig source files.
-
+The `.addImport("zigjr")` call makes the library's module available to your executable, allowing you to import it in your source files:
 ```zig
 const zigjr = @import("zigjr");
 ```
@@ -121,16 +137,16 @@ const zigjr = @import("zigjr");
 
 ## Usage
 
-JSON-RPC 2.0 applications can be built with ZigJR at different levels:
-- Using the stream API to handle streaming messages at the message-frame level.
-- Using the RPC pipeline for handling individual requests at the RPC level.
-- Using the parsers and composers to parse and build JSON messages at the protocol level.
+You can build JSON-RPC 2.0 applications with ZigJR at several levels of abstraction:
+* **Streaming API:** Handle message frames for continuous communication (recommended).
+* **RPC Pipeline:** Process individual requests and responses.
+* **Parsers and Composers:** Manually build and parse JSON-RPC messages for maximum control.
 
-For most cases, the streaming API is the simplest.
+For most use cases, the Streaming API is the simplest and most powerful approach.
 
-### Handle Stream of Messages with Streaming API
-The following sets up message streaming with reading requests from the StdIn
-and writing the responses to the StdOut. The messages have Content-Length prefices.
+### Streaming API
+The following example handles a stream of messages prefixed with a `Content-Length` header, 
+reading requests from `stdin` and writing responses to `stdout`.
 ```zig
 {
     var registry = zigjr.RpcRegistry.init(alloc);
@@ -145,8 +161,8 @@ and writing the responses to the StdOut. The messages have Content-Length prefic
 fn addTwoNums(a: i64, b: i64) i64 { return a + b; }
 ```
 
-The following sets up message streaming with reading requests from an in-memory buffer
-and writing the responses to an in-memory buffer.  The messages are delimited by LF.
+This example streams messages from one in-memory buffer to another, 
+using a newline character (`\n`) as a delimiter.
 ```zig
 {
     var registry = zigjr.RpcRegistry.init(alloc);
@@ -169,22 +185,25 @@ and writing the responses to an in-memory buffer.  The messages are delimited by
 
     std.debug.print("output_jsons: {s}\n", .{out_buf.items});
 }
-
 ```
 
-### Handle Single Message with RPC Pipeline
-`RequestPipeline` combines request message parsing, dispatching, and response composing in one pipeline.
+### RPC Pipeline
+To handle individual requests, use the `RequestPipeline`. It abstracts away message parsing, 
+dispatching, and response composition.
 
 ```zig
 {
+    // Set up the registry as the dispatcher.
     var registry = zigjr.RpcRegistry.init(alloc);
     defer registry.deinit();
     try registry.add("add", addTwoNums);
-
     const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+
+    // Set up the request pipeline with the dispatcher.
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
+    // Run the individual requests to the pipeline.
     const response_json1 = pipeline.runRequestToJson(
         \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
     );
@@ -203,8 +222,8 @@ and writing the responses to an in-memory buffer.  The messages are delimited by
 ```
 
 ### Parse JSON-RPC Messages
-For low level application, JSON-RPC messages can be parsed into RpcRequest objects,
-where the request's method, parameters, and request ID can be retrieved.
+For lower-level control, you can parse messages directly into `RpcRequest` objects,
+where the request's method, parameters, and request ID can be accessed.
 ```zig
 const zigjr = @import("zigjr");
 {
@@ -222,6 +241,7 @@ const zigjr = @import("zigjr");
 `parseRpcRequest()` can parse a single message or a batch of messages.  Use `result.batch()` to get the list of requests in the batch.
 
 ### Compose JSON-RPC Messages
+The `composer` API helps you build valid JSON-RPC messages.
 ```zig
 const zigjr = @import("zigjr");
 {
@@ -233,19 +253,18 @@ const zigjr = @import("zigjr");
 }
 ```
 
-## Dispatcher and Handler Functions
-Dispatcher is the entry point for handling incoming RPC messages. After a message is parsed,
-the RPC pipeline feeds it to the dispatcher to route to a handling function based on the message's method.
-The `RequestDispatcher` interface and the `ResponseDispatcher` interface define
-the sets of dispatching functions.
+## Dispatcher
+The dispatcher is the entry point for handling incoming RPC messages. 
+After a message is parsed, the RPC pipeline feeds it to the dispatcher, 
+which routes it to a handler function based on the message's `method`. 
+The `RequestDispatcher` and `ResponseDispatcher` interfaces define the required dispatching functions.
 
-### RpcRegistry
-The built-in `RpcRegistry` implements the `RequestDispatcher` interface and can serve as
-a dispatcher. `RpcRegistry.add(method, function)` registers a handling function for a
-JSON-RPC message's method. When a request is fed to `RpcRegistry`, it looks up
-the handling function for the request's method, maps the request's parameters
-to the function's arguments, calls the function, and captures the result or error 
-returned from the function.
+## RpcRegistry
+The built-in `RpcRegistry` implements the `RequestDispatcher` interface and 
+serves as a powerful, ready-to-use dispatcher. You use `RpcRegistry.add(method_name, function)` 
+to register a handler function for a specific JSON-RPC method. When a request comes in, 
+the registry looks up the handler, maps the request's parameters to the function's arguments, 
+calls the function, and captures the result or error to formulate a response.
 
 ```zig
 {
@@ -260,24 +279,23 @@ returned from the function.
 }
 ```
 
-### Custom Dispatcher
-Custom dispatcher can be used as long as it implements the `dispatch()` and `dispatchEnd()` functions of
-`RequestDispatcher`.  See the example dispatcher_hello.zig for detail.
+## Custom Dispatcher
+You can provide a custom dispatcher as long as it implements the `dispatch()` and `dispatchEnd()` 
+functions of the `RequestDispatcher` interface. See the `dispatcher_hello.zig` example for details.
 
-### Request Invocation and Cleanup
+## Invocation and Cleanup
+Each request is processed in two phases: `dispatch()`, which executes the handler, 
+and `dispatchEnd()`, which performs per-invocation cleanup (such as freeing memory).
 
-Each request invocation to a dispatcher has two phases: calling `dispatcher.dispatch()` and calling
-`dispatcher.dispatchEnd()`. A dispatcher's `dispatch()` performs the message dispatching
-and `dispatchEnd()` does per-invocation cleanup.
-
-### Handler Functions
+## Handler Function
 Message handler functions are native Zig functions.
 
-#### Scopes
-Handler functions can be in the global scope, in a struct scope, or in a struct instance scope.
+### Scopes
+Handler functions can be defined in the global scope, a struct scope, or a struct instance scope.
 
-For struct instance scope, pass the struct instance as the context pointer when registering the handler function.
-The context pointer is passed back as the first parameter to the handler function when invoked.
+For instance-scoped methods, pass a pointer to the struct instance as the context 
+when registering the handler. This context pointer will be passed as the first parameter 
+to the handler function when it is invoked.
 
 ```zig
 {
@@ -303,103 +321,86 @@ const Counter = struct {
     fn get(self: *@This()) i64  { return self.count; }
 };
 ```
-#### Parameters
-The parameters of handler functions are of native Zig data types, with a few limitations.
 
-One limitation is the parameter data types should match the JSON data types.
-- bool, mapped to JavaScript's Boolean
-- i64, mapped to JavaScript's signed 53-bit Integer type
-- f64, mapped to JavaScript's 64-bit floating number
-- []const u8, mapped to JavaScript's String
-- struct, mapped to JavaScript's Object
+### Parameters
+Handler function parameters are native Zig types, with a few limitations related 
+to JSON compatibility. Parameter types should generally map to JSON types:
+
+*   `bool`: JSON boolean
+*   `i64`: JSON number (compatible with JavaScript's 53-bit safe integer range)
+*   `f64`: JSON number (64-bit float)
+*   `[]const u8`: JSON string
+*   `struct`: JSON object
+
 There're some light automatic type conversion when the function parameter's type
 and the JSON message's parameter type are closely related. (See `ValueAs()` in json_call.zig for details).
 
-Another limitation is that for struct parameters they have to be parsable from JSON.
-When a JSON message's parameter is a JSON object, the matching handler function's parameter
-should have the same fields and data types for the JSON object. 
-ZigJR uses the `std.json` package for parsing.
+Struct parameters must be deserializable from JSON. The corresponding handler 
+parameter's struct must have fields that match the JSON object. ZigJR uses `std.json` 
+for deserialization. Nested objects are supported, and you can implement custom 
+parsing by adding a `jsonParseFromValue` function to your struct. See the `std.json` 
+documentation for details.
 
-Nested objects are supported as long as they can be parsed to JSON. 
-Custom parsing can be done via adding the `jsonParseFromValue()` to the struct. See std.json for detail.
+### Special Parameters
 
-#### Special Parameters
+#### Context
 
-##### Context
+If a context pointer is supplied to `RpcRegistry.addCtx()`, it is passed as 
+the first parameter to the handler function, effectively serving as a `self` pointer.
 
-If an object pointer is supplied to RpcRegistry.addCtx() as the context,
-it is passed in as the first parameter to the handler function. The context
-object can serve as the 'self' pointer for the function.
 The first parameter's type and the context type need to be the same.
 
-##### Allocator
+#### Allocator
+If an `std.mem.Allocator` is the first parameter of a handler (or the second, 
+if a context is used as the first), an arena allocator is passed in. The handler does 
+not need to free memory allocated with it; the arena is automatically reset after the request completes.
+The arena memory is reset in dispatchEnd() by called by higher level callers.
 
-If an Allocator parameter is declared as the first parameter of a handler function
-(or the second parameter if a context object is supplied), an allocator is passed in
-during function invocation.  The allocator is an arena allocator so the function 
-doesn't need to worry about freeing the memory.  The arena memory is reset via 
-the reset() function. The arena memory is reset in dispatchEnd() by higher level callers.
+#### Value
+To handle parameters manually, you can use `std.json.Value`:
+* As the **only** parameter: The entire `params` field from the request (`array` or `object`) is passed as a single `std.json.Value`.
+    ```zig
+    fn h1(params: std.json.Value) void { /* ... */ }
+    ```
+* As **one of several** parameters: The corresponding JSON-RPC parameter is passed as a `std.json.Value` without being converted to a native Zig type.
+    ```zig
+    fn h3(a: std.json.Value, b: i64, c: std.json.Value) void { /* ... */ }
+    ```
 
-##### Value
+### Return Value
+The return value of a handler function is serialized to JSON and becomes the `result` 
+of the JSON-RPC response. You can return any Zig type that can be serialized by `std.json`.
 
-If `std.json.Value` is declared as a single parameter of the handler function,
-all the JSON-RPC parameters are passed in as a Value object (as an `array` or an `object`) 
-without any interpretation.  It's up to the function to interpret the value types
-and extract the value data. E.g.
-```zig 
-    fn h1(a: std.json.Value) {
-    }
-```
+If your function returns a `void`, it is treated as a Notification, and no response message is generated.
 
-If `std.json.Value` is declared as part of the parameters of the handler function,
-the JSON-RPC parameters of the correponding Value type function parameters are passed in
-as Value objects without any interpretation. E.g.
+### Error
+You can declare an error union as the return type. Any error returned will be 
+packaged into a JSON-RPC error response with the `InternalError` code.
 
-```zig
-    fn h3(a: std.json.Value, b: i64, c: std.json.Value) {
-    }
-```
+### Memory Management
+When using `RpcRegistry`, memory management is straightforward. Any memory 
+obtained from the allocator passed to a handler is automatically freed 
+after the request completes. Handlers do not need to perform manual cleanup.
+Memory is freed in the `dispatcher.dispatchEnd()` phase.
 
-#### Return Value
-The return value of a handler function will be returned as the `result` of a JSON-RPC 
-Response message in JSON form. The data type of a handler function can be any Zig 
-data type as long as it can be stringified to JSON. Some data types are automatically 
-converted so it's best to use data types that the clients expect.
+If you implement a custom dispatcher, you are responsible for managing the memory's lifecycle.
 
-If the function has already stringified its return value as JSON string, it can
-use zigjr.JsonStr as return type to prevent it from being stringified again.
-
-A `void` return type would not return any JSON-RPC Response message. It's used for 
-JSON-RPC Notification, which should not generate any response.
-
-#### Error
-Error union set can be declared as part of the handler function's return type.
-Any error returned will be packaged as a JSON-RPC error message with the 
-`InternalError` error code.
-
-#### Memory Management
-Handler functions using `RpcRegistry` as a dispatcher has a simple memory usage policy.
-Any memory allocated with the passed in `Allocator` will be freed automatically at the
-end of the message dispatching. Handlers don't need to worry about memory management.
-
-Memory is freed in the `dispatcher.dispatchEnd()` phase. Customer dispatchers need to manage
-the memory themselves.
-
-## Logging
+### Logging
 
 Logging is a great way to learn about a protocol by watching the messages exchanged between
-the client and the server, and it's great for debugging the message handlers. 
-ZigJR has logging built into the library. It has pre-built loggers that logs to file or logs to StdErr.
-Custom logger can be built easily by implementing a few methods for the Logger interface.
+the client and server. ZigJR has a built-in logging mechanism to help you inspect messages 
+and debug handlers. You can use a pre-built logger or implement a custom one.
 
-Use DbgLogger in a request pipeline.
+#### DbgLogger
+Use `DbgLogger` in a request pipeline. This logger prints to `stderr`.
 ```zig
     var logger = zigjr.DbgLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
         RequestDispatcher.impl_by(&registry), zigjr.Logger.impl_by(&logger));
     
 ```
-Use FileLogger in a request stream.
+#### FileLogger
+Use `FileLogger` in a request stream. This logger writes to a file.
 ```zig
     var logger = try zigjr.FileLogger.init("log.txt");
     defer logger.deinit();
@@ -407,6 +408,7 @@ Use FileLogger in a request stream.
         std.io.getStdIn().reader(), std.io.getStdOut().writer(),
         dispatcher, .{ .logger = Logger.impl_by(&logger) });
 ```
+#### Custom Logger
 Use a custom logger in a request pipeline.
 ```zig
 {
@@ -425,32 +427,30 @@ const MyLogger = struct {
     }
     pub fn stop(_: @This(), _: []const u8) void {}
 };
-
 ```
 
 ## Standalone Build
+You do not need to build this project if you are only using it as a library 
+via `zig fetch`. To run the examples, clone the repository and run `zig build`. 
+The example binaries will be located in `zig-out/bin/`.
 
-You don't need to build the project if you just use the library via `zig fetch`.
-You might want to build the project for running the examples.
-Git clone the repository, then run the `zig build` command.
-The binary output is in zig-out/bin/, which consists of the examples mostly.
+## Running the Examples
 
-### Running the Examples
-
-#### Interactive Run
-Running the programs interactively is a great way to debug the message handlers.
+### Interactive Run
+Running the programs interactively is a great way to experiment with the handlers.
 Just type in the JSON requests and see the result.
 ```
 zig-out/bin/hello
 ```
-The program reads from stdin. Type the following (or copy and paste), and hit Enter.
+The program will wait for input. Type or paste the JSON-RPC request and press Enter.
 ```
 {"jsonrpc": "2.0", "method": "hello", "id": 1}
 ```
-It should return the result JSON.
+It will print the JSON result.
 ```
 {"jsonrpc": "2.0", "result": "Hello world", "id": 1}
 ```
+
 Other sample requests,
 ```
 {"jsonrpc": "2.0", "method": "hello-name", "params": ["Foobar"], "id": 1}
@@ -464,10 +464,8 @@ Other sample requests,
 ```
 {"jsonrpc": "2.0", "method": "say", "params": ["Abc Xyz"], "id": 1}
 ```
-#### Run with Data Files
-
-Runs the examples with piping the test data files from stdin.
-Running the programs with data files is a great way to have repeatable tests.
+### Run with Data Files
+You can also run the examples by piping test data from a file, which is useful for creating repeatable tests.
 ```
 zig-out/bin/hello < data/hello.json
 zig-out/bin/hello < data/hello_name.json
@@ -488,15 +486,11 @@ zig-out/bin/calc.exe < data/calc_divide_99.json
 zig-out/bin/calc.exe < data/calc_divide_by_0.json
 ```
 
-
-
 ## License
 
 ZigJR is [MIT licensed](./LICENSE).
 
-## Further Reading
-
-For reference information, check out these resources:
+## References
 
 - [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 - [MCP Schema](https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema)
