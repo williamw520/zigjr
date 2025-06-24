@@ -8,10 +8,8 @@ const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 
-const zigjr = @import("../zigjr.zig");
-const json_call = @import("../rpc/json_call.zig");
-const JrErrors = zigjr.JrErrors;
-
+const zigjr = @import("zigjr");
+const json_call = @import("../src/rpc/json_call.zig");
 
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -41,7 +39,7 @@ fn fn0_return_value_with_err() ![]const u8 {
     return "Hello";
 }
 
-fn fn0_return_json_str() json_call.JsonStr {
+fn fn0_return_json_str() zigjr.JsonStr {
     return .{
         .json = "{ \"foobar\": 42 }",
     };

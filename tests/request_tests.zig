@@ -6,7 +6,7 @@ const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 
-const zigjr = @import("../zigjr.zig");
+const zigjr = @import("zigjr");
 const RpcRequestMessage = zigjr.RpcRequestMessage;
 const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
