@@ -37,9 +37,9 @@ This small library is packed with the following features:
    * [Memory Management](#memory-management)
    * [Logging](#logging)
 * [Standalone Build](#standalone-build)
-* [Running the Examples](#running-the-examples)
-   * [Interactive Run](#interactive-run)
-   * [Run with Data Files](#run-with-data-files)
+* [Examples](#examples)
+   * [Run Examples Interactively](#run-examples-interactively)
+   * [Run Examples with Data Files](#run-examples-with-data-files)
 * [License](#license)
 * [References](#references)
 
@@ -434,9 +434,18 @@ You do not need to build this project if you are only using it as a library
 via `zig fetch`. To run the examples, clone the repository and run `zig build`. 
 The example binaries will be located in `zig-out/bin/`.
 
-## Running the Examples
+## Examples
 
-### Interactive Run
+The project has a number of examples showing how to build applications with ZigJR.
+
+* [hello.zig](examples/hello.zig): Showcase the basics of handler function registration and the streaming API.
+* [calc.zig](examples/calc.zig): Showcase different kinds of handler functions.
+* [dispatcher_hello.zig](example/dispatcher_hello.zig): Custom dispatcher.
+* [mcp_hello.zig](example/mcp_hello.zig): A basic MCP server written from the ground up.
+
+Check [examples](examples) for other examples.
+
+### Run Examples Interactively
 Running the programs interactively is a great way to experiment with the handlers.
 Just type in the JSON requests and see the result.
 ```
@@ -464,7 +473,8 @@ Other sample requests,
 ```
 {"jsonrpc": "2.0", "method": "say", "params": ["Abc Xyz"], "id": 1}
 ```
-### Run with Data Files
+
+### Run Examples with Data Files
 You can also run the examples by piping test data from a file, which is useful for creating repeatable tests.
 ```
 zig-out/bin/hello < data/hello.json
@@ -485,10 +495,6 @@ zig-out/bin/calc.exe < data/calc_divide.json
 zig-out/bin/calc.exe < data/calc_divide_99.json
 zig-out/bin/calc.exe < data/calc_divide_by_0.json
 ```
-
-## Examples
-
-
 
 ## License
 
