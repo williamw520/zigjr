@@ -90,11 +90,9 @@ pub const RequestPipeline = struct {
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
     /// and return the JSON-RPC response(s) as a JSON string.
     /// The JSON request message can contain a single request or a batch of requests.
-    /// Error is turned into a JSON-RPC error response message.
+    /// The JSON response message will contain a single response or a batch of responses accordingly.
+    /// Errors are turned into JSON-RPC error response messages.
     /// The function can return null, as notification requests have no response.
-    ///
-    /// The 'anytype' dispatcher needs to have a dispatch() method returning a DispatchResult.
-    /// The 'anytype' dispatcher needs to have a free() method to free the DispatchResult.
     pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
         var response_buf = ArrayList(u8).init(self.alloc);
         if (try self.runRequest(request_json, &response_buf)) {

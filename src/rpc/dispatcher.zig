@@ -47,6 +47,8 @@ pub const RequestDispatcher = struct {
         };
     }
 
+    // The implementation must have methods.
+
     pub fn dispatch(self: @This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
         return self.dispatch_fn(self.impl_ptr, alloc, req);
     }

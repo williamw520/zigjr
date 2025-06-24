@@ -22,101 +22,148 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 // Test handler registration.
 
+var fn0_called = false;
+var fn0_with_err_called = false;
+var fn0_alloc_called = false;
+
 fn fn0() void {
-    std.debug.print("fn0() called\n", .{});
+    // std.debug.print("fn0() called\n", .{});
+    fn0_called = true;
 }
 
 fn fn0_with_err() !void {
-    std.debug.print("fn0_with_err() called\n", .{});
+    // std.debug.print("fn0_with_err() called\n", .{});
+    fn0_with_err_called = true;
 }
 
 fn fn0_return_value() []const u8 {
-    std.debug.print("fn0_return_value() called\n", .{});
+    // std.debug.print("fn0_return_value() called\n", .{});
     return "Hello";
 }
 
 fn fn0_return_value_with_err() ![]const u8 {
-    std.debug.print("fn0_return_value_with_err() called\n", .{});
+    // std.debug.print("fn0_return_value_with_err() called\n", .{});
     return "Hello";
 }
 
 fn fn0_alloc(alloc: Allocator) !void {
-    std.debug.print("fn0_alloc() called\n", .{});
+    // std.debug.print("fn0_alloc() called\n", .{});
     // The arena allocator will take care of freeing it.
     _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
+    fn0_alloc_called = true;
 }
 
 
+var fn1_called = false;
+var fn1_with_err_called = false;
+
 fn fn1(a: i64) void {
-    std.debug.print("fn1() called, a:{}\n", .{a});
+    _=a;
+    // std.debug.print("fn1() called, a:{}\n", .{a});
+    fn1_called = true;
 }
 
 fn fn1_with_err(a: i64) !void {
-    std.debug.print("fn1_with_err() called, a:{}\n", .{a});
+    _=a;
+    // std.debug.print("fn1_with_err() called, a:{}\n", .{a});
+    fn1_with_err_called = true;
 }
 
 fn fn1_return_value(a: i64) []const u8 {
-    std.debug.print("fn1_return_value() called, a:{}\n", .{a});
+    _=a;
+    // std.debug.print("fn1_return_value() called, a:{}\n", .{a});
     return "Hello";
 }
 
 fn fn1_return_value_with_err(a: i64) ![]const u8 {
-    std.debug.print("fn1_return_value_with_err() called, a:{}\n", .{a});
+    _=a;
+    // std.debug.print("fn1_return_value_with_err() called, a:{}\n", .{a});
     return "Hello";
 }
 
 fn fn1_alloc_with_err(alloc: Allocator, a: i64) !void {
-    std.debug.print("fn1_alloc_with_err() called, a:{}\n", .{a});
+    _=a;
+    // std.debug.print("fn1_alloc_with_err() called, a:{}\n", .{a});
     // The arena allocator will take care of freeing it.
     _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
 }
 
+
+var fn2_called = false;
+var fn2_with_err_called = false;
+var fn2_alloc_with_err_called = false;
+
 fn fn2(a: i64, b: bool) void {
-    std.debug.print("fn2() called, a:{}, b:{}\n", .{a, b});
+    _=a;
+    _=b;
+    // std.debug.print("fn2() called, a:{}, b:{}\n", .{a, b});
+    fn2_called = true;
 }
 
 fn fn2_with_err(a: i64, b: bool) !void {
-    std.debug.print("fn2_with_err() called, a:{}, b:{}\n", .{a, b});
+    _=a;
+    _=b;
+    // std.debug.print("fn2_with_err() called, a:{}, b:{}\n", .{a, b});
+    fn2_with_err_called = true;
 }
 
 fn fn2_return_value(a: i64, b: bool) i64 {
-    std.debug.print("fn2_return_value() called, a:{}, b:{}\n", .{a, b});
+    // std.debug.print("fn2_return_value() called, a:{}, b:{}\n", .{a, b});
     return if (b) a * 1 else a * 2;
 }
 
 fn fn2_return_value_with_err(a: i64, b: bool) i64 {
-    std.debug.print("fn2_return_value_with_err() called, a:{}, b:{}\n", .{a, b});
+    // std.debug.print("fn2_return_value_with_err() called, a:{}, b:{}\n", .{a, b});
     return if (b) a * 1 else a * 2;
 }
 
 fn fn2_alloc_with_err(alloc: Allocator, a: i64, b: bool) !void {
-    std.debug.print("fn2_alloc_with_err() called, a:{}, b:{}\n", .{a, b});
+    _=a;
+    _=b;
+    // std.debug.print("fn2_alloc_with_err() called, a:{}, b:{}\n", .{a, b});
     // The arena allocator will take care of freeing it.
     _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
+    fn2_alloc_with_err_called = true;
 }
+
+const Group = struct {
+    var group_fn0_called = false;
+    var group_fn1_called = false;
+    
+    fn fn0() void {
+        group_fn0_called = true;
+    }
+
+    fn fn1(_: i64) void {
+        group_fn1_called = true;
+    }
+};
 
 
 const Ctx = struct {
+    var ctx_fn0_called = false;
+    
     count: i64 = 0,
 
     // All methods must have self as pointer as the context is passed in as a pointer.
     fn get(self: *@This()) i64 {
-        std.debug.print("ctx.get() called, count:{}\n", .{self.count});
+        // std.debug.print("ctx.get() called, count:{}\n", .{self.count});
         return self.count;
     }
 
-    fn fn0(self: *@This()) void {
-        std.debug.print("ctx.fn0() called, count:{}\n", .{self.count});
+    fn fn0(_: *@This()) void {
+        // std.debug.print("ctx.fn0() called, count:{}\n", .{self.count});
+        ctx_fn0_called = true;
     }
 
     fn fn1(self: *@This(), a: i64) void {
         self.count += a;
-        std.debug.print("ctx.fn1() called, count:{}\n", .{self.count});
+        // std.debug.print("ctx.fn1() called, count:{}\n", .{self.count});
     }
 
     fn fn1_alloc(self: *@This(), alloc: Allocator, a: i64) !void {
         self.count += a;
-        std.debug.print("ctx.fn1_alloc() called, count:{}\n", .{self.count});
+        // std.debug.print("ctx.fn1_alloc() called, count:{}\n", .{self.count});
         _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
     }
 
@@ -168,7 +215,7 @@ fn fn_cat(name: []const u8, weight: f64, color: []const u8) CatInfo {
 }
 
 fn fn_cat_value(json_value: std.json.Value) CatInfo {
-    std.debug.print("fn_cat_value() called\n", .{});
+    // std.debug.print("fn_cat_value() called\n", .{});
     return .{
         .cat_name = json_value.object.get("cat_name").?.string,
         .weight = json_value.object.get("weight").?.float,
@@ -202,24 +249,28 @@ fn fn_cat_struct_alloc(alloc: Allocator, cat: CatInfo) !CatInfo {
     };
 }
 
-fn fn_json_value1(value1: std.json.Value) bool {
-    std.debug.print("fn_json_value1() called {any}\n", .{value1});
-    return true;
+fn fn_json_value1(value1: std.json.Value) i64 {
+    // std.debug.print("fn_json_value1() called {any}\n", .{value1});
+    switch (value1) {
+        .integer    => |num| return if (num == 1) 1 else -1,
+        .array      => |array| return @intCast(array.items.len),
+        else        => return -1,
+    }
 }
 
-fn fn_json_value2(value1: std.json.Value, value2: std.json.Value) bool {
-    std.debug.print("fn_json_value2() called {any}, {any}\n", .{value1, value2});
-    return true;
+fn fn_json_value2(value1: std.json.Value, value2: std.json.Value) i64 {
+    // std.debug.print("fn_json_value2() called {any}, {any}\n", .{value1, value2});
+    return value1.integer + value2.integer;
 }
 
-fn fn_json_value_int(value1: std.json.Value, b: i64) bool {
-    std.debug.print("fn_json_value_int() called {any}, {}\n", .{value1, b});
-    return true;
+fn fn_json_value_int(value1: std.json.Value, b: i64) i64 {
+    // std.debug.print("fn_json_value_int() called {any}, {}\n", .{value1, b});
+    return value1.integer + b;
 }
 
-fn fn_json_value_int_value(value1: std.json.Value, b: i64, value3: std.json.Value) bool {
-    std.debug.print("fn_json_value_int_value() called {any}, {}, {any}\n", .{value1, b, value3});
-    return true;
+fn fn_json_value_int_value(value1: std.json.Value, b: i64, value3: std.json.Value) i64 {
+    // std.debug.print("fn_json_value_int_value() called {any}, {}, {any}\n", .{value1, b, value3});
+    return value1.integer + b + value3.integer;
 }
 
 
@@ -274,8 +325,7 @@ test "rpc_registry fn0" {
                 ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn0_called);
         }
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -301,8 +351,7 @@ test "rpc_registry fn0 variants" {
                 ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn0_called);
         }
 
         {
@@ -311,8 +360,7 @@ test "rpc_registry fn0 variants" {
                 ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn0_with_err_called);
         }
         
         {
@@ -345,8 +393,7 @@ test "rpc_registry fn0 variants" {
                 ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn0_alloc_called);
         }
 
     }
@@ -373,11 +420,7 @@ test "rpc_registry fn1" {
                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
-            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-            // defer res_result.deinit();
-            // try testing.expect((try res_result.response()).resultEql(0));
+            try testing.expect(fn1_called);
         }
 
         {
@@ -385,11 +428,7 @@ test "rpc_registry fn1" {
                 \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
-            // var res_result = try zigjr.parseRpcResponse(alloc, res_json);
-            // defer res_result.deinit();
-            // try testing.expect((try res_result.response()).resultEql(0));
+            try testing.expect(fn1_with_err_called);
         }
         
         {
@@ -447,8 +486,7 @@ test "rpc_registry fn2" {
                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn2_called);
         }
 
         {
@@ -456,8 +494,7 @@ test "rpc_registry fn2" {
                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn2_with_err_called);
         }
         
         {
@@ -487,10 +524,39 @@ test "rpc_registry fn2" {
                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(fn2_alloc_with_err_called);
         }
 
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+
+test "rpc_registry with struct scope functions" {
+    const alloc = gpa.allocator();
+    {
+        var registry = rpc_reg.RpcRegistry.init(alloc);
+        defer registry.deinit();
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&registry), null);
+        defer pipeline.deinit();
+
+        try registry.add("fn0", Group.fn0);
+        try registry.add("fn1", Group.fn1);
+
+        {
+            const res_json = try pipeline.runRequestToJson(
+                \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
+                ) orelse "";
+            defer alloc.free(res_json);
+            try testing.expect(Group.group_fn0_called);
+        }
+        {
+            const res_json = try pipeline.runRequestToJson(
+                \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
+                ) orelse "";
+            defer alloc.free(res_json);
+            try testing.expect(Group.group_fn1_called);
+        }
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -528,8 +594,7 @@ test "rpc_registry with context" {
                 \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-
-            try testing.expect(res_json.len == 0);
+            try testing.expect(Ctx.ctx_fn0_called);
         }
 
         {
@@ -546,7 +611,7 @@ test "rpc_registry with context" {
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
                 ) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
 
             try testing.expect(res_json.len == 0);
         }
@@ -616,11 +681,11 @@ test "rpc_registry fn with built array params returning struct value" {
             const params = .{"cat1", 9, "blue"};
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
             defer alloc.free(req_json);
-            std.debug.print("request: {s}\n", .{req_json});
+            // std.debug.print("request: {s}\n", .{req_json});
 
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
-            std.debug.print("response: {s}\n", .{res_json});
+            // std.debug.print("response: {s}\n", .{res_json});
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
@@ -767,7 +832,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
-            try testing.expect((try res_result.response()).resultEql(true));
+            try testing.expect((try res_result.response()).resultEql(1));
         }
 
         try registry.addCtx("fn_json_value1", null, fn_json_value1);
@@ -779,6 +844,10 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
+
+            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
         }
 
     }
@@ -806,7 +875,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
-            try testing.expect((try res_result.response()).resultEql(true));
+            try testing.expect((try res_result.response()).resultEql(3));
         }
 
     }
@@ -834,7 +903,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
-            try testing.expect((try res_result.response()).resultEql(true));
+            try testing.expect((try res_result.response()).resultEql(3));
         }
 
     }
@@ -862,7 +931,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
 
             var res_result = try zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
-            try testing.expect((try res_result.response()).resultEql(true));
+            try testing.expect((try res_result.response()).resultEql(6));
         }
 
     }
