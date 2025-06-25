@@ -13,7 +13,6 @@ const ObjectMap = std.json.ObjectMap;
 const allocPrint = std.fmt.allocPrint;
 
 const zigjr = @import("zigjr");
-const DelimiterStream = zigjr.DelimiterStream;
 const Logger = zigjr.Logger;
 
 
@@ -30,8 +29,8 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
-        // Use a file-based logger since the executable is run in a mcp host
-        // as a subprocess and cannot log to stdout.
+        // Use a file-based logger since the executable is run in a MCP host
+        // as a sub-process and cannot log to the host's stdout.
         var logger = try zigjr.FileLogger.init("log.txt");
         defer logger.deinit();
 
@@ -45,14 +44,15 @@ pub fn main() !void {
         try registry.addWithCtx("tools/list", &logger, mcp_tools_list);
         try registry.addWithCtx("tools/call", &logger, mcp_tools_call);
 
-        // RequestDispatcher interface implemented by the registry.
+        // RpcRegistry has implemented the RequestDispatcher interface.
         const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
         // Starts the JSON streaming pipeline from stdin to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
                                              std.io.getStdIn().reader(),
                                              std.io.getStdOut().writer(),
-                                             dispatcher, .{ .logger = Logger.implBy(&logger) });
+                                             dispatcher,
+                                             .{ .logger = Logger.implBy(&logger) });
     }
 
     if (gpa.detectLeaks()) {
@@ -63,9 +63,10 @@ pub fn main() !void {
 // The MCP message handlers.
 //
 // All the MCP message parameters and return values are defined in below 
-// as Zig structs or tagged union according to the MCP JSON schema spec.
-// Let ZigJR do the mapping between the Zig structs and the JSON objects.
+// as Zig structs or tagged unions according to the MCP JSON schema spec.
+// ZigJR automatically does the mapping between the structs and the JSON objects.
 
+// First message from a MCP client to do the initial handshake.
 fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
                   params: InitializeRequest_params) !InitializeResult {
     const msg = try allocPrint(alloc, "client name: {s}, version: {s}", .{params.clientInfo.name, params.clientInfo.version});
@@ -79,8 +80,7 @@ fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
         },
         .instructions = "Hello world",
         .capabilities = ServerCapabilities {
-            .tools = .{
-            },
+            .tools = .{},                   // server capable of doing tools
         },
     };
 }
@@ -105,7 +105,7 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
     try helloNameTool.inputSchema.addRequired("name");
     try tools.append(helloNameTool);
 
-    var helloXTimesTool = Tool.init(alloc, "hello-xtimes", "Replying a 'Hello NAME' repeated X times when called with a NAME and a number.");
+    var helloXTimesTool = Tool.init(alloc, "hello-xtimes", "Replying a 'Hello NAME NUMBER' repeated X times when called with a NAME and a number.");
     try helloXTimesTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloXTimesTool.inputSchema.addRequired("name");
     try helloXTimesTool.inputSchema.addProperty("times", "integer", "The number of times to repeat");
