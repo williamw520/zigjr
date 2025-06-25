@@ -119,17 +119,21 @@ Next, update your `build.zig` to add the ZigJR module to your executable.
 ```diff
 pub fn build(b: *std.Build) void {
     ...
-+  const opts = .{ .target = target, .optimize = optimize };
-+  const zigjr_module = b.dependency("zigjr", opts).module("zigjr");
++ const zigjr_pkg = b.dependency("zigjr", .{ .target = target, .optimize = optimize });
++ const zigjr_mod = zigjr_pkg.module("zigjr");      // get the module defined in the pkg.
     ...
-    const exe = b.addExecutable(.{
+    const exe1 = b.addExecutable(.{
         .name = "my_project",
-        .root_module = exe_mod,
+        .root_module = exe1_mod,
     });
-+  exe.root_module.addImport("zigjr", zigjr_module);
+    ...
++  exe1.root_module.addImport("zigjr", zigjr_module);
++  exe2.root_module.addImport("zigjr", zigjr_module);
++  lib1.root_module.addImport("zigjr", zigjr_module);
 ```
 
-The `.addImport("zigjr")` call makes the library's module available to your executable, allowing you to import it in your source files:
+The `.addImport("zigjr")` call makes the library's module available to your executable, 
+allowing you to import it in your source files:
 ```zig
 const zigjr = @import("zigjr");
 ```
