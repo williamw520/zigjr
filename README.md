@@ -50,7 +50,8 @@ The following example shows a JSON-RPC server that registers native Zig function
 as RPC handlers in a registry, creates a dispatcher from the registry,
 and uses it to stream JSON-RPC messages from `stdin` to `stdout`.
 
-The functions take in native Zig data types and return native result values or errors.
+The functions take in native Zig data types and return native result values or errors,
+which are mapped to the JSON data types automatically.
 
 ```zig
 {
@@ -87,7 +88,15 @@ fn weigh(cat: CatInfo) f64 {
     return cat.weight;
 }
 ```
-
+The sample request and response messages.
+```
+Request:  {"jsonrpc": "2.0", "method": "hello", "id": 1}
+Response: {"jsonrpc": "2.0", "result": "Hello world", "id": 1}
+```
+```
+Request:  {"jsonrpc": "2.0", "method": "hello-name", "params": ["Spiderman"], "id": 2}
+Response: {"jsonrpc": "2.0", "result": "Hello Spiderman", "id": 2}
+```
 
 ## Installation
 
