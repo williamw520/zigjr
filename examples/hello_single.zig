@@ -28,7 +28,7 @@ pub fn main() !void {
         try registry.add("say", say);
 
         // RequestDispatcher interface implemented by the 'registry' registry.
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
         var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
         defer pipeline.deinit();
 

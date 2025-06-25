@@ -17,7 +17,7 @@ pub const Logger = struct {
     stop_fn:    *const fn(impl_ptr: *anyopaque, message: []const u8) void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn impl_by(impl: anytype) Logger {
+    pub fn implBy(impl: anytype) Logger {
         const ImplType = @TypeOf(impl);
 
         const Thunk = struct {

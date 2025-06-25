@@ -45,15 +45,15 @@ pub fn main() !void {
         try registry.addCtx("tools/call", &logger, mcp_tools_call);
 
         // RequestDispatcher interface implemented by the 'registry' registry.
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
         // Starts the JSON stream pipeline on stdin and stdout.
-        // const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.impl_by(&logger) });
+        // const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.implBy(&logger) });
         // try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
         try zigjr.stream.requestsByDelimiter(alloc,
                                              std.io.getStdIn().reader(),
                                              std.io.getStdOut().writer(),
-                                             dispatcher, .{ .logger = Logger.impl_by(&logger) });
+                                             dispatcher, .{ .logger = Logger.implBy(&logger) });
     }
 
     if (gpa.detectLeaks()) {

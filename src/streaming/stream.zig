@@ -101,7 +101,7 @@ pub const DelimiterOptions = struct {
     request_delimiter: u8 = '\n',
     response_delimiter: u8 = '\n',
     skip_blank_message: bool = true,
-    logger: zigjr.Logger = zigjr.Logger.impl_by(&nopLogger),
+    logger: zigjr.Logger = zigjr.Logger.implBy(&nopLogger),
 };
 
 
@@ -183,7 +183,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
 pub const ContentLengthOptions = struct {
     recover_on_missing_header: bool = true,
     skip_blank_message: bool = true,
-    logger: zigjr.Logger = zigjr.Logger.impl_by(&nopLogger),
+    logger: zigjr.Logger = zigjr.Logger.implBy(&nopLogger),
 };
 
 var nopLogger = zigjr.NopLogger{};

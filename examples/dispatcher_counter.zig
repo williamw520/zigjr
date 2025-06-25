@@ -23,7 +23,7 @@ pub fn main() !void {
     {
         // RequestDispatcher interface implemented by the custom dispatcher.
         var dispatcher_impl = CounterDispatcher{};
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&dispatcher_impl);
+        const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
         try zigjr.stream.requestsByDelimiter(alloc,
                                              std.io.getStdIn().reader(),
                                              std.io.getStdOut().writer(),

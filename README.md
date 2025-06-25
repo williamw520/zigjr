@@ -65,7 +65,7 @@ which are mapped to the JSON data types automatically.
 
     try zigjr.stream.requestsByDelimiter(alloc, 
         std.io.getStdIn().reader(), std.io.getStdOut().writer(), 
-        RequestDispatcher.impl_by(&registry), .{});
+        RequestDispatcher.implBy(&registry), .{});
 }
 
 fn say(msg: []const u8) void {
@@ -162,7 +162,7 @@ reading requests from `stdin` and writing responses to `stdout`.
     defer registry.deinit();
     try registry.add("add", addTwoNums);
 
-    const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
     try zigjr.stream.requestsByContentLength(alloc, std.io.getStdIn().reader(), 
         std.io.getStdOut().writer(), dispatcher, .{});
 }
@@ -188,7 +188,7 @@ using a newline character (`\n`) as a delimiter.
     var out_buf = ArrayList(u8).init(alloc);
     defer out_buf.deinit();
 
-    const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
     try zigjr.stream.requestsByDelimiter(alloc, in_stream.reader(), 
         out_buf.writer(), dispatcher, .{});
 
@@ -206,7 +206,7 @@ dispatching, and response composition.
     var registry = zigjr.RpcRegistry.init(alloc);
     defer registry.deinit();
     try registry.add("add", addTwoNums);
-    const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
     // Set up the request pipeline with the dispatcher.
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
@@ -283,7 +283,7 @@ calls the function, and captures the result or error to formulate a response.
     try registry.add("add", addTwoNums);
     try registry.add("sub", subTwoNums);
     ...
-    const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
     ...
 }
 ```
@@ -405,7 +405,7 @@ Use `DbgLogger` in a request pipeline. This logger prints to `stderr`.
 ```zig
     var logger = zigjr.DbgLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.impl_by(&registry), zigjr.Logger.impl_by(&logger));
+        RequestDispatcher.implBy(&registry), zigjr.Logger.implBy(&logger));
     
 ```
 #### FileLogger
@@ -415,7 +415,7 @@ Use `FileLogger` in a request stream. This logger writes to a file.
     defer logger.deinit();
     try zigjr.stream.requestsByDelimiter(alloc,
         std.io.getStdIn().reader(), std.io.getStdOut().writer(),
-        dispatcher, .{ .logger = Logger.impl_by(&logger) });
+        dispatcher, .{ .logger = Logger.implBy(&logger) });
 ```
 #### Custom Logger
 Use a custom logger in a request pipeline.
@@ -423,7 +423,7 @@ Use a custom logger in a request pipeline.
 {
     var logger = MyLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.impl_by(&registry), zigjr.Logger.impl_by(&logger));
+        RequestDispatcher.implBy(&registry), zigjr.Logger.implBy(&logger));
 }
 
 const MyLogger = struct {

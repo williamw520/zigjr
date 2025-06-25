@@ -31,7 +31,7 @@ pub fn main() !void {
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
             std.io.getStdIn().reader(), std.io.getStdOut().writer(),
-            zigjr.RequestDispatcher.impl_by(&registry), .{});
+            zigjr.RequestDispatcher.implBy(&registry), .{});
     }
 
     if (gpa.detectLeaks()) {

@@ -41,7 +41,7 @@ pub const RequestPipeline = struct {
     logger:         zigjr.Logger,
 
     pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
-        const l = logger orelse zigjr.Logger.impl_by(&nopLogger);
+        const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline] Logging starts");
         return .{
             .alloc = alloc,

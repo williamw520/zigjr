@@ -170,7 +170,7 @@ test "Response to a request of hello method" {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var response_buf = std.ArrayList(u8).init(alloc);
@@ -196,7 +196,7 @@ test "Handle a request of hello method" {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const res_json = try pipeline.runRequestToJson(
@@ -220,7 +220,7 @@ test "Handle a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -240,7 +240,7 @@ test "Response to a request of integer add" {
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -260,7 +260,7 @@ test "runRequestToJson on a request of integer add" {
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -280,7 +280,7 @@ test "Response to a request of integer sub" {
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -300,7 +300,7 @@ test "Response to a request of integer multiply" {
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -320,7 +320,7 @@ test "Response to a request of integer divide" {
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -341,7 +341,7 @@ test "Response to a request of integer add with missing parameter, expect error"
     const alloc = gpa.allocator();
     {
         var impl = IntCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -361,7 +361,7 @@ test "Response to a request of float add" {
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -381,7 +381,7 @@ test "Response to a request of float sub" {
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -401,7 +401,7 @@ test "Response to a request of float multiply" {
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -421,7 +421,7 @@ test "Response to a request of float divide" {
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var parsed_res = try pipeline.runRequestToResponse(
@@ -441,7 +441,7 @@ test "Response using an object based dispatcher." {
     const alloc = gpa.allocator();
     {
         var impl = CounterDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         {
@@ -487,7 +487,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
         
         var parsed_res = try pipeline.runRequestToResponse(
@@ -590,8 +590,8 @@ test "Handle batch requests with the CounterDispatcher" {
     {
         var impl = CounterDispatcher{};
         var dbg_logger = zigjr.DbgLogger{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl),
-                                                           zigjr.Logger.impl_by(&dbg_logger));
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl),
+                                                           zigjr.Logger.implBy(&dbg_logger));
         defer pipeline.deinit();
         const req_jsons = [_][]const u8{
             \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
@@ -657,7 +657,7 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
     {
         var impl = CounterDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const req_jsons = [_][]const u8{
@@ -716,7 +716,7 @@ test "Handle empty batch response" {
     const alloc = gpa.allocator();
     {
         var impl = CounterDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const req_jsons = [_][]const u8{};
@@ -749,7 +749,7 @@ test "Dispatch on the response to a request of float add" {
     const alloc = gpa.allocator();
     {
         var impl = FloatCalcDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         var response_buf = std.ArrayList(u8).init(alloc);
@@ -769,7 +769,7 @@ test "Dispatch on the response to a request of float add" {
                 try testing.expect(res.id.eql(1));
             }
         } {};
-        const dispatcher = ResponseDispatcher.impl_by(&my_dispatcher);
+        const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
         try res_pipeline.handleJsonResponse(res_json);
@@ -781,7 +781,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
     const alloc = gpa.allocator();
     {
         var impl = CounterDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.impl_by(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const req_jsons = [_][]const u8{
@@ -819,7 +819,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
                 }
             }
         } {};
-        const dispatcher = ResponseDispatcher.impl_by(&my_dispatcher);
+        const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
         try res_pipeline.handleJsonResponse(batch_res_json);

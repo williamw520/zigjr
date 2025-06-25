@@ -40,7 +40,7 @@ pub fn main() !void {
         try registry.add("desc-cat", descCat);          // function returns a tuple.
         try registry.add("add-weight", addWeight);
 
-        const dispatcher = zigjr.RequestDispatcher.impl_by(&registry);
+        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
         var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
         defer pipeline.deinit();
 

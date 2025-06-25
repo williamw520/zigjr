@@ -79,9 +79,9 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         const writer = write_buffer.writer();
 
         // var logger = zigjr.DbgLogger{};
-        // try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher),
-        //                            .{ .logger = zigjr.Logger.impl_by(&logger) });
-        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        // try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher),
+        //                            .{ .logger = zigjr.Logger.implBy(&logger) });
+        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
 
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
@@ -125,9 +125,9 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         const writer = write_buffer.writer();
 
         // var logger = zigjr.DbgLogger{};
-        // try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher),
-        //                                    .{ .logger = zigjr.Logger.impl_by(&logger) });
-        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        // try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher),
+        //                                    .{ .logger = zigjr.Logger.implBy(&logger) });
+        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -165,7 +165,7 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -200,7 +200,7 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{ .skip_blank_message = false });
+        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{ .skip_blank_message = false });
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -264,7 +264,7 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -300,7 +300,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -325,7 +325,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
         try zigjr.stream.responsesByDelimiter(alloc, response_reader,
-                                        zigjr.ResponseDispatcher.impl_by(&my_response_dispatcher), .{});
+                                        zigjr.ResponseDispatcher.implBy(&my_response_dispatcher), .{});
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -358,7 +358,7 @@ test "responsesByLength on JSON responses, single param, id" {
         defer write_buffer.deinit();
         const writer = write_buffer.writer();
 
-        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.impl_by(&dispatcher), .{});
+        try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
 
         try testing.expectEqualSlices(u8, write_buffer.items,
@@ -386,7 +386,7 @@ test "responsesByLength on JSON responses, single param, id" {
         var response_stream = std.io.fixedBufferStream(write_buffer.items);
         const response_reader = response_stream.reader();
         try zigjr.stream.responsesByContentLength(alloc, response_reader,
-                                            zigjr.ResponseDispatcher.impl_by(&my_response_dispatcher), .{});
+                                            zigjr.ResponseDispatcher.implBy(&my_response_dispatcher), .{});
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
