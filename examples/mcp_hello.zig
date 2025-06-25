@@ -21,16 +21,17 @@ const Logger = zigjr.Logger;
 /// - MCP handshake
 /// - MCP tool discovery
 /// - MCP tool call
-/// - Two sample tools:
+/// - A few sample tools:
 ///     hello: replies "Hello World!" when called.
-///     hello-name: replies "Hello 'NAME'!" when called with the name.
+///     hello-name: replies "Hello 'NAME'!" when called with a name.
+///     hello-xtimes: replies "Hello 'NAME'" X times when called with a name and a number.
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
     {
-        // Use a file-based logger so we can save the RPC messages to a file
-        // as the executable is run in a mcp host as a subprocess and cannot log to stdout.
+        // Use a file-based logger since the executable is run in a mcp host
+        // as a subprocess and cannot log to stdout.
         var logger = try zigjr.FileLogger.init("log.txt");
         defer logger.deinit();
 
@@ -38,18 +39,16 @@ pub fn main() !void {
         defer registry.deinit();
 
         // Register the MCP RPC methods.
-        // Pass the logger in as context so each handler can also log to the log file.
+        // Pass the logger in as the context so handlers can also log to the log file.
         try registry.addCtx("initialize", &logger, mcp_initialize);
         try registry.addCtx("notifications/initialized", &logger, mcp_notifications_initialized);
         try registry.addCtx("tools/list", &logger, mcp_tools_list);
         try registry.addCtx("tools/call", &logger, mcp_tools_call);
 
-        // RequestDispatcher interface implemented by the 'registry' registry.
+        // RequestDispatcher interface implemented by the registry.
         const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
-        // Starts the JSON stream pipeline on stdin and stdout.
-        // const streamer = DelimiterStream.init(alloc, .{ .logger = Logger.implBy(&logger) });
-        // try streamer.streamRequests(std.io.getStdIn().reader(), std.io.getStdOut().writer(), dispatcher);
+        // Starts the JSON streaming pipeline from stdin to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
                                              std.io.getStdIn().reader(),
                                              std.io.getStdOut().writer(),
@@ -61,7 +60,11 @@ pub fn main() !void {
     }    
 }
 
-// The MCP message handlers
+// The MCP message handlers.
+//
+// All the MCP message parameters and return values are defined in below 
+// as Zig structs or tagged union according to the MCP JSON schema spec.
+// Let ZigJR do the mapping between the Zig structs and the JSON objects.
 
 fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
                   params: InitializeRequest_params) !InitializeResult {
@@ -116,9 +119,10 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
 
 fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !CallToolResult {
     const tool = params.object.get("name").?.string;
-    const msg = try allocPrint(alloc, "name: {s}", .{tool});
+    const msg = try allocPrint(alloc, "tool name: {s}", .{tool});
     logger.log("mcp_tools_call", "tools/call", msg);
 
+    // We'll just do a poorman's dispatching on the MCP tool name.
     if (std.mem.eql(u8, tool, "hello")) {
         var ctr = CallToolResult.init(alloc);
         try ctr.addTextContent("Hello World!");
@@ -151,8 +155,8 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !C
 }
 
 
-// The following MCP message structs should be put in a library,
-// but it's put here to illustrate that it's not too hard to come up with a MCP example.
+// The following MCP message structs should have been put in a library,
+// but they're put here to illustrate that it's not too hard to come up with a MCP server.
 
 /// See the MCP message schema definition and sample messages for detail.
 /// https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26

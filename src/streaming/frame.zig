@@ -10,10 +10,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
-
-const zigjr = @import("../zigjr.zig");
-
-const JrErrors = zigjr.JrErrors;
+const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
 /// Write a data frame to a writer, with a header section containing
@@ -60,11 +57,11 @@ fn readContentLengthHeader(reader: anytype, frame_buf: *ArrayList(u8)) !usize {
     return if (content_length)|len| len else JrErrors.MissingContentLengthHeader;
 }
 
-/// Read a data frame, that has a Content-Length header, into data_buffer.
+/// Read a data frame, that has a Content-Length header, into frame_buffer.
 /// The content data is written to the output frame_buffer, which is expanded as needed.
 /// Check the length of the frame_buffer for the content length.
 pub fn readContentLengthFrame(reader: anytype, frame_buffer: *ArrayList(u8)) !void {
-    // Use data_buffer as a temp buffer to read the headers.
+    // Use frame_buffer as a temp buffer to read the headers.
     const content_length = try readContentLengthHeader(reader, frame_buffer);
     frame_buffer.clearRetainingCapacity();
     try frame_buffer.ensureTotalCapacity(content_length);

@@ -13,7 +13,6 @@ const ArrayList = std.ArrayList;
 const bufferedWriter = std.io.bufferedWriter;
 
 const zigjr = @import("../zigjr.zig");
-
 const RequestDispatcher = zigjr.RequestDispatcher;
 const ResponseDispatcher = zigjr.ResponseDispatcher;
 const JrErrors = zigjr.JrErrors;
@@ -32,7 +31,6 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
     const frame_writer = frame_buf.writer();
     var response_buf = std.ArrayList(u8).init(alloc);
     defer response_buf.deinit();
-    // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
@@ -65,8 +63,8 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
 }
 
 
-// Runs a loop to read a stream of JSON response messages (frames) from the reader,
-// and handle each one with the dispatcher.
+/// Runs a loop to read a stream of JSON response messages (frames) from the reader,
+/// and handle each one with the dispatcher.
 pub fn responsesByDelimiter(alloc: Allocator, reader: anytype,
                             dispatcher: ResponseDispatcher, options: DelimiterOptions) !void {
     var frame_buf = std.ArrayList(u8).init(alloc);  // Each JSON response is one frame.
@@ -113,7 +111,6 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
     defer frame_buf.deinit();
     var response_buf = std.ArrayList(u8).init(alloc);
     defer response_buf.deinit();
-    // const response_writer = response_buf.writer();
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);

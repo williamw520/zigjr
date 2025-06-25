@@ -41,6 +41,7 @@ This small library is packed with the following features:
 * [Examples](#examples)
    * [Run Examples Interactively](#run-examples-interactively)
    * [Run Examples with Data Files](#run-examples-with-data-files)
+   * [Run the MCP Server Example](#run-the-mcp-server-example)
 * [License](#license)
 * [References](#references)
 
@@ -89,6 +90,8 @@ fn weigh(cat: CatInfo) f64 {
     return cat.weight;
 }
 ```
+Check [hello.zig](examples/hello.zig) for a complete example.  
+
 Sample request and response messages.
 ```
 Request:  {"jsonrpc": "2.0", "method": "hello", "id": 1}
@@ -364,7 +367,7 @@ The first parameter's type and the context type need to be the same.
 If an `std.mem.Allocator` is the first parameter of a handler (or the second, 
 if a context is used as the first), an arena allocator is passed in. The handler does 
 not need to free memory allocated with it; the arena is automatically reset after the request completes.
-The arena memory is reset in dispatchEnd() by called by higher level callers.
+The arena memory is reset in dispatchEnd() called by higher level callers.
 
 #### Value
 To handle parameters manually, you can use `std.json.Value`:
@@ -512,6 +515,56 @@ zig-out/bin/calc.exe < data/calc_divide.json
 zig-out/bin/calc.exe < data/calc_divide_99.json
 zig-out/bin/calc.exe < data/calc_divide_by_0.json
 ```
+
+### Run the MCP Server Example
+
+The `mcp_hello` executible can be run standalone on a console for testing its message,
+or run as an embedded subprocess in a MCP host.
+
+#### Run Standalone
+
+Run it standalone. Feed the MCP requests by hand.
+
+```
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"mcphost","version":"1.0.0"},"capabilities":{}}}
+```
+```
+{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
+```
+```
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+```
+```
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"hello","arguments":{}}}
+```
+```
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"hello-name","arguments":{"name":"Mate"}}}
+```
+
+#### Run Embedded in a MCP Host
+
+This uses [MCP Host](https://github.com/mark3labs/mcphost) as an example.  
+
+Create a configuration file `config-mcp-hello.json` with `command` pointing to the mcp_hello executible.
+```json
+{
+  "mcpServers": {
+    "mcp-hello": {
+      "command": "/zigjr/zig-out/bin/mcp_hello.exe",
+      "args": []
+    }
+  }
+}
+```
+
+Run `mcphost` with one of the LLM providers.
+```
+mcphost --config config-mcp-hello.json --provider-api-key YOUR-API-KEY --model anthropic:claude-3-5-sonnet-latest
+mcphost --config config-mcp-hello.json --provider-api-key YOUR-API-KEY --model openai:gpt-4
+mcphost --config config-mcp-hello.json --provider-api-key YOUR-API-KEY --model google:gemini-2.0-flash
+```
+
+Type `hello`, `hello Joe` or `hello Joe 10` in the prompt for testing. The `log.txt` file captures the interaction.
 
 ## License
 
