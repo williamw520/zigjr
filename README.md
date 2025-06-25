@@ -505,10 +505,10 @@ zig-out/bin/calc.exe < data/calc_divide_by_0.json
 
 ## Run the MCP Server Example
 
-The `mcp_hello` executible can be run standalone on a console for testing its message,
+The `mcp_hello` executible can be run standalone on a console for testing its message handling,
 or run as an embedded subprocess in a MCP host.
 
-#### Run Standalone
+#### Standalone Run
 
 Run it standalone. Feed the MCP requests by hand.
 
@@ -528,7 +528,7 @@ Run it standalone. Feed the MCP requests by hand.
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"hello-name","arguments":{"name":"Mate"}}}
 ```
 
-#### Run Embedded in a MCP Host
+#### Embedded in a MCP Host
 
 This uses [MCP Host](https://github.com/mark3labs/mcphost) as an example.  
 
