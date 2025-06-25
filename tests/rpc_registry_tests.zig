@@ -570,10 +570,10 @@ test "rpc_registry with context" {
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.addCtx("ctx.get", &ctx, Ctx.get);
-        try registry.addCtx("ctx.fn0", &ctx, Ctx.fn0);
-        try registry.addCtx("ctx.fn1", &ctx, Ctx.fn1);
-        try registry.addCtx("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
+        try registry.addWithCtx("ctx.get", &ctx, Ctx.get);
+        try registry.addWithCtx("ctx.fn0", &ctx, Ctx.fn0);
+        try registry.addWithCtx("ctx.fn1", &ctx, Ctx.fn1);
+        try registry.addWithCtx("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
 
         {
             const res_json = try pipeline.runRequestToJson(
@@ -639,7 +639,7 @@ test "rpc_registry fn with array params returning struct value" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat", null, fn_cat);
+        try registry.addWithCtx("fn_cat", null, fn_cat);
 
         {
             const res_json = try pipeline.runRequestToJson(
@@ -673,7 +673,7 @@ test "rpc_registry fn with built array params returning struct value" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat", null, fn_cat);
+        try registry.addWithCtx("fn_cat", null, fn_cat);
 
         {
             const params = .{"cat1", 9, "blue"};
@@ -709,7 +709,7 @@ test "rpc_registry passing in an Value as a parameter" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat_value", null, fn_cat_value);
+        try registry.addWithCtx("fn_cat_value", null, fn_cat_value);
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
@@ -745,7 +745,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
+        try registry.addWithCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
@@ -782,7 +782,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.addCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
+        try registry.addWithCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
 
         {
             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
@@ -818,7 +818,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_json_value1", null, fn_json_value1);
+        try registry.addWithCtx("fn_json_value1", null, fn_json_value1);
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
             defer alloc.free(req_json);
@@ -833,7 +833,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             try testing.expect((try res_result.response()).resultEql(1));
         }
 
-        try registry.addCtx("fn_json_value1", null, fn_json_value1);
+        try registry.addWithCtx("fn_json_value1", null, fn_json_value1);
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
             defer alloc.free(req_json);
@@ -861,7 +861,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_json_value2", null, fn_json_value2);
+        try registry.addWithCtx("fn_json_value2", null, fn_json_value2);
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
             defer alloc.free(req_json);
@@ -889,7 +889,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_json_value_int", null, fn_json_value_int);
+        try registry.addWithCtx("fn_json_value_int", null, fn_json_value_int);
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
             defer alloc.free(req_json);
@@ -917,7 +917,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_json_value_int_value", null, fn_json_value_int_value);
+        try registry.addWithCtx("fn_json_value_int_value", null, fn_json_value_int_value);
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
             defer alloc.free(req_json);
@@ -945,7 +945,7 @@ test "rpc_registry passing in a struct object as a parameter" {
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat_struct", null, fn_cat_struct);
+        try registry.addWithCtx("fn_cat_struct", null, fn_cat_struct);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -981,7 +981,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
         defer pipeline.deinit();
 
-        try registry.addCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
+        try registry.addWithCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
 
         {
             const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
@@ -1019,7 +1019,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.addCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
+        try registry.addWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -1057,7 +1057,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
 
         var ctx = Ctx { .count = 0 };
 
-        try registry.addCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
+        try registry.addWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
 
         {
             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
@@ -1095,10 +1095,10 @@ test "rpc_registry register standalone functions on standalone object." {
 
         var s = Standalone{};
 
-        try registry.addCtx("fn_standalone_on", &s, fn_standalone_on);
-        try registry.addCtx("fn_standalone_off", &s, fn_standalone_off);
-        try registry.addCtx("fn_standalone_get", &s, fn_standalone_get);
-        try registry.addCtx("fn_standalone_msg", &s, fn_standalone_msg);
+        try registry.addWithCtx("fn_standalone_on", &s, fn_standalone_on);
+        try registry.addWithCtx("fn_standalone_off", &s, fn_standalone_off);
+        try registry.addWithCtx("fn_standalone_get", &s, fn_standalone_get);
+        try registry.addWithCtx("fn_standalone_msg", &s, fn_standalone_msg);
 
         {
             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_on", null, .none);

@@ -303,8 +303,8 @@ to the handler function when it is invoked.
     try registry.add("group-fn", Group.group_fn);
     ...
     var counter = Counter{};
-    try registry.addCtx("counter-inc", &counter, Counter.inc);
-    try registry.addCtx("counter-get", &counter, Counter.get);
+    try registry.addWithCtx("counter-inc", &counter, Counter.inc);
+    try registry.addWithCtx("counter-get", &counter, Counter.get);
     ...
 }
 
@@ -345,7 +345,7 @@ documentation for details.
 
 #### Context
 
-If a context pointer is supplied to `RpcRegistry.addCtx()`, it is passed as 
+If a context pointer is supplied to `RpcRegistry.addWithCtx()`, it is passed as 
 the first parameter to the handler function, effectively serving as a `self` pointer.
 
 The first parameter's type and the context type need to be the same.

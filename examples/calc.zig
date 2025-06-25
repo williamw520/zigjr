@@ -24,20 +24,20 @@ pub fn main() !void {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        try registry.add("add", Basic.add);             // register functions in a struct scope.
+        try registry.add("add", Basic.add);                 // register functions in a struct scope.
         try registry.add("subtract", Basic.subtract);
         try registry.add("multiply", Basic.multiply);
         try registry.add("divide", Basic.divide);
-        try registry.add("pow", raiseToPower);          // register function from any scope.
-        try registry.add("logNum", logNum);             // function with no result.
-        try registry.addCtx("inc", &g_sum, increase);   // attach a context to the function.
-        try registry.addCtx("dec", &g_sum, decrease);   // attach the same context to another function.
-        try registry.addCtx("load", &stash,Stash.load); // handler on a struct object context.
-        try registry.addCtx("save", &stash,Stash.save); // handler on a struct object context.
-        try registry.add("weigh-cat", weighCat);        // function with a struct parameter.
-        try registry.add("make-cat", makeCat);          // function returns a struct parameter.
-        try registry.add("clone-cat", cloneCat);        // function returns an array.
-        try registry.add("desc-cat", descCat);          // function returns a tuple.
+        try registry.add("pow", raiseToPower);              // register function from any scope.
+        try registry.add("logNum", logNum);                 // function with no result.
+        try registry.addWithCtx("inc", &g_sum, increase);   // attach a context to the function.
+        try registry.addWithCtx("dec", &g_sum, decrease);   // attach the same context to another function.
+        try registry.addWithCtx("load", &stash,Stash.load); // handler on a struct object context.
+        try registry.addWithCtx("save", &stash,Stash.save); // handler on a struct object context.
+        try registry.add("weigh-cat", weighCat);            // function with a struct parameter.
+        try registry.add("make-cat", makeCat);              // function returns a struct parameter.
+        try registry.add("clone-cat", cloneCat);            // function returns an array.
+        try registry.add("desc-cat", descCat);              // function returns a tuple.
         try registry.add("add-weight", addWeight);
 
         const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
