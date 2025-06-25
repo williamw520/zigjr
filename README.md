@@ -20,28 +20,15 @@ This small library is packed with the following features:
 * [Quick Usage](#quick-usage)
 * [Installation](#installation)
 * [Usage](#usage)
-   * [Streaming API](#streaming-api)
-   * [RPC Pipeline](#rpc-pipeline)
-   * [Parse JSON-RPC Messages](#parse-json-rpc-messages)
-   * [Compose JSON-RPC Messages](#compose-json-rpc-messages)
 * [Dispatcher](#dispatcher)
 * [RpcRegistry](#rpcregistry)
 * [Custom Dispatcher](#custom-dispatcher)
 * [Invocation and Cleanup](#invocation-and-cleanup)
 * [Handler Function](#handler-function)
-   * [Scopes](#scopes)
-   * [Parameters](#parameters)
-   * [Special Parameters](#special-parameters)
-   * [Return Value](#return-value)
-   * [Error](#error)
-   * [Memory Management](#memory-management)
-   * [Logging](#logging)
 * [Transport](#transport)
 * [Project Build](#project-build)
 * [Examples](#examples)
-   * [Run Examples Interactively](#run-examples-interactively)
-   * [Run Examples with Data Files](#run-examples-with-data-files)
-   * [Run the MCP Server Example](#run-the-mcp-server-example)
+* [Run the MCP Server Example](#run-the-mcp-server-example)
 * [License](#license)
 * [References](#references)
 
@@ -516,7 +503,7 @@ zig-out/bin/calc.exe < data/calc_divide_99.json
 zig-out/bin/calc.exe < data/calc_divide_by_0.json
 ```
 
-### Run the MCP Server Example
+## Run the MCP Server Example
 
 The `mcp_hello` executible can be run standalone on a console for testing its message,
 or run as an embedded subprocess in a MCP host.
