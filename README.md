@@ -36,7 +36,8 @@ This small library is packed with the following features:
    * [Error](#error)
    * [Memory Management](#memory-management)
    * [Logging](#logging)
-* [Standalone Build](#standalone-build)
+* [Transport](#transport)
+* [Project Build](#project-build)
 * [Examples](#examples)
    * [Run Examples Interactively](#run-examples-interactively)
    * [Run Examples with Data Files](#run-examples-with-data-files)
@@ -88,7 +89,7 @@ fn weigh(cat: CatInfo) f64 {
     return cat.weight;
 }
 ```
-The sample request and response messages.
+Sample request and response messages.
 ```
 Request:  {"jsonrpc": "2.0", "method": "hello", "id": 1}
 Response: {"jsonrpc": "2.0", "result": "Hello world", "id": 1}
@@ -250,7 +251,7 @@ const zigjr = @import("zigjr");
 `parseRpcRequest()` can parse a single message or a batch of messages.  Use `result.batch()` to get the list of requests in the batch.
 
 ### Compose JSON-RPC Messages
-The `composer` API helps you build valid JSON-RPC messages.
+The `composer` API helps to build valid JSON-RPC messages.
 ```zig
 const zigjr = @import("zigjr");
 {
@@ -270,7 +271,7 @@ The `RequestDispatcher` and `ResponseDispatcher` interfaces define the required 
 
 ## RpcRegistry
 The built-in `RpcRegistry` implements the `RequestDispatcher` interface and 
-serves as a powerful, ready-to-use dispatcher. You use `RpcRegistry.add(method_name, function)` 
+serves as a powerful, ready-to-use dispatcher. Use `RpcRegistry.add(method_name, function)` 
 to register a handler function for a specific JSON-RPC method. When a request comes in, 
 the registry looks up the handler, maps the request's parameters to the function's arguments, 
 calls the function, and captures the result or error to formulate a response.
@@ -438,9 +439,16 @@ const MyLogger = struct {
 };
 ```
 
-## Standalone Build
+## Transport
+
+A few words on message transport. ZigJR doesn't deal with transport at all. 
+It sits on top of any transport, network or others.
+It's assumed the JSON-RPC messages are sent over some transport before arriving at ZigJR.
+
+## Project Build
+
 You do not need to build this project if you are only using it as a library 
-via `zig fetch`. To run the examples, clone the repository and run `zig build`. 
+via `zig fetch`. To run the examples, clone the repository and run `zig build` to build the project.
 The example binaries will be located in `zig-out/bin/`.
 
 ## Examples
@@ -449,8 +457,8 @@ The project has a number of examples showing how to build applications with ZigJ
 
 * [hello.zig](examples/hello.zig): Showcase the basics of handler function registration and the streaming API.
 * [calc.zig](examples/calc.zig): Showcase different kinds of handler functions.
-* [dispatcher_hello.zig](example/dispatcher_hello.zig): Custom dispatcher.
-* [mcp_hello.zig](example/mcp_hello.zig): A basic MCP server written from the ground up.
+* [dispatcher_hello.zig](examples/dispatcher_hello.zig): Custom dispatcher.
+* [mcp_hello.zig](examples/mcp_hello.zig): A basic MCP server written from the ground up.
 
 Check [examples](examples) for other examples.
 
@@ -493,7 +501,7 @@ zig-out/bin/hello < data/hello_say.json
 zig-out/bin/hello < data/hello_stream.json
 ```
 
-Some more sample data files.  Examine the data files in the `data` directory to 
+Some more sample data files.  Examine the data files in the [Data](data) directory to 
 see how they exercise the message handlers.
 ```
 zig-out/bin/calc.exe < data/calc_add.json

@@ -17,7 +17,7 @@ const DelimiterStream = zigjr.DelimiterStream;
 const Logger = zigjr.Logger;
 
 
-/// A simple MCP server example implements:
+/// A simple MCP server example using the stdin/stdout transport. It implements:
 /// - MCP handshake
 /// - MCP tool discovery
 /// - MCP tool call
