@@ -52,7 +52,6 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         options.logger.log("requestsByDelimiter", "receive request", request_json);
-        // response_buf.clearRetainingCapacity();
         if (try pipeline.runRequest(request_json, &response_buf)) {
             try output_writer.writeAll(response_buf.items);
             try output_writer.writeByte(options.response_delimiter);
@@ -138,7 +137,6 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         options.logger.log("requestsByContentLength", "receive request", request_json);
-        // response_buf.clearRetainingCapacity();
         if (try pipeline.runRequest(request_json, &response_buf)) {
             try frame.writeContentLengthFrame(output_writer, response_buf.items);
             try buffered_writer.flush();

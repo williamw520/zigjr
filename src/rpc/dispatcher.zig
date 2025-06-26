@@ -47,7 +47,7 @@ pub const RequestDispatcher = struct {
         };
     }
 
-    // The implementation must have methods.
+    // The implementation must have these methods.
 
     pub fn dispatch(self: @This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
         return self.dispatch_fn(self.impl_ptr, alloc, req);
@@ -88,7 +88,7 @@ pub const ResponseDispatcher = struct {
 };
 
 
-/// The returning result from dispatcher.dispatch(), expected by handleRpcRequest() below.
+/// The returning result from dispatcher.dispatch().
 /// For the result JSON string and the err.data JSON string, it's best that they're produced by
 /// std.json.stringifyAlloc() to ensure a valid JSON string.
 /// The DispatchResult object is cleaned up at the dispatchEnd() stage.

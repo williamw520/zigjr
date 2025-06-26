@@ -45,7 +45,7 @@ pub const Logger = struct {
         };
     }
 
-    // The implementation must have methods.
+    // The implementation must have these methods.
 
     pub fn start(self: @This(), message: []const u8) void {
         self.start_fn(self.impl_ptr, message);

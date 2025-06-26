@@ -377,8 +377,12 @@ of the JSON-RPC response. You can return any Zig type that can be serialized by 
 
 If your function returns a `void`, it is treated as a Notification, and no response message is generated.
 
+#### JSON Return Value
+If the return value is already a JSON string, you can wrap it in `zigjr.JsonStr` to avoid double-serialization.
+Declare `zigjr.JsonStr` as the return type of the handler function.
+
 ### Error
-You can declare an error union as the return type. Any error returned will be 
+A handler function can have an error union with the return type. Any error returned will be 
 packaged into a JSON-RPC error response with the `InternalError` code.
 
 ### Memory Management
@@ -396,7 +400,7 @@ the client and server. ZigJR has a built-in logging mechanism to help you inspec
 and debug handlers. You can use a pre-built logger or implement a custom one.
 
 #### DbgLogger
-Use `DbgLogger` in a request pipeline. This logger prints to `stderr`.
+This example uses a `DbgLogger` in a request pipeline. This logger prints to `stderr`.
 ```zig
     var logger = zigjr.DbgLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
@@ -404,7 +408,9 @@ Use `DbgLogger` in a request pipeline. This logger prints to `stderr`.
     
 ```
 #### FileLogger
-Use `FileLogger` in a request stream. This logger writes to a file.
+This example uses a `FileLogger` in a request stream. This logger writes to a file.
+File based logging is great in situations where the stdout is not available, e.g.
+when running as a sub-process in a MCP host.
 ```zig
     var logger = try zigjr.FileLogger.init("log.txt");
     defer logger.deinit();
@@ -413,7 +419,7 @@ Use `FileLogger` in a request stream. This logger writes to a file.
         dispatcher, .{ .logger = Logger.implBy(&logger) });
 ```
 #### Custom Logger
-Use a custom logger in a request pipeline.
+This example uses a custom logger in a request pipeline.
 ```zig
 {
     var logger = MyLogger{};
@@ -454,7 +460,7 @@ The project has a number of examples showing how to build applications with ZigJ
 * [dispatcher_hello.zig](examples/dispatcher_hello.zig): Custom dispatcher.
 * [mcp_hello.zig](examples/mcp_hello.zig): A basic MCP server written from the ground up.
 
-Check [examples](examples) for other examples.
+Check out [examples](examples) for other examples.
 
 ### Run Examples Interactively
 Running the programs interactively is a great way to experiment with the handlers.
