@@ -52,7 +52,8 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         options.logger.log("requestsByDelimiter", "receive request", request_json);
-        if (try pipeline.runRequest(request_json, &response_buf)) {
+        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
+        if (try pipeline.runRequest(request_json, &response_buf, null)) {
             try output_writer.writeAll(response_buf.items);
             try output_writer.writeByte(options.response_delimiter);
             try buffered_writer.flush();
@@ -132,8 +133,8 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
         const request_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        // TODO: reset response_buf in caller, pass in FrameBuf.headers.
-        if (try pipeline.runRequest(request_json, &response_buf)) {
+        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
+        if (try pipeline.runRequest(request_json, &response_buf, frame_buf.headers)) {
             try frame.writeContentLengthFrame(output_writer, response_buf.items);
             try buffered_writer.flush();
             options.logger.log("requestsByContentLength", "return response", response_buf.items);

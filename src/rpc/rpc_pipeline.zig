@@ -60,11 +60,13 @@ pub const RequestPipeline = struct {
     /// Error is turned into a JSON-RPC error response message.
     /// The function returns a boolean flag indicating whether any responses have been written,
     /// as notification requests have no response.
-    pub fn runRequest(self: @This(), request_json: []const u8, response_buf: *ArrayList(u8)) AllocError!bool {
+    pub fn runRequest(self: @This(), request_json: []const u8, response_buf: *ArrayList(u8),
+                      headers: ?std.StringHashMap([]const u8)) AllocError!bool {
+        _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
+
         self.logger.log("runRequest", "request_json ", request_json);
         var parsed_result = parseRpcRequest(self.alloc, request_json);
         defer parsed_result.deinit();
-        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
         const writer = response_buf.writer();
         switch (parsed_result.request_msg) {
             .request    => |req| {
@@ -95,7 +97,7 @@ pub const RequestPipeline = struct {
     /// The function can return null, as notification requests have no response.
     pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
         var response_buf = ArrayList(u8).init(self.alloc);
-        if (try self.runRequest(request_json, &response_buf)) {
+        if (try self.runRequest(request_json, &response_buf, null)) {
             return try response_buf.toOwnedSlice();
         } else {
             response_buf.deinit();
