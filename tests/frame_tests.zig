@@ -17,26 +17,38 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 test "readHttpHeaders" {
     const alloc = gpa.allocator();
     {
-        var header_buf = frame.HeaderBuf.init(alloc);
-        defer header_buf.deinit();
+        var frame_buf = frame.FrameBuf.init(alloc);
+        defer frame_buf.deinit();
         const frame_data =
-            \\Content-Length: 29  
+            \\Content-Length: 30  
             \\  Header1: abc
             ++ "\r\n\r\n" ++
-            \\context-data
-            \\more context-data
+            \\content-data
+            \\more content-data
         ;
         // std.debug.print("frame_data: {s}\n", .{frame_data});
-        var frame_stream = std.io.fixedBufferStream(frame_data);
+        var stream1 = std.io.fixedBufferStream(frame_data);
 
-        const count = try frame.readHttpHeaders(frame_stream.reader(), &header_buf);
-        // var itr = header_buf.headers.iterator();
+        const count = try frame.readHttpHeaders(stream1.reader(), &frame_buf);
+        // var itr = frame_buf.headers.iterator();
         // while (itr.next()) |entry| {
         //     std.debug.print("key: '{s}', value: '{s}'\n", .{ entry.key_ptr.*, entry.value_ptr.* });
         // }        
         try testing.expect(count == 2);
-        try testing.expectEqualStrings(header_buf.headers.get("Content-Length").?, "29");
-        try testing.expectEqualStrings(header_buf.headers.get("Header1").?, "abc");
+        try testing.expectEqualStrings(frame_buf.headers.get("Content-Length").?, "30");
+        try testing.expectEqualStrings(frame_buf.headers.get("Header1").?, "abc");
+        try testing.expect((try frame_buf.getContentLength()) orelse 0 == 30);
+
+        var stream2 = std.io.fixedBufferStream(frame_data);
+        frame_buf.reset();
+        const has_data = try frame.readContentLengthFrameNew(stream2.reader(), &frame_buf);
+        try testing.expect(has_data == true);
+        // std.debug.print("content: |{s}|\n", .{frame_buf.getContent()});
+
+        frame_buf.reset();
+        const has_data2 = try frame.readContentLengthFrameNew(stream2.reader(), &frame_buf);
+        try testing.expect(has_data2 == false);
+        
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
         
