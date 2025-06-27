@@ -106,7 +106,7 @@ pub const DelimiterOptions = struct {
 /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
 pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytype,
                                dispatcher: RequestDispatcher, options: ContentLengthOptions) !void {
-    var frame_buf = std.ArrayList(u8).init(alloc);
+    var frame_buf = frame.FrameBuf.init(alloc);
     defer frame_buf.deinit();
     var response_buf = std.ArrayList(u8).init(alloc);
     defer response_buf.deinit();
@@ -119,24 +119,20 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
     defer { options.logger.stop("[requestsByContentLength] Logging stops"); }
 
     while (true) {
-        frame.readContentLengthFrame(reader, &frame_buf) catch |err| {
-            switch (err) {
-                error.EndOfStream => return,
-                JrErrors.MissingContentLengthHeader => {
-                    if (options.recover_on_missing_header) {
-                        continue;
-                    } else {
-                        return err; // treat it as a unrecoverable error.
-                    }
-                },
-                else => return err, // unrecoverable error while reading from reader.
+        frame_buf.reset();
+        const has_more = frame.readContentLengthFrame(reader, &frame_buf) catch |err| {
+            if (err == JrErrors.MissingContentLengthHeader and options.recover_on_missing_header) {
+                continue;
             }
+            return err;     // unrecoverable error while reading from reader.
         };
+        if (!has_more)
+            break;
 
-        const request_json = std.mem.trim(u8, frame_buf.items, " \t");
+        const request_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        options.logger.log("requestsByContentLength", "receive request", request_json);
+        // TODO: reset response_buf in caller, pass in FrameBuf.headers.
         if (try pipeline.runRequest(request_json, &response_buf)) {
             try frame.writeContentLengthFrame(output_writer, response_buf.items);
             try buffered_writer.flush();
@@ -149,7 +145,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
 /// and handle each one with the dispatcher.
 pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
                                 dispatcher: ResponseDispatcher, options: ContentLengthOptions) !void {
-    var frame_buf = std.ArrayList(u8).init(alloc);
+    var frame_buf = frame.FrameBuf.init(alloc);
     defer frame_buf.deinit();
     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
@@ -157,14 +153,11 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
     defer { options.logger.stop("[streamResponses] Logging stops"); }
 
     while (true) {
-        frame.readContentLengthFrame(reader, &frame_buf) catch |e| {
-            switch (e) {
-                error.EndOfStream => break,
-                else => return e,   // unrecoverable error while reading from reader.
-            }
-        };
+        frame_buf.reset();
+        if (!try frame.readContentLengthFrame(reader, &frame_buf))
+            break;
 
-        const response_json = std.mem.trim(u8, frame_buf.items, " \t");
+        const response_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("streamResponses", "receive response", response_json);
