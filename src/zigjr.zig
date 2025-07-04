@@ -16,6 +16,7 @@ const rpc_registry = @import("rpc/rpc_registry.zig");
 pub const stream = @import("streaming/stream.zig");
 pub const frame = @import("streaming/frame.zig");
 const logger = @import("rpc/logger.zig");
+pub const json_call = @import("rpc/json_call.zig");
 
 pub const parseRpcRequest = request.parseRpcRequest;
 pub const RpcRequestResult = request.RpcRequestResult;

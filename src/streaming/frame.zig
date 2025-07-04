@@ -11,6 +11,9 @@ const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const StringHashMap = std.hash_map.StringHashMap;
+const RpcId = @import("../jsonrpc/request.zig").RpcId;
+const makeRequestJson = @import("../jsonrpc/composer.zig").makeRequestJson;
+const makeResponseJson = @import("../jsonrpc/composer.zig").makeResponseJson;
 const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
@@ -146,9 +149,27 @@ pub fn writeContentLengthFrame(writer: anytype, content: []const u8) !void {
     try writer.writeAll(content);
 }
 
+/// Write a request data frame to a writer, with a header section containing
+/// the Content-Length header for the data.
+pub fn writeContentLengthRequest(alloc: Allocator, writer: anytype,
+                                 method: []const u8, params: anytype, id: RpcId) !void {
+    const json = try makeRequestJson(alloc, method, params, id);
+    defer alloc.free(json);
+    try writeContentLengthFrame(writer, json);
+}
+
+/// Write a request data frame to a writer, with a header section containing
+/// the Content-Length header for the data.
+pub fn writeContentLengthResponse(alloc: Allocator, writer: anytype,
+                                  result_json: []const u8, id: RpcId) !void {
+    const json = try makeResponseJson(alloc, id, result_json);
+    defer alloc.free(json);
+    try writeContentLengthFrame(writer, json);
+}
+
 /// Build a sequence of data frames into a byte buffer, with a header section
 /// containing the Content-Length header for each frame.
-pub fn writeContentLengthFrames(alloc: Allocator, data_frames: []const []const u8) !ArrayList(u8) {
+pub fn makeContentLengthFrames(alloc: Allocator, data_frames: []const []const u8) !ArrayList(u8) {
     var buffer = ArrayList(u8).init(alloc);
     const writer = buffer.writer();
     for (data_frames)|data| try writeContentLengthFrame(writer, data);

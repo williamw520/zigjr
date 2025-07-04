@@ -147,6 +147,11 @@ pub const RpcId = union(enum) {
     num:        i64,
     str:        []const u8,
 
+    pub fn ofNone() RpcId { return .{ .none = {} }; }
+    pub fn ofNull() RpcId { return .{ .null = {} }; }
+    pub fn of(id: i64) RpcId { return .{ .num = id }; }
+    pub fn ofStr(id: []const u8) RpcId { return .{ .str = id }; }
+
     pub fn jsonParse(alloc: Allocator, source: anytype, options: ParseOptions) !RpcId {
         const value = try innerParse(Value, alloc, source, options);
         return switch (value) {

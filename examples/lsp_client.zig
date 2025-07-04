@@ -15,6 +15,10 @@ const ObjectMap = std.json.ObjectMap;
 const allocPrint = std.fmt.allocPrint;
 
 const zigjr = @import("zigjr");
+const RpcId = zigjr.RpcId;
+const makeRequestJson = zigjr.composer.makeRequestJson;
+const writeContentLengthFrame = zigjr.frame.writeContentLengthFrame;
+const writeContentLengthRequest = zigjr.frame.writeContentLengthRequest;
 
 const MyErrors = error{ MissingCfg, MissingCmd };
 
@@ -97,23 +101,31 @@ fn request_worker(in_stdin: std.fs.File) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
     const in_writer = in_stdin.writer();
+    var id: i64 = 0;
 
     std.debug.print("[request_worker] starts\n", .{});
     std.time.sleep(1_000_000_000);  // Wait a bit to let the LSP server to come up.
 
     std.debug.print("[request_worker] sending 'initialize' message \n", .{});
+    id += 1;
     const initialize_params = InitializeParams {
         .capabilities = .{},
     };
-    const req_init_json = try zigjr.composer.makeRequestJson(alloc, "initialize", initialize_params, .{ .num = 1 });
-    defer alloc.free(req_init_json);
-    try zigjr.frame.writeContentLengthFrame(in_writer, req_init_json);
-    std.debug.print("[request_worker] after writeContentLengthFrame\n", .{});
+    try writeContentLengthRequest(alloc, in_writer, "initialize", initialize_params, RpcId.of(id));
+
+    try writeContentLengthRequest(alloc, in_writer, "initialized", InitializedParams{}, RpcId.ofNone());
 
     // TODO: input-request loop
+
     std.time.sleep(5_000_000_000);
 
-    in_stdin.close();   // signal EOF to the subprocess.
+    std.debug.print("[request_worker] shutdown request\n", .{});
+    id += 1;
+    try writeContentLengthRequest(alloc, in_writer, "shutdown", null, RpcId.of(id));
+    try writeContentLengthRequest(alloc, in_writer, "exit", null, RpcId.ofNone());
+
+    std.time.sleep(500_000_000);
+    in_stdin.close();   // force an EOF signal to the subprocess.
     std.debug.print("[request_worker] exits\n", .{});
 }
 
@@ -129,7 +141,7 @@ fn response_worker(child_stdout: std.fs.File) !void {
     while (true) {
         const read_len = try out_reader.read(&buf);
         if (read_len == 0) break;
-        std.debug.print("[response_worker] Child stdout: {s}\n", .{buf[0..read_len]});
+        std.debug.print("[response_worker] Child response: {s}\n", .{buf[0..read_len]});
     }
 
     std.debug.print("[response_worker] exits\n", .{});
@@ -151,6 +163,10 @@ pub const InitializeParams = struct {
 
 /// Defines the capabilities provided by the client.
 pub const ClientCapabilities = struct {
+};
+
+/// Client let the server know that it's ready to accept requests.
+pub const InitializedParams = struct {
 };
 
 

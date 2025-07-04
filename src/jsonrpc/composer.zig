@@ -12,9 +12,7 @@ const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const assert = std.debug.assert;
 
-const parser = @import("request.zig");
-const RpcId = parser.RpcId;
-
+const RpcId = @import("request.zig").RpcId;
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;

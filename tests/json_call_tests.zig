@@ -9,8 +9,7 @@ const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 
 const zigjr = @import("zigjr");
-const json_call = @import("../src/rpc/json_call.zig");
-// const json_call = zigjr.json_call;
+const json_call = zigjr.json_call;
 
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};

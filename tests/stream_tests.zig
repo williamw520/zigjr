@@ -113,7 +113,7 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
                 ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
-        const req_frames = try zigjr.frame.writeContentLengthFrames(alloc, &req_jsons);
+        const req_frames = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
         defer req_frames.deinit();
         // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
@@ -239,11 +239,11 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         var req_frames = std.ArrayList(u8).init(alloc);
         defer req_frames.deinit();
         const garbage_data1 = "abcdesdf\r\n";
-        const valid_frames1 = try zigjr.frame.writeContentLengthFrames(alloc, &req_jsons1);
+        const valid_frames1 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons1);
         const garbage_data2 = "sdfadf: sdfads\r\n";
-        const valid_frames2 = try zigjr.frame.writeContentLengthFrames(alloc, &req_jsons2);
+        const valid_frames2 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons2);
         const garbage_data3 = "\r\n\r\n\r\n\r\n";
-        const valid_frames3 = try zigjr.frame.writeContentLengthFrames(alloc, &req_jsons3);
+        const valid_frames3 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons3);
         const garbage_data4 = "sdfadf: sdfads\r\n";
         defer valid_frames1.deinit();
         defer valid_frames2.deinit();
@@ -347,7 +347,7 @@ test "responsesByLength on JSON responses, single param, id" {
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
-        const req_frames = try zigjr.frame.writeContentLengthFrames(alloc, &req_jsons);
+        const req_frames = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
         defer req_frames.deinit();
         // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
