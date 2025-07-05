@@ -13,12 +13,14 @@ const Mutex = std.Thread.Mutex;
 const Value = std.json.Value;
 const ObjectMap = std.json.ObjectMap;
 const allocPrint = std.fmt.allocPrint;
+const StringifyOptions = std.json.StringifyOptions;
 
 const zigjr = @import("zigjr");
 const RpcId = zigjr.RpcId;
-const makeRequestJson = zigjr.composer.makeRequestJson;
-const writeContentLengthFrame = zigjr.frame.writeContentLengthFrame;
 const writeContentLengthRequest = zigjr.frame.writeContentLengthRequest;
+const responsesByContentLength = zigjr.stream.responsesByContentLength;
+const ResponseDispatcher = zigjr.ResponseDispatcher;
+const RpcResponse = zigjr.RpcResponse;
 
 const MyErrors = error{ MissingCfg, MissingCmd, MissingSourceFile };
 
@@ -37,14 +39,15 @@ pub fn main() !void {
         var child = std.process.Child.init(args.cmd_argv.items, alloc);
         child.stdin_behavior    = .Pipe;
         child.stdout_behavior   = .Pipe;
-        child.stderr_behavior   = .Inherit;  // show child's stderr in the parent's stderr
+        child.stderr_behavior   = .Inherit;  // show LSP server's stderr in the parent's stderr
         try child.spawn();
 
-        const response_thread  = try Thread.spawn(.{}, response_worker, .{ child.stdout.? });
-        try request_worker(child.stdin.?);  // Run request_worker in the main thread.
-
+        const request_thread    = try Thread.spawn(.{}, request_worker, .{ child.stdin.? });
+        const response_thread   = try Thread.spawn(.{}, response_worker, .{ child.stdout.?, args.pp_json });
+        request_thread.join();
         response_thread.join();
-        child.stdin = null;                 // already closed by the request_worker; clear so it won't be closed again.
+
+        child.stdin = null; // already closed by the request_worker; clear so it won't be closed again.
         _ = try child.wait();
     }
     if (gpa.detectLeaks()) {
@@ -54,9 +57,12 @@ pub fn main() !void {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  lsp_client lsp_server arguments
-        \\Usage:  lsp_client --file source.zig lsp_server arguments
+        \\Usage:  lsp_client [--pp-json] lsp_server [arguments]
+        \\        --pp-json pretty-print the result JSON from server.
         \\
+        \\e.g.    lsp_client /zls/zls.exe
+        \\e.g.    lsp_client --pp-json /zls/zls.exe
+        \\e.g.    lsp_client --pp-json /zls/zls.exe --enable-stderr-logs
         , .{});
 }
 
@@ -64,13 +70,12 @@ fn usage() void {
 const CmdArgs = struct {
     arg_itr:        std.process.ArgIterator,
     cmd_argv:       std.ArrayList([]const u8),
-    src_file:       []const u8,
+    pp_json:        bool = false,
 
     fn init(alloc: Allocator) !@This() {
         return .{
             .arg_itr = try std.process.argsWithAllocator(alloc),
             .cmd_argv = std.ArrayList([]const u8).init(alloc),
-            .src_file = "",
         };
     }
 
@@ -84,12 +89,8 @@ const CmdArgs = struct {
         _ = argv.next();            // skip this program's name.
         while (argv.next())|argz| {
             const arg = std.mem.sliceTo(argz, 0);
-            if (std.mem.eql(u8, arg, "--file")) {
-                if (std.mem.sliceTo(argv.next(), 0)) |src_file| {
-                    self.src_file = src_file;
-                } else {
-                    return error.MissingSourceFile;
-                }
+            if (std.mem.eql(u8, arg, "--pp-json")) {
+                self.pp_json = true;
             } else {
                 try self.cmd_argv.append(arg);  // collect the sub-process cmd and args.
             }
@@ -195,24 +196,47 @@ fn request_worker(in_stdin: std.fs.File) !void {
     std.debug.print("\n[==== request_worker ====] exits\n", .{});
 }
 
-fn response_worker(child_stdout: std.fs.File) !void {
+fn response_worker(child_stdout: std.fs.File, pp_json: bool) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
     const out_reader = child_stdout.reader();
     std.debug.print("[response_worker] starts\n", .{});
 
-    var buf = std.ArrayList(u8).init(alloc);
-    defer buf.deinit();
-    var chunk: [1024]u8 = undefined;
-    while (true) {
-        const chunk_len = try out_reader.read(&chunk);
-        if (chunk_len == 0) break;
-        try buf.appendSlice(chunk[0..chunk_len]);
-        if (chunk_len == 1024) continue;    // bug if the whole msg is aligned at 1024.
-        std.debug.print("\n[---- response_worker ---] LSP server response:\n{s}\n\n", .{buf.items});
-        buf.clearRetainingCapacity();
-    }
+    // Use ZigJR's ResponseDispatcher to process the response messages.
+    var dispatcher = struct {
+        out_buf: std.ArrayList(u8),
+        json_opt: StringifyOptions,
+
+        pub fn dispatch(self: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+            // res.result has the result JSON object from server.
+            // res.id is the request id; dispatch based on the id recorded in request_worker().
+            // In here it just prints out the JSON.
+            self.out_buf.clearRetainingCapacity();
+            try std.json.stringify(res.result, self.json_opt, self.out_buf.writer());
+            std.debug.print("\n[---- response_worker ---] LSP server response id: {any}\n{s}\n\n",
+                            .{res.id.num, self.out_buf.items});
+        }
+    } {
+        .out_buf = std.ArrayList(u8).init(alloc),
+        .json_opt = if (pp_json) .{ .whitespace = .indent_2 } else .{},
+    };
+
+    try responsesByContentLength(alloc, out_reader, ResponseDispatcher.implBy(&dispatcher), .{});
+    dispatcher.out_buf.deinit();
+
+    // Handle the raw messages from LSP server.
+    // var buf = std.ArrayList(u8).init(alloc);
+    // defer buf.deinit();
+    // var chunk: [1024]u8 = undefined;
+    // while (true) {
+    //     const chunk_len = try out_reader.read(&chunk);
+    //     if (chunk_len == 0) break;
+    //     try buf.appendSlice(chunk[0..chunk_len]);
+    //     if (chunk_len == 1024)
+    //         continue;   // if the msg aligns at 1024, will read the next msg and combine both.
+    //     std.debug.print("\n[---- response_worker ---] LSP server response:\n{s}\n\n", .{buf.items});
+    // }
 
     std.debug.print("[response_worker] exits\n", .{});
 }

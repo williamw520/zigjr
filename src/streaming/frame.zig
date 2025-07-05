@@ -62,6 +62,10 @@ pub const FrameBuf = struct {
         return self.buf.items[self.data_start..];
     }
 
+    pub fn totalBytes(self: @This()) usize {
+        return self.buf.items.len;      // length of headers + content
+    }
+
 };
 
 
@@ -94,8 +98,9 @@ pub fn readHttpHeaders(reader: anytype, frame_buf: *FrameBuf) !void {
 /// The headers and the content data are kept in the frame_buf.
 pub fn readContentLengthFrame(reader: anytype, frame_buf: *FrameBuf) !bool {
     readHttpHeaders(reader, frame_buf) catch |err| {
-        if (err == error.EndOfStream) return false;
-        return err;     // unrecoverable error while reading from reader.
+        if (err == error.EndOfStream)
+            return false;   // no more data.
+        return err;         // unrecoverable error while reading from reader.
     };
     const content_length = try frame_buf.getContentLength() orelse {
         return JrErrors.MissingContentLengthHeader;
@@ -111,7 +116,7 @@ pub fn readContentLengthFrame(reader: anytype, frame_buf: *FrameBuf) !bool {
         read_total += read_len;
     }
 
-    return true;        // has more data.
+    return true;            // has content data.
 }
 
 /// Write a data frame to a writer, with a header section containing
