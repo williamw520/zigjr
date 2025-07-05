@@ -144,8 +144,7 @@ pub fn readContentLengthFrame(reader: anytype, frame_buf: *FrameBuf) !bool {
 /// Write a data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
 pub fn writeContentLengthFrame(writer: anytype, content: []const u8) !void {
-    try writer.print("Content-Length: {d}\r\n", .{content.len});
-    try writer.print("\r\n", .{});
+    try writer.print("Content-Length: {d}\r\n\r\n", .{content.len});
     try writer.writeAll(content);
 }
 
