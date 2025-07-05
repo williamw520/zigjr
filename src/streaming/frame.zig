@@ -90,33 +90,6 @@ pub fn readHttpHeaders(reader: anytype, frame_buf: *FrameBuf) !void {
     }
 }
 
-/// Read the headers of a data frame and return the Content-Length value.
-/// The data frame has the format of:
-///     Content-Length: DATA_LENGTH\r\n
-///     Other-Header: VALUE\r\n
-///     ...
-///     \r\n
-///     DATA
-fn readContentLengthHeader(reader: anytype, frame_buf: *ArrayList(u8)) !usize {
-    var content_length: ?usize = null;
-    while (true) {
-        frame_buf.clearRetainingCapacity();
-        try reader.streamUntilDelimiter(frame_buf.writer(), '\n', null);
-        const line = std.mem.trim(u8, frame_buf.items, "\r\n");
-        if (line.len == 0) {
-            break;              // reach the empty line \r\n
-        }
-        var parts       = std.mem.splitScalar(u8, line, ':');
-        const str_key   = parts.next() orelse "";
-        const str_val   = parts.next() orelse "";
-        const trim_val  = std.mem.trim(u8, str_val, " ");
-        if (std.mem.eql(u8, str_key, "Content-Length"))
-            content_length = try std.fmt.parseInt(usize, trim_val, 10);
-    }
-
-    return if (content_length)|len| len else JrErrors.MissingContentLengthHeader;
-}
-
 /// Read a data frame, that has a Content-Length header, into frame_buf.
 /// The headers and the content data are kept in the frame_buf.
 pub fn readContentLengthFrame(reader: anytype, frame_buf: *FrameBuf) !bool {
