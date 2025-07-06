@@ -27,26 +27,24 @@ const JrErrors = errors.JrErrors;
 pub fn parseRpcRequest(alloc: Allocator, json_str: []const u8) RpcRequestResult {
     const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
         // Create an empty request with the error so callers can have a uniform request handling.
-        var empty_req = RpcRequest{};
-        empty_req.setParseErr(parse_err);
         return .{
-            .request_msg = RpcRequestMessage { .request = empty_req },
-            .parsed = null,
+            .request_msg = .{ .request = RpcRequest.ofParseErr(parse_err) },
+            ._parsed = null,
         };
     };
     return .{
         .request_msg = parsed.value,
-        .parsed = parsed,
+        ._parsed = parsed,
     };
 }
 
 pub const RpcRequestResult = struct {
     const Self = @This();
     request_msg:    RpcRequestMessage,
-    parsed:         ?std.json.Parsed(RpcRequestMessage) = null,
+    _parsed:        ?std.json.Parsed(RpcRequestMessage) = null,
 
     pub fn deinit(self: *Self) void {
-        if (self.parsed) |parsed| parsed.deinit();
+        if (self._parsed) |parsed| parsed.deinit();
     }
 
     pub fn isRequest(self: Self) bool {
@@ -100,12 +98,16 @@ pub const RpcRequest = struct {
     id:         RpcId = .{ .none = {} },    // default for optional field.
     _err:       RpcRequestError = .{},      // attach parsing error and validation error here.
 
-    fn setParseErr(self: *Self, parse_err: ParseError(Scanner)) void {
-        self._err = RpcRequestError.fromParseError(parse_err);
+    fn ofParseErr(parse_err: ParseError(Scanner)) Self {
+        var empty_req = Self{};
+        empty_req._err = RpcRequestError.fromParseError(parse_err);
+        return empty_req;
     }
 
     fn validate(self: *Self) void {
-        self._err = RpcRequestError.validateRequest(self) orelse .{};
+        if (RpcRequestError.validateRequest(self)) |e| {
+            self._err = e;
+        }
     }
 
     pub fn err(self: Self) RpcRequestError {
@@ -208,12 +210,18 @@ pub const RpcRequestError = struct {
     fn fromParseError(parse_err: ParseError(Scanner)) Self {
         return switch (parse_err) {
             error.MissingField, error.UnknownField, error.DuplicateField,
-            error.LengthMismatch, error.UnexpectedEndOfInput =>
-                .{ .code = ErrorCode.InvalidRequest, .err_msg = @errorName(parse_err) },
-            error.Overflow, error.OutOfMemory => 
-                .{ .code = ErrorCode.InternalError, .err_msg = @errorName(parse_err) },
-            else =>
-                .{ .code = ErrorCode.ParseError, .err_msg = @errorName(parse_err) },
+            error.LengthMismatch, error.UnexpectedEndOfInput => .{
+                .code = ErrorCode.InvalidRequest,
+                .err_msg = @errorName(parse_err),
+            },
+            error.Overflow, error.OutOfMemory => .{
+                .code = ErrorCode.InternalError,
+                .err_msg = @errorName(parse_err),
+            },
+            else => .{
+                .code = ErrorCode.ParseError,
+                .err_msg = @errorName(parse_err),
+            },
         };
     }
 

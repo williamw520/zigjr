@@ -180,7 +180,7 @@ test "Response to a request of hello method" {
                 , &response_buf, null);
         // std.debug.print("response: {s}\n", .{response_buf.items});
 
-        var parsed_res = try zigjr.parseRpcResponse(alloc, response_buf.items);
+        var parsed_res = zigjr.parseRpcResponse(alloc, response_buf.items);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -205,7 +205,7 @@ test "Handle a request of hello method" {
         defer if (res_json)|json| alloc.free(json);
         // std.debug.print("response: {s}\n", .{res_json.?});
 
-        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
+        var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -448,7 +448,7 @@ test "Response using an object based dispatcher." {
             var parsed_res = try pipeline.runRequestToResponse(
                 \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
                 );
-            defer parsed_res.deinit();
+            defer parsed_res.deinit();
             try testing.expect(parsed_res.isNone());
         }
         {
@@ -509,7 +509,7 @@ test "Construct a normal response message, simple integer result" {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             
@@ -530,7 +530,7 @@ test "Construct a normal response message, array result" {
             defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
 
@@ -550,7 +550,7 @@ test "Construct an error response message" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
+        var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -570,7 +570,7 @@ test "Construct an error response message with data" {
         defer alloc.free(res_json);
         // std.debug.print("res_json: {s}\n", .{res_json});
 
-        var parsed_res = try zigjr.parseRpcResponse(alloc, res_json);
+        var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -621,7 +621,7 @@ test "Handle batch requests with the CounterDispatcher" {
         const batch_res_json = response_buf.items;
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
+        var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
@@ -679,7 +679,7 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
         const batch_res_json = try pipeline.runRequestToJson(batch_req_json) orelse "";
         defer alloc.free(batch_res_json);
 
-        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
+        var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         // for (batch_res)|res| std.debug.print("response {any}\n", .{res});
@@ -735,7 +735,7 @@ test "Handle empty batch response" {
         const batch_res_json = batch_res_buf.items;
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
-        var batch_parsed_res = try zigjr.parseRpcResponse(alloc, batch_res_json);
+        var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
         const batch_res = try batch_parsed_res.batch();
         for (batch_res)|res| std.debug.print("response {any}\n", .{res});

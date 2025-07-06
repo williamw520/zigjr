@@ -112,8 +112,9 @@ pub const RequestPipeline = struct {
     /// parses the JSON-RPC response message in one shot.  This is mainly for testing.
     pub fn runRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
         const response_json = try self.runRequestToJson(request_json) orelse "";
-        defer self.alloc.free(response_json);
-        return try parseRpcResponse(self.alloc, response_json);
+        var rpc_rresult = parseRpcResponse(self.alloc, response_json);
+        rpc_rresult.ownsResponseJson(self.alloc, response_json);
+        return rpc_rresult;
     }
 
     /// Run the dispatcher on the RpcRequest and write the response JSON to the writer.
@@ -185,7 +186,7 @@ pub const ResponsePipeline = struct {
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
     pub fn handleJsonResponse(self: @This(), response_json: ?[]const u8) !void {
-        var parsed_result: RpcResponseResult = try parseRpcResponse(self.alloc, response_json);
+        var parsed_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer parsed_result.deinit();
         const response_msg: RpcResponseMessage = parsed_result.response_msg;
         return switch (response_msg) {

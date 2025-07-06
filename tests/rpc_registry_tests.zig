@@ -368,7 +368,7 @@ test "rpc_registry fn0 variants" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("Hello"));
         }
@@ -380,7 +380,7 @@ test "rpc_registry fn0 variants" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("Hello"));
         }
@@ -435,7 +435,7 @@ test "rpc_registry fn1" {
                 ) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("Hello"));
         }
@@ -446,7 +446,7 @@ test "rpc_registry fn1" {
                 ) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("Hello"));
         }
@@ -501,7 +501,7 @@ test "rpc_registry fn2" {
                 ) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(3));
         }
@@ -512,7 +512,7 @@ test "rpc_registry fn2" {
                 ) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(8));
         }
@@ -582,7 +582,7 @@ test "rpc_registry with context" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(0));
         }
@@ -621,7 +621,7 @@ test "rpc_registry with context" {
 
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(4));
         }
@@ -649,7 +649,7 @@ test "rpc_registry fn with array params returning struct value" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -685,7 +685,7 @@ test "rpc_registry fn with built array params returning struct value" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -721,7 +721,7 @@ test "rpc_registry passing in an Value as a parameter" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -756,7 +756,7 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -794,7 +794,7 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -828,7 +828,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(1));
         }
@@ -843,7 +843,7 @@ test "rpc_registry passing in a single JSON Value as parameter" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(3));
         }
@@ -871,7 +871,7 @@ test "rpc_registry passing in two JSON Values as parameters" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(3));
         }
@@ -899,7 +899,7 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(3));
         }
@@ -927,7 +927,7 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(6));
         }
@@ -957,7 +957,7 @@ test "rpc_registry passing in a struct object as a parameter" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -993,7 +993,7 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -1031,7 +1031,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -1069,7 +1069,7 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
@@ -1117,7 +1117,7 @@ test "rpc_registry register standalone functions on standalone object." {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(true));
         }
@@ -1137,7 +1137,7 @@ test "rpc_registry register standalone functions on standalone object." {
             const res_json = try pipeline.runRequestToJson( req_json) orelse "";
             defer alloc.free(res_json);
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql(false));
         }
@@ -1150,7 +1150,7 @@ test "rpc_registry register standalone functions on standalone object." {
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
-            var res_result = try zigjr.parseRpcResponse(alloc, res_json);
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("flag value is: false"));
         }
