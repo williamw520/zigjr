@@ -25,23 +25,23 @@ pub const RequestDispatcher = struct {
     dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn implBy(impl: anytype) RequestDispatcher {
-        const ImplType = @TypeOf(impl);
+    pub fn implBy(impl_obj: anytype) RequestDispatcher {
+        const ImplType = @TypeOf(impl_obj);
 
         const Thunk = struct {
             fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return implementation.dispatch(alloc, req);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                return impl.dispatch(alloc, req);
             }
 
             fn dispatchEnd(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return implementation.dispatchEnd(alloc, req, dresult);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                return impl.dispatchEnd(alloc, req, dresult);
             }
         };
 
         return .{
-            .impl_ptr = impl,
+            .impl_ptr = impl_obj,
             .dispatch_fn = Thunk.dispatch,
             .dispatchEnd_fn = Thunk.dispatchEnd,
         };
@@ -66,18 +66,18 @@ pub const ResponseDispatcher = struct {
     dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn implBy(impl: anytype) ResponseDispatcher {
-        const ImplType = @TypeOf(impl);
+    pub fn implBy(impl_obj: anytype) ResponseDispatcher {
+        const ImplType = @TypeOf(impl_obj);
 
         const Thunk = struct {
             fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return implementation.dispatch(alloc, res);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                return impl.dispatch(alloc, res);
             }
         };
 
         return .{
-            .impl_ptr = impl,
+            .impl_ptr = impl_obj,
             .dispatch_fn = Thunk.dispatch,
         };
     }

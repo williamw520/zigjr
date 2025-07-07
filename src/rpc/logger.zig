@@ -17,28 +17,28 @@ pub const Logger = struct {
     stop_fn:    *const fn(impl_ptr: *anyopaque, message: []const u8) void,
 
     // Interface is implemented by the 'impl' object.
-    pub fn implBy(impl: anytype) Logger {
-        const ImplType = @TypeOf(impl);
+    pub fn implBy(impl_obj: anytype) Logger {
+        const ImplType = @TypeOf(impl_obj);
 
         const Thunk = struct {
             fn start(impl_ptr: *anyopaque, message: []const u8) void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                implementation.start(message);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                impl.start(message);
             }
 
             fn log(impl_ptr: *anyopaque, source: [] const u8, operation: []const u8, message: []const u8) void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                implementation.log(source, operation, message);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                impl.log(source, operation, message);
             }
 
             fn stop(impl_ptr: *anyopaque, message: []const u8) void {
-                const implementation: ImplType = @ptrCast(@alignCast(impl_ptr));
-                implementation.stop(message);
+                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
+                impl.stop(message);
             }
         };
 
         return .{
-            .impl_ptr = impl,
+            .impl_ptr = impl_obj,
             .start_fn = Thunk.start,
             .log_fn = Thunk.log,
             .stop_fn = Thunk.stop,
