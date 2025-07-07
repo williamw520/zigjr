@@ -71,16 +71,7 @@ pub fn build(b: *std.Build) void {
 
     // End of building examples
 
-    // Build and run tests.
-    const tests_mod = b.addModule("tests", .{
-        .root_source_file = b.path("tests/tests.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = strip_debug_symbols,
-    });
-    tests_mod.addImport("zigjr", zigjr_mod);
-
-    const lib_unit_tests = b.addTest(.{ .root_module = tests_mod });
+    const lib_unit_tests = b.addTest(.{ .root_module = zigjr_mod });
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);

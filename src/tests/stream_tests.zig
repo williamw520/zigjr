@@ -6,7 +6,7 @@ const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 
-const zigjr = @import("zigjr");
+const zigjr = @import("../zigjr.zig");
 const ErrorCode = zigjr.ErrorCode;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;

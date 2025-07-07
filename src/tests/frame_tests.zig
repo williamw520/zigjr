@@ -7,10 +7,8 @@ const ArrayList = std.ArrayList;
 const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 const Array = std.json.Array;
-const zigjr = @import("zigjr");
-const frame = zigjr.frame;
-// const frame = @import("../src/streaming/frame.zig");
-
+const frame = @import("../streaming/frame.zig");
+    
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 

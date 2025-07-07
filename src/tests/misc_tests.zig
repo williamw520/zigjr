@@ -8,6 +8,8 @@ const nanoTimestamp = std.time.nanoTimestamp;
 const Value = std.json.Value;
 const Array = std.json.Array;
 
+const Deiniter = @import("../rpc/deiniter.zig").Deiniter;
+const ConstDeiniter = @import("../rpc/deiniter.zig").ConstDeiniter;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
@@ -136,4 +138,45 @@ test "Misc" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
         
 }
+
+test "Deiniter var struct" {
+    const alloc = gpa.allocator();
+    {
+        var obj1 = struct {
+            alloc:  Allocator,
+            text:   []const u8,
+            pub fn deinit(self: @This()) void {
+                self.alloc.free(self.text);
+            }
+        } {
+            .alloc = alloc,
+            .text = try Allocator.dupe(alloc, u8, "This is a test"),
+        };
+        
+        var de1 = Deiniter.implBy(&obj1);
+        de1.deinit();
+    
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Deiniter const struct" {
+    const alloc = gpa.allocator();
+    {
+        var de1 = ConstDeiniter.implBy(&struct {
+            alloc:  Allocator,
+            text:   []const u8,
+            pub fn deinit(self: @This()) void {
+                self.alloc.free(self.text);
+            }
+        } {
+            .alloc = alloc,
+            .text = try Allocator.dupe(alloc, u8, "This is a test"),
+        });
+        de1.deinit();
+    
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
 
