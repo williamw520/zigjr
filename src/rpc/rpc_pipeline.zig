@@ -185,7 +185,7 @@ pub const ResponsePipeline = struct {
     /// Any parse error is returned to the caller and the dispatcher is not called.
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
-    pub fn handleJsonResponse(self: @This(), response_json: ?[]const u8) !void {
+    pub fn runResponse(self: @This(), response_json: ?[]const u8) !void {
         var parsed_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer parsed_result.deinit();
         const response_msg: RpcResponseMessage = parsed_result.response_msg;
