@@ -18,6 +18,7 @@ const RpcRequest = zigjr.RpcRequest;
 const RpcId = zigjr.RpcId;
 
 const parseRpcResponse = zigjr.parseRpcResponse;
+const parseRpcResponseOwned = zigjr.parseRpcResponseOwned;
 const RpcResponse = zigjr.RpcResponse;
 const RpcResponseResult = zigjr.RpcResponseResult;
 const RpcResponseMessage = zigjr.RpcResponseMessage;
@@ -111,10 +112,9 @@ pub const RequestPipeline = struct {
     /// The client then parses the JSON-RPC response message.  This skips all those and directly
     /// parses the JSON-RPC response message in one shot.  This is mainly for testing.
     pub fn runRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
-        const response_json = try self.runRequestToJson(request_json) orelse "";
-        var rpc_rresult = parseRpcResponse(self.alloc, response_json);
-        rpc_rresult.ownsResponseJson(self.alloc, response_json);
-        return rpc_rresult;
+        // response_json is freshly allocated in runRequestToJson(); need freeing.
+        const response_json = try self.runRequestToJson(request_json);
+        return parseRpcResponseOwned(self.alloc, response_json);
     }
 
     /// Run the dispatcher on the RpcRequest and write the response JSON to the writer.

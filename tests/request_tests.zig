@@ -230,6 +230,23 @@ test "Parse valid request, with no params, with no id" {
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
+test "Parse valid request, with memory ownership transfered" {
+    const alloc = gpa.allocator();
+    {
+        const request_json = try Allocator.dupe(alloc, u8,
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
+        );
+        var result = zigjr.parseRpcRequestOwned(alloc, request_json);
+        defer result.deinit();
+        const req = try result.request();
+        try testing.expect(!req.hasError());
+        try testing.expect(!req.id.isValid());
+        try testing.expect(req.id.isNull());
+        try testing.expect(req.id == .null);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
 test "Parse valid request, with no params, with null id" {
     const alloc = gpa.allocator();
     {

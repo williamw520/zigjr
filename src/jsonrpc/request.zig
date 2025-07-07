@@ -21,11 +21,23 @@ const ObjectMap = std.json.ObjectMap;
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
+const Owned = @import("../rpc/deiniter.zig").Owned;
 
 
+/// Parse request_json into a RpcRequestResult.
+/// Caller transfers ownership of request_json to RpcRequestResult.
+/// They will be freed in the RpcRequestResult.deinit().
+pub fn parseRpcRequestOwned(alloc: Allocator, request_json: []const u8) RpcRequestResult {
+    var rresult = parseRpcRequest(alloc, request_json);
+    rresult.jsonOwned(request_json, alloc);
+    return rresult;
+}
 
-pub fn parseRpcRequest(alloc: Allocator, json_str: []const u8) RpcRequestResult {
-    const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, json_str, .{}) catch |parse_err| {
+/// Parse request_json into a RpcRequestResult.
+/// Caller manages the lifetime request_json.  Needs to ensure request_json is not
+/// freed before RpcRequestResult.deinit(). Parsed result references request_json.
+pub fn parseRpcRequest(alloc: Allocator, request_json: []const u8) RpcRequestResult {
+    const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, request_json, .{}) catch |parse_err| {
         // Create an empty request with the error so callers can have a uniform request handling.
         return .{
             .request_msg = .{ .request = RpcRequest.ofParseErr(parse_err) },
@@ -42,9 +54,15 @@ pub const RpcRequestResult = struct {
     const Self = @This();
     request_msg:    RpcRequestMessage,
     _parsed:        ?std.json.Parsed(RpcRequestMessage) = null,
+    _request_json:  Owned([]const u8) = .{},
 
     pub fn deinit(self: *Self) void {
         if (self._parsed) |parsed| parsed.deinit();
+        self._request_json.deinit();
+    }
+
+    fn jsonOwned(self: *Self, request_json: []const u8, alloc: Allocator) void {
+         self._request_json = Owned([]const u8).init(request_json, alloc);
     }
 
     pub fn isRequest(self: Self) bool {
@@ -53,6 +71,14 @@ pub const RpcRequestResult = struct {
 
     pub fn isBatch(self: Self) bool {
         return self.request_msg == .batch;
+    }
+
+    pub fn isMissingMethod(self: Self) bool {
+        if (self.request_msg == .request) {
+            return self.request_msg.request._no_method;
+        } else {
+            return false;
+        }
     }
 
     /// Shortcut to access the inner tagged union invariant request.
@@ -97,10 +123,12 @@ pub const RpcRequest = struct {
     params:     Value = .{ .null = {} },    // default for optional field.
     id:         RpcId = .{ .none = {} },    // default for optional field.
     _err:       RpcRequestError = .{},      // attach parsing error and validation error here.
+    _no_method: bool = false,               // treat MissingField error as no method.
 
     fn ofParseErr(parse_err: ParseError(Scanner)) Self {
         var empty_req = Self{};
         empty_req._err = RpcRequestError.fromParseError(parse_err);
+        empty_req._no_method = (parse_err == error.MissingField);
         return empty_req;
     }
 

@@ -19,6 +19,7 @@ const logger = @import("rpc/logger.zig");
 pub const json_call = @import("rpc/json_call.zig");
 
 pub const parseRpcRequest = request.parseRpcRequest;
+pub const parseRpcRequestOwned = request.parseRpcRequestOwned;
 pub const RpcRequestResult = request.RpcRequestResult;
 pub const RpcRequestMessage = request.RpcRequestMessage;
 pub const RpcRequest = request.RpcRequest;
@@ -26,6 +27,7 @@ pub const RpcId = request.RpcId;
 pub const RpcRequestError = request.RpcRequestError;
 
 pub const parseRpcResponse = response.parseRpcResponse;
+pub const parseRpcResponseOwned = response.parseRpcResponseOwned;
 pub const RpcResponseResult = response.RpcResponseResult;
 pub const RpcResponseMessage = response.RpcResponseMessage;
 pub const RpcResponse = response.RpcResponse;

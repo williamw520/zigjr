@@ -506,10 +506,9 @@ test "Construct a normal response message, simple integer result" {
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, .{ .num = 1 }, "10");
         if (response_json)|res_json| {
-            defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             
@@ -527,10 +526,9 @@ test "Construct a normal response message, array result" {
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, zigjr.RpcId{ .str = "2" }, "[1, 2, 3]");
         if (response_json)|res_json| {
-            defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json);
             defer parsed_res.deinit();
             const res = try parsed_res.response();
 

@@ -17,16 +17,29 @@ const Value = std.json.Value;
 
 const req_parser = @import("request.zig");
 const RpcId = req_parser.RpcId;
-
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
+const Owned = @import("../rpc/deiniter.zig").Owned;
 
-const FreeFor = @import("../rpc/deiniter.zig").FreeFor;
 
+/// Parse response_json into a RpcResponseResult.
+/// Caller transfers ownership of response_json to RpcResponseResult.
+/// They will be freed in the RpcResponseResult.deinit().
+pub fn parseRpcResponseOwned(alloc: Allocator, response_json: ?[]const u8) RpcResponseResult {
+    var rresult = parseRpcResponse(alloc, response_json);
+    if (response_json) |json| {
+        rresult.jsonOwned(json, alloc);
+    }
+    return rresult;
+}
 
-pub fn parseRpcResponse(alloc: Allocator, json_str: ?[]const u8) RpcResponseResult {
-    const json = std.mem.trim(u8, json_str orelse "", " ");
+/// Parse response_json into a RpcResponseResult.
+/// Caller manages the lifetime response_json.  Needs to ensure response_json is not
+/// freed before RpcResponseResult.deinit(). Parsed result references response_json.
+/// response_json can be null, to accommodate no reply from server, for notification.
+pub fn parseRpcResponse(alloc: Allocator, response_json: ?[]const u8) RpcResponseResult {
+    const json = std.mem.trim(u8, response_json orelse "", " ");
     if (json.len == 0) {
         return .{ .response_msg = .{ .none = {} } };
     }
@@ -44,17 +57,15 @@ pub const RpcResponseResult = struct {
     const Self = @This();
     response_msg:   RpcResponseMessage = .{ .none = {} },
     _parsed:        ?std.json.Parsed(RpcResponseMessage) = null,
-    _response_json: FreeFor([]const u8) = .{},
+    _response_json: Owned([]const u8) = .{},
 
     pub fn deinit(self: *Self) void {
         if (self._parsed) |parsed| parsed.deinit();
         self._response_json.deinit();
     }
 
-    // Caller transfers ownership of response_json to this object.
-    // Parsed result references it; they must be in the same lifetime.
-    pub fn ownsResponseJson(self: *Self, alloc: Allocator, response_json: []const u8) void {
-        self._response_json = FreeFor([]const u8).init(alloc, response_json);
+    fn jsonOwned(self: *Self, response_json: []const u8, alloc: Allocator) void {
+         self._response_json = Owned([]const u8).init(response_json, alloc);
     }
 
     pub fn isResponse(self: Self) bool {

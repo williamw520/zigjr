@@ -33,16 +33,16 @@ pub const Deiniter = struct {
     }
 };
 
-/// Capture the allocator and memory to free later.
-pub fn FreeFor(T: type) type {
+/// Capture the memory and its allocator in one place so it can be freed later.
+pub fn Owned(T: type) type {
     return struct {
-        alloc:  std.mem.Allocator = undefined,
         memory: ?T = null,
+        alloc:  std.mem.Allocator = undefined,
 
-        pub fn init(alloc: std.mem.Allocator, memory: ?T) @This() {
+        pub fn init(memory: ?T, alloc: std.mem.Allocator) @This() {
             return .{
-                .alloc = alloc,
                 .memory = memory,
+                .alloc = alloc,
             };
         }
 
