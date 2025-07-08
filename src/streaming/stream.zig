@@ -178,3 +178,30 @@ pub const ContentLengthOptions = struct {
 var nopLogger = zigjr.NopLogger{};
 
 
+// /// Runs a loop to read a stream of JSON request and/or response messages (frames) from the reader,
+// /// and handle each one with the dispatcher.
+// pub fn messagesByContentLength(alloc: Allocator, reader: anytype,
+//                                dispatcher: MessageDispatcher, options: ContentLengthOptions) !void {
+//     var frame_buf = frame.FrameBuf.init(alloc);
+//     defer frame_buf.deinit();
+//     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+
+//     options.logger.start("[streamResponses] Logging starts");
+//     defer { options.logger.stop("[streamResponses] Logging stops"); }
+
+//     while (true) {
+//         frame_buf.reset();
+//         if (!try frame.readContentLengthFrame(reader, &frame_buf))
+//             break;
+
+//         const response_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
+//         if (options.skip_blank_message and response_json.len == 0) continue;
+
+//         options.logger.log("streamResponses", "receive response", response_json);
+//         pipeline.handleJsonResponse(response_json) catch |err| {
+//             const stderr = std.io.getStdErr().writer();
+//             stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
+//         };
+//     }
+// }
+
