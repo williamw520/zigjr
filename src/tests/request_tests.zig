@@ -19,8 +19,8 @@ test "Parsing valid request, single integer param, integer id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0", "params": [42], "id": 1}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [42], "id": 1}
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
@@ -55,8 +55,8 @@ test "Parsing valid request, single string param, string id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
@@ -92,8 +92,8 @@ test "Parsing valid request, tw0 integer params, integer id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun1", "params": [42, 22], "id": 2}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun1", "params": [42, 22], "id": 2}
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
@@ -130,8 +130,8 @@ test "Parsing valid request, object params, integer id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
@@ -166,8 +166,8 @@ test "Parse valid request, with 0 params, with no id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(@TypeOf(result.request_msg) == RpcRequestMessage);
@@ -201,8 +201,8 @@ test "Parse valid request, with no params, with no id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0" }
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0" }
+        );
         defer result.deinit();
         const req = try result.request();
         // std.debug.print("Request: {any}\n", .{req});
@@ -251,8 +251,8 @@ test "Parse valid request, with no params, with null id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(!req.hasError());
@@ -267,8 +267,8 @@ test "Parse valid request, with no params, with string id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(!req.hasError());
@@ -282,9 +282,9 @@ test "Parse valid request batch, with no params, with string id" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
-                                        \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
-                                        );
+            \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
+            \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
+        );
         defer result.deinit();
         try testing.expect(result.isBatch());
         try testing.expect(!result.isRequest());
@@ -304,8 +304,8 @@ test "Parse a valid empty request batch" {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\[ ]
-                                        );
+            \\[ ]
+        );
         defer result.deinit();
         try testing.expect(result.isBatch());
         try testing.expect(!result.isRequest());
@@ -322,8 +322,8 @@ test "Parse empty request, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\
-                                        );
+            \\
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(req.hasError());
@@ -337,8 +337,8 @@ test "Parse incomplete opening request {, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{
-                                        );
+            \\{
+        );
         defer result.deinit();
         const req = try result.request();
         try testing.expect(req.hasError());
@@ -352,8 +352,8 @@ test "Parse incomplete closing request }, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\}
-                                        );
+            \\}
+        );
         defer result.deinit();
         // std.debug.print("Error {}, {s}\n", .{(try result.request()).err().code, (try result.request()).err().err_msg});
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
@@ -365,8 +365,8 @@ test "Parse empty object request {}, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{}
-                                        );
+            \\{}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -377,8 +377,8 @@ test "Parse invalid syntax request, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\ foo abc 123
-                                        );
+            \\ foo abc 123
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
@@ -389,8 +389,8 @@ test "Parse incomplete missing value request, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"foo":
-                                        );
+            \\{"foo":
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -401,8 +401,8 @@ test "Parse missing value request, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"foo": }
-                                        );
+            \\{"foo": }
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -413,8 +413,8 @@ test "Parse missing value for 'jsonrpc' property, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": }
-                                        );
+            \\{"jsonrpc": }
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
@@ -425,8 +425,8 @@ test "Parse incomplete jsonrpc request 'jsonrpc' only, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0"}
-                                        );
+            \\{"jsonrpc": "2.0"}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -437,8 +437,8 @@ test "Parse duplicate 'params' properties, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "methodx": "foobar", "params": [], "id": "4"}
-                                        );
+            \\{"jsonrpc": "2.0", "methodx": "foobar", "params": [], "id": "4"}
+        );
         defer result.deinit();
         // try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -449,8 +449,8 @@ test "Parse invalid jsonrpc version 0.0, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "0.0", "method": "foobar", "params": [], "id": "5"}
-                                        );
+            \\{"jsonrpc": "0.0", "method": "foobar", "params": [], "id": "5"}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -461,8 +461,8 @@ test "Parse invalid jsonrpc version 1.0, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "1.0", "method": "foobar", "params": [], "id": "5"}
-                                        );
+            \\{"jsonrpc": "1.0", "method": "foobar", "params": [], "id": "5"}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -473,8 +473,8 @@ test "Parse invalid jsonrpc version 3.0, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "3.0", "method": "foobar", "params": [], "id": "5"}
-                                        );
+            \\{"jsonrpc": "3.0", "method": "foobar", "params": [], "id": "5"}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -485,8 +485,8 @@ test "Parse empty method, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": ""}
-                                        );
+            \\{"jsonrpc": "2.0", "method": ""}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
@@ -497,8 +497,8 @@ test "Parse non-object nor non-array params '1234', expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
+        );
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
     }
@@ -509,8 +509,8 @@ test "Parse non-object nor non-array params 'abcd', expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5d"}
-                                        );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5d"}
+        );
         defer result.deinit();
         // std.debug.print("Request: {any}\n", .{try result.request()});
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
@@ -522,8 +522,8 @@ test "Parse valid request and get as a batch, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
-                                        );
+            \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
+        );
         try testing.expect(!result.isBatch());
         try testing.expect(result.isRequest());
         defer result.deinit();
@@ -537,9 +537,9 @@ test "Parse valid request batch and get as a request, expect error." {
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
-                                        \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
-                                        \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
-                                        );
+            \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
+            \\  {"jsonrpc": "2.0", "method": "fun0", "id": "5b" } ]
+        );
         try testing.expect(result.isBatch());
         try testing.expect(!result.isRequest());
         try testing.expect(result.isBatch());
@@ -557,8 +557,8 @@ test "Build request json with no params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar"}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar"}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -570,8 +570,8 @@ test "Build request json with no params and null Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": null}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "id": null}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -583,8 +583,8 @@ test "Build request json with no params and integer Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": 1}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "id": 1}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -596,8 +596,8 @@ test "Build request json with no params and string Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "id": "1"}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "id": "1"}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -609,8 +609,8 @@ test "Build request json with array params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2]}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2]}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -627,8 +627,8 @@ test "Build request json with object params and none Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": {"a":1,"b":2}}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": {"a":1,"b":2}}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -640,8 +640,8 @@ test "Build request json with array params and null Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": null}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": null}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -653,8 +653,8 @@ test "Build request json with array params and num Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": 123}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": 123}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -666,8 +666,8 @@ test "Build request json with array params and str Id." {
         defer alloc.free(req_json);
         // std.debug.print("req_json {s}\n", .{req_json});
         try testing.expectEqualSlices(u8, req_json,
-                                      \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": "10"}
-                                      );
+            \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": "10"}
+        );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }

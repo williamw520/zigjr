@@ -320,7 +320,7 @@ test "rpc_registry fn0" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
             try testing.expect(fn0_called);
@@ -346,7 +346,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
             try testing.expect(fn0_called);
@@ -355,7 +355,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
             try testing.expect(fn0_with_err_called);
@@ -364,7 +364,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -376,7 +376,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -388,7 +388,7 @@ test "rpc_registry fn0 variants" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
             try testing.expect(fn0_alloc_called);
@@ -416,7 +416,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(fn1_called);
         }
@@ -424,7 +424,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(fn1_with_err_called);
         }
@@ -432,7 +432,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = zigjr.parseRpcResponse(alloc, res_json);
@@ -443,7 +443,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = zigjr.parseRpcResponse(alloc, res_json);
@@ -454,7 +454,7 @@ test "rpc_registry fn1" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -482,7 +482,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(fn2_called);
         }
@@ -490,7 +490,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(fn2_with_err_called);
         }
@@ -498,7 +498,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = zigjr.parseRpcResponse(alloc, res_json);
@@ -509,7 +509,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             var res_result = zigjr.parseRpcResponse(alloc, res_json);
@@ -520,7 +520,7 @@ test "rpc_registry fn2" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(fn2_alloc_with_err_called);
         }
@@ -544,14 +544,14 @@ test "rpc_registry with struct scope functions" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(Group.group_fn0_called);
         }
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(Group.group_fn1_called);
         }
@@ -578,7 +578,7 @@ test "rpc_registry with context" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -590,7 +590,7 @@ test "rpc_registry with context" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             try testing.expect(Ctx.ctx_fn0_called);
         }
@@ -598,7 +598,7 @@ test "rpc_registry with context" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
 
             try testing.expect(res_json.len == 0);
@@ -607,7 +607,7 @@ test "rpc_registry with context" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
-                ) orelse "";
+            ) orelse "";
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});
 
@@ -617,7 +617,7 @@ test "rpc_registry with context" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-                            ) orelse "";
+            ) orelse "";
 
             defer alloc.free(res_json);
 
@@ -644,7 +644,7 @@ test "rpc_registry fn with array params returning struct value" {
         {
             const res_json = try pipeline.runRequestToJson(
                 \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
-                            ) orelse "";
+            ) orelse "";
 
             defer alloc.free(res_json);
             // std.debug.print("response: {s}\n", .{res_json});

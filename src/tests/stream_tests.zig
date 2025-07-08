@@ -133,11 +133,11 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
         try testing.expectEqualSlices(u8, write_buffer.items,
                                       \\Content-Length: 40
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
+                                      \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
+                                      \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "result": 0, "id": 4}
+                                      \\{"jsonrpc": "2.0", "result": 0, "id": 4}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -170,10 +170,10 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
 
         try testing.expectEqualSlices(u8, write_buffer.items,
                                       \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
-                                          \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "SyntaxError"}}
-                                          \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
-                                          \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
-                                          \\
+                                      \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "SyntaxError"}}
+                                      \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+                                      \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
+                                      \\
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -205,11 +205,11 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
 
         try testing.expectEqualSlices(u8, write_buffer.items,
                                       \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
-                                          \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "SyntaxError"}}
-                                          \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
-                                          \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "UnexpectedEndOfInput"}}
-                                          \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
-                                          \\
+                                      \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "SyntaxError"}}
+                                      \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+                                      \\{"jsonrpc": "2.0", "id": null, "error": {"code": -32600, "message": "UnexpectedEndOfInput"}}
+                                      \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
+                                      \\
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -270,11 +270,11 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
         try testing.expectEqualSlices(u8, write_buffer.items,
                                       \\Content-Length: 40
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
+                                      \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
+                                      \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
                                           ++ "\r\n\r\n" ++
-                                          \\{"jsonrpc": "2.0", "result": 0, "id": 4}
+                                      \\{"jsonrpc": "2.0", "result": 0, "id": 4}
                                       );
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
@@ -305,9 +305,9 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
 
         try testing.expectEqualSlices(u8, write_buffer.items,
                                       \\{"jsonrpc": "2.0", "result": "abc", "id": "5a"}
-                                          \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
-                                          \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
-                                          \\
+                                      \\{"jsonrpc": "2.0", "result": "xyz", "id": "5b"}
+                                      \\{"jsonrpc": "2.0", "id": "5c", "error": {"code": -32602, "message": "InvalidParams"}}
+                                      \\
                                       );
 
         var my_response_dispatcher = struct {
@@ -363,11 +363,11 @@ test "responsesByLength on JSON responses, single param, id" {
 
         try testing.expectEqualSlices(u8, write_buffer.items,
             \\Content-Length: 40
-            ++ "\r\n\r\n" ++
+                ++ "\r\n\r\n" ++
             \\{"jsonrpc": "2.0", "result": 1, "id": 2}Content-Length: 84
-            ++ "\r\n\r\n" ++
+                ++ "\r\n\r\n" ++
             \\{"jsonrpc": "2.0", "id": 99, "error": {"code": -32601, "message": "MethodNotFound"}}Content-Length: 40
-            ++ "\r\n\r\n" ++
+                ++ "\r\n\r\n" ++
             \\{"jsonrpc": "2.0", "result": 0, "id": 4}
         );
 

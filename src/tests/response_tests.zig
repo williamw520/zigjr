@@ -177,7 +177,7 @@ test "Response to a request of hello method" {
         defer response_buf.deinit();
         _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-                , &response_buf, null);
+            , &response_buf, null);
         // std.debug.print("response: {s}\n", .{response_buf.items});
 
         var parsed_res = zigjr.parseRpcResponse(alloc, response_buf.items);
@@ -225,7 +225,7 @@ test "Handle a request of unknown method, expect error" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -245,7 +245,7 @@ test "Response to a request of integer add" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -265,7 +265,7 @@ test "runRequestToJson on a request of integer add" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -285,7 +285,7 @@ test "Response to a request of integer sub" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -305,7 +305,7 @@ test "Response to a request of integer multiply" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -325,7 +325,7 @@ test "Response to a request of integer divide" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -346,7 +346,7 @@ test "Response to a request of integer add with missing parameter, expect error"
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -366,7 +366,7 @@ test "Response to a request of float add" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -386,7 +386,7 @@ test "Response to a request of float sub" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "sub", "params": [1, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -406,7 +406,7 @@ test "Response to a request of float multiply" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "multiply", "params": [10, 2], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -426,7 +426,7 @@ test "Response to a request of float divide" {
 
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "divide", "params": [10, 3], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         const res = try parsed_res.response();
 
@@ -446,36 +446,36 @@ test "Response using an object based dispatcher." {
 
         {
             var parsed_res = try pipeline.runRequestToResponse(
-                \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
-                );
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+        );
             defer parsed_res.deinit();
             try testing.expect(parsed_res.isNone());
         }
         {
             var parsed_res = try pipeline.runRequestToResponse(
-                \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
-                );
+            \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
+        );
             defer parsed_res.deinit();
             try testing.expect(parsed_res.isNone());
         }
         {
             var parsed_res = try pipeline.runRequestToResponse(
-                \\{"jsonrpc": "2.0", "method": "get", "id": 1}
-                );
+            \\{"jsonrpc": "2.0", "method": "get", "id": 1}
+        );
             defer parsed_res.deinit();
             try testing.expect((try parsed_res.response()).resultEql(2));
         }
         {
             var parsed_res = try pipeline.runRequestToResponse(
-                \\{"jsonrpc": "2.0", "method": "dec", "id": 1}
-                );
+            \\{"jsonrpc": "2.0", "method": "dec", "id": 1}
+        );
             defer parsed_res.deinit();
             try testing.expect(parsed_res.isNone());
         }
         {
             var parsed_res = try pipeline.runRequestToResponse(
-                \\{"jsonrpc": "2.0", "method": "get", "id": 1}
-                );
+            \\{"jsonrpc": "2.0", "method": "get", "id": 1}
+        );
             defer parsed_res.deinit();
             try testing.expect((try parsed_res.response()).resultEql(1));
         }
@@ -492,7 +492,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
         
         var parsed_res = try pipeline.runRequestToResponse(
             \\{"jsonrpc": "2.0", "method": "add", "params": ["1", "2"], "id": 1}
-            );
+        );
         defer parsed_res.deinit();
         try testing.expect((try parsed_res.response()).hasErr());
         try testing.expectEqual((try parsed_res.response()).err().code, @intFromEnum(ErrorCode.InvalidParams));
@@ -603,7 +603,7 @@ test "Handle batch requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons        );
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -670,7 +670,7 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons        );
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
@@ -754,7 +754,7 @@ test "Dispatch on the response to a request of float add" {
         defer response_buf.deinit();
         _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
-                , &response_buf, null);
+            , &response_buf, null);
         const res_json = response_buf.items;
         // std.debug.print("res_json: {s}\n", .{res_json});
 
@@ -794,7 +794,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
             \\{"jsonrpc": "2.0", "method": "get", "id": 4}
             ,
         };
-        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons);
+        const batch_req_json = try zigjr.composer.makeBatchRequestJson(alloc, &req_jsons        );
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
