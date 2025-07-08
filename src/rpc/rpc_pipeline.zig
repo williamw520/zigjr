@@ -103,7 +103,11 @@ pub const RequestPipeline = struct {
     pub fn runRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
         // response_json is freshly allocated in runRequestToJson(); need freeing.
         const response_json = try self.runRequestToJson(request_json);
-        return parseRpcResponseOwned(self.alloc, response_json);
+        if (response_json) |json| {
+            return parseRpcResponseOwned(self.alloc, json);
+        } else {
+            return .{};
+        }        
     }
 };
 
@@ -206,7 +210,7 @@ pub const ResponsePipeline = struct {
     /// Any parse error is returned to the caller and the dispatcher is not called.
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
-    pub fn runResponse(self: @This(), response_json: ?[]const u8) !void {
+    pub fn runResponse(self: @This(), response_json: []const u8) !void {
         var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
         return self.res_executor.execResponseResult(response_result);

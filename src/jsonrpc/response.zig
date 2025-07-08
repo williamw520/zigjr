@@ -26,20 +26,17 @@ const Owned = @import("../rpc/deiniter.zig").Owned;
 /// Parse response_json into a RpcResponseResult.
 /// Caller transfers ownership of response_json to RpcResponseResult.
 /// They will be freed in the RpcResponseResult.deinit().
-pub fn parseRpcResponseOwned(alloc: Allocator, response_json: ?[]const u8) RpcResponseResult {
+pub fn parseRpcResponseOwned(alloc: Allocator, response_json: []const u8) RpcResponseResult {
     var rresult = parseRpcResponse(alloc, response_json);
-    if (response_json) |json| {
-        rresult.jsonOwned(json, alloc);
-    }
+    rresult.jsonOwned(response_json, alloc);
     return rresult;
 }
 
 /// Parse response_json into a RpcResponseResult.
 /// Caller manages the lifetime response_json.  Needs to ensure response_json is not
 /// freed before RpcResponseResult.deinit(). Parsed result references response_json.
-/// response_json can be null, to accommodate no reply from server, for notification.
-pub fn parseRpcResponse(alloc: Allocator, response_json: ?[]const u8) RpcResponseResult {
-    const json = std.mem.trim(u8, response_json orelse "", " ");
+pub fn parseRpcResponse(alloc: Allocator, response_json: []const u8) RpcResponseResult {
+    const json = std.mem.trim(u8, response_json, " ");
     if (json.len == 0) {
         return .{ .response_msg = .{ .none = {} } };
     }

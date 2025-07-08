@@ -205,7 +205,7 @@ test "Handle a request of hello method" {
         defer if (res_json)|json| alloc.free(json);
         // std.debug.print("response: {s}\n", .{res_json.?});
 
-        var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
+        var parsed_res = zigjr.parseRpcResponse(alloc, res_json.?);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
