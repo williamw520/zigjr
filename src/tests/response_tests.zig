@@ -770,7 +770,7 @@ test "Dispatch on the response to a request of float add" {
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
-        try res_pipeline.runResponse(res_json);
+        try res_pipeline.runResponse(res_json, null);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
@@ -820,7 +820,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
-        try res_pipeline.runResponse(batch_res_json);
+        try res_pipeline.runResponse(batch_res_json, null);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }

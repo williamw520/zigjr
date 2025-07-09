@@ -174,15 +174,12 @@ fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8
 
 pub const ResponsePipeline = struct {
     alloc:          Allocator,
-    res_executor:   ResponseExcutor,
+    res_dispatcher: ResponseDispatcher,
 
     pub fn init(alloc: Allocator, res_dispatcher: ResponseDispatcher) @This() {
         return .{
             .alloc = alloc,
-            .res_executor = .{
-                .alloc = alloc,
-                .res_dispatcher = res_dispatcher,
-            },
+            .res_dispatcher = res_dispatcher,
         };
     }
 
@@ -192,36 +189,27 @@ pub const ResponsePipeline = struct {
     /// Any parse error is returned to the caller and the dispatcher is not called.
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
-    // TODO: pass headers in.
-    pub fn runResponse(self: @This(), response_json: []const u8) !void {
+    pub fn runResponse(self: @This(), response_json: []const u8,
+                       headers: ?std.StringHashMap([]const u8)) !void {
+        _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
         var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
-        return self.res_executor.execResponseResult(response_result);
+        try processResponseResult(self.alloc, response_result, self.res_dispatcher);
     }
 
 };
 
-const ResponseExcutor = struct {
-    alloc:          Allocator,
-    res_dispatcher: ResponseDispatcher,
-
-    fn execResponseResult(self: @This(), response_result: RpcResponseResult) !void {
-        return switch (response_result.response_msg) {
-            .response   => |rpc_response|  try self.res_dispatcher.dispatch(self.alloc, rpc_response),
-            .batch      => |rpc_responses| for (rpc_responses) |rpc_response| {
-                try self.res_dispatcher.dispatch(self.alloc, rpc_response);
-            },
-            .none       => {},
-        };
-    }
-};
-
-
-pub const MessageRunResult = union(enum) {
-    request_no_result:  void,
-    request_result:     []const u8,
-    response_result:    void,
-};
+fn processResponseResult(alloc: Allocator, response_result: RpcResponseResult,
+                         dispatcher: ResponseDispatcher) anyerror!void {
+    // Any errors (parsing or others) are forwarded to the handlers via the dispatcher.
+    return switch (response_result.response_msg) {
+        .response   => |rpc_response|  try dispatcher.dispatch(alloc, rpc_response),
+        .batch      => |rpc_responses| for (rpc_responses) |rpc_response| {
+            try dispatcher.dispatch(alloc, rpc_response);
+        },
+        .none       => {},
+    };
+}
 
 
 pub const MessagePipeline = struct {
@@ -229,7 +217,6 @@ pub const MessagePipeline = struct {
     req_dispatcher: RequestDispatcher,
     res_dispatcher: ResponseDispatcher,
     logger:         zigjr.Logger,
-    res_executor:   ResponseExcutor,
 
     pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
                 logger: ?zigjr.Logger) @This() {
@@ -240,10 +227,6 @@ pub const MessagePipeline = struct {
             .logger = l,
             .req_dispatcher = req_dispatcher,
             .res_dispatcher = res_dispatcher,
-            .res_executor = .{
-                .alloc = alloc,
-                .res_dispatcher = res_dispatcher,
-            },
         };
     }
 
@@ -251,33 +234,36 @@ pub const MessagePipeline = struct {
         self.logger.stop("[MessagePipeline] Logging stops");
     }
 
-    pub fn runMessageToJson(self: @This(), message_json: []const u8, 
-                            headers: ?std.StringHashMap([]const u8)) AllocError!MessageRunResult {
+    pub fn runMessage(self: @This(), message_json: []const u8, response_buf: *ArrayList(u8),
+                      headers: ?std.StringHashMap([]const u8)) anyerror!MessageRunResult {
         _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
 
-        self.logger.log("runMessageToJson", "message_json ", message_json);
+        self.logger.log("runMessage", "message_json ", message_json);
         var msg_result = parseRpcMessage(self.alloc, message_json);
         defer msg_result.deinit();
+
         switch (msg_result) {
-            .request_result     => |req_result| {
-                var response_buf = ArrayList(u8).init(self.alloc);
+            .request_result  => |request_result| {
                 const writer = response_buf.writer();
-                const has_response = switch (req_result.request_msg) {
+                const response_written = switch (request_result.request_msg) {
                     .batch   => |reqs| try processRpcBatch(self.alloc,  reqs, self.req_dispatcher, writer),
                     .request => |req|  try processRpcRequest(self.alloc, req, self.req_dispatcher, "", writer),
                 };
-                return if (has_response)
-                    .{ .request_result = response_buf.toOwnedSlice() }
-                else
-                    .{ .request_no_result = {} };
+                self.logger.log("runMessage", "response_json", response_buf.items);
+                return if (response_written) .request_has_response else .request_no_response;
             },
-            .response_result    => |res_result| {
-                try self.res_executor.execResponseResult(res_result);
-                return .{ .response_result = {} };
+            .response_result => |response_result| {
+                try processResponseResult(self.alloc, response_result, self.res_dispatcher);
+                return .response_processed;
             },
         }
     }
 };
 
+pub const MessageRunResult = enum {
+    request_has_response,
+    request_no_response,
+    response_processed,
+};
 
 

@@ -88,7 +88,7 @@ pub fn responsesByDelimiter(alloc: Allocator, reader: anytype,
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("streamResponses", "receive response", response_json);
-        pipeline.runResponse(response_json) catch |err| {
+        pipeline.runResponse(response_json, null) catch |err| {
             const stderr = std.io.getStdErr().writer();
             stderr.print("Error in runResponse(). {any}", .{err}) catch {};
         };
@@ -162,7 +162,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("streamResponses", "receive response", response_json);
-        pipeline.runResponse(response_json) catch |err| {
+        pipeline.runResponse(response_json, null) catch |err| {
             const stderr = std.io.getStdErr().writer();
             stderr.print("Error in runResponse(). {any}", .{err}) catch {};
         };

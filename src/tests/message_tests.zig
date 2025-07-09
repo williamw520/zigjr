@@ -181,11 +181,9 @@ test "Dispatch on the request and response" {
 
         var res_dispatcher = struct {
             pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
-                std.debug.print("response: {any}\n", .{res});
-                // try testing.expectEqual(res.result.float, 3);
-                // try testing.expect(res.resultEql(3));
-                // try testing.expect(res.resultEql(3.0));
-                // try testing.expect(res.id.eql(1));
+                // std.debug.print("response: {any}\n", .{res});
+                try testing.expectEqualSlices(u8, res.result.string, "hello back");
+                try testing.expect(res.id.eql(1));
             }
         } {};
 
@@ -195,24 +193,21 @@ test "Dispatch on the request and response" {
                                                            null);
         defer pipeline.deinit();
 
-        // const res_json = try pipeline.runRequestToJson(
-        //     \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-        // );
-        // defer if (res_json)|json| alloc.free(json);
-        
+        var response_buf = ArrayList(u8).init(alloc);
+        defer response_buf.deinit();
+        const run_req_result = try pipeline.runMessage(
+            \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
+        , &response_buf, null);
+        try testing.expect(run_req_result == .request_has_response);
+        // std.debug.print("run_result: {}\n", .{run_result});
+        // std.debug.print("response_buf: {s}\n", .{response_buf.items});
 
-        // var response_buf = std.ArrayList(u8).init(alloc);
-        // defer response_buf.deinit();
-        // _ = try pipeline.runRequest(
-        //     \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
-        //     , &response_buf, null);
+        // Feed the response from request back into the message pipeline.
+        var response_buf2 = ArrayList(u8).init(alloc);
+        defer response_buf2.deinit();
+        const run_res_result = try pipeline.runMessage(response_buf.items, &response_buf2, null);
+        try testing.expect(run_res_result == .response_processed);
 
-        // const res_json = response_buf.items;
-        // // std.debug.print("res_json: {s}\n", .{res_json});
-
-        // const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
-
-        // try res_pipeline.runResponse(res_json);
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
