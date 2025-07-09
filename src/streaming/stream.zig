@@ -178,30 +178,46 @@ pub const ContentLengthOptions = struct {
 var nopLogger = zigjr.NopLogger{};
 
 
-// /// Runs a loop to read a stream of JSON request and/or response messages (frames) from the reader,
-// /// and handle each one with the dispatcher.
-// pub fn messagesByContentLength(alloc: Allocator, reader: anytype,
-//                                dispatcher: MessageDispatcher, options: ContentLengthOptions) !void {
-//     var frame_buf = frame.FrameBuf.init(alloc);
-//     defer frame_buf.deinit();
-//     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+/// Runs a loop to read a stream of JSON request and/or response messages (frames) from the reader,
+/// and handle each one with the RequestDispatcher or the ResponseDispatcher.
+pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: anytype,
+                               req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
+                               options: ContentLengthOptions) !void {
+    var frame_buf = frame.FrameBuf.init(alloc);
+    defer frame_buf.deinit();
+    var req_response_buf = std.ArrayList(u8).init(alloc);
+    defer req_response_buf.deinit();
+    var req_buffered_writer = std.io.bufferedWriter(req_writer);
+    const req_output_writer = req_buffered_writer.writer();
+    var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
+    defer pipeline.deinit();
 
-//     options.logger.start("[streamResponses] Logging starts");
-//     defer { options.logger.stop("[streamResponses] Logging stops"); }
+    options.logger.start("[messagesByContentLength] Logging starts");
+    defer { options.logger.stop("[messagesByContentLength] Logging stops"); }
 
-//     while (true) {
-//         frame_buf.reset();
-//         if (!try frame.readContentLengthFrame(reader, &frame_buf))
-//             break;
+    while (true) {
+        frame_buf.reset();
+        if (!try frame.readContentLengthFrame(reader, &frame_buf))
+            break;
 
-//         const response_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
-//         if (options.skip_blank_message and response_json.len == 0) continue;
+        const message_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
+        if (options.skip_blank_message and message_json.len == 0) continue;
 
-//         options.logger.log("streamResponses", "receive response", response_json);
-//         pipeline.handleJsonResponse(response_json) catch |err| {
-//             const stderr = std.io.getStdErr().writer();
-//             stderr.print("Error in handleJsonResponse(). {any}", .{err}) catch {};
-//         };
-//     }
-// }
+        req_response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
+        const run_result = try pipeline.runMessage(message_json, &req_response_buf, null);
+        switch (run_result) {
+            .request_has_response => {
+                try frame.writeContentLengthFrame(req_output_writer, req_response_buf.items);
+                try req_buffered_writer.flush();
+                options.logger.log("messagesByContentLength", "request_has_response", req_response_buf.items);
+            },
+            .request_no_response => {
+                options.logger.log("messagesByContentLength", "request_no_response", "");
+            },
+            .response_processed => {
+                options.logger.log("messagesByContentLength", "response_processed", "");
+            },
+        }
+    }
+}
 

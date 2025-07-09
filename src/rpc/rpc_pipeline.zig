@@ -192,6 +192,7 @@ pub const ResponsePipeline = struct {
     pub fn runResponse(self: @This(), response_json: []const u8,
                        headers: ?std.StringHashMap([]const u8)) !void {
         _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
+
         var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
         try processResponseResult(self.alloc, response_result, self.res_dispatcher);
@@ -234,7 +235,7 @@ pub const MessagePipeline = struct {
         self.logger.stop("[MessagePipeline] Logging stops");
     }
 
-    pub fn runMessage(self: @This(), message_json: []const u8, response_buf: *ArrayList(u8),
+    pub fn runMessage(self: @This(), message_json: []const u8, req_response_buf: *ArrayList(u8),
                       headers: ?std.StringHashMap([]const u8)) anyerror!MessageRunResult {
         _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
 
@@ -244,12 +245,12 @@ pub const MessagePipeline = struct {
 
         switch (msg_result) {
             .request_result  => |request_result| {
-                const writer = response_buf.writer();
+                const writer = req_response_buf.writer();
                 const response_written = switch (request_result.request_msg) {
                     .batch   => |reqs| try processRpcBatch(self.alloc,  reqs, self.req_dispatcher, writer),
                     .request => |req|  try processRpcRequest(self.alloc, req, self.req_dispatcher, "", writer),
                 };
-                self.logger.log("runMessage", "response_json", response_buf.items);
+                self.logger.log("runMessage", "req_response_json", req_response_buf.items);
                 return if (response_written) .request_has_response else .request_no_response;
             },
             .response_result => |response_result| {
