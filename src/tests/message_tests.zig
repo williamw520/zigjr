@@ -174,3 +174,46 @@ test "Parse error from a request of unknown method, expect error" {
 }
 
 
+test "Dispatch on the request and response" {
+    const alloc = gpa.allocator();
+    {
+        var req_dispatcher = HelloDispatcher{};
+
+        var res_dispatcher = struct {
+            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+                std.debug.print("response: {any}\n", .{res});
+                // try testing.expectEqual(res.result.float, 3);
+                // try testing.expect(res.resultEql(3));
+                // try testing.expect(res.resultEql(3.0));
+                // try testing.expect(res.id.eql(1));
+            }
+        } {};
+
+        var pipeline = zigjr.pipeline.MessagePipeline.init(alloc,
+                                                           RequestDispatcher.implBy(&req_dispatcher),
+                                                           ResponseDispatcher.implBy(&res_dispatcher),
+                                                           null);
+        defer pipeline.deinit();
+
+        // const res_json = try pipeline.runRequestToJson(
+        //     \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
+        // );
+        // defer if (res_json)|json| alloc.free(json);
+        
+
+        // var response_buf = std.ArrayList(u8).init(alloc);
+        // defer response_buf.deinit();
+        // _ = try pipeline.runRequest(
+        //     \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
+        //     , &response_buf, null);
+
+        // const res_json = response_buf.items;
+        // // std.debug.print("res_json: {s}\n", .{res_json});
+
+        // const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
+
+        // try res_pipeline.runResponse(res_json);
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
