@@ -10,6 +10,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 const Mutex = std.Thread.Mutex;
+const ArrayList = std.ArrayList;
 const Value = std.json.Value;
 const ObjectMap = std.json.ObjectMap;
 const allocPrint = std.fmt.allocPrint;
@@ -43,12 +44,12 @@ pub fn main() !void {
         var child = std.process.Child.init(args.cmd_argv.items, alloc);
         child.stdin_behavior    = .Pipe;
         child.stdout_behavior   = .Pipe;
-        child.stderr_behavior   = .Inherit;  // show LSP server's stderr in the parent's stderr
+        child.stderr_behavior   = if (args.stderr) .Inherit else .Ignore;
         try child.spawn();
 
-        const request_thread    = try Thread.spawn(.{}, request_worker, .{ child.stdin.? });
-        const response_thread   = try Thread.spawn(.{}, response_worker,
-                                                   .{ child.stdout.?, args.pp_json, args.dump });
+        const request_thread    = try Thread.spawn(.{}, request_worker,  .{ child.stdin.? });
+        const response_thread   = try Thread.spawn(.{}, response_worker, .{ child.stdout.?, args });
+
         request_thread.join();
         response_thread.join();
 
@@ -62,9 +63,11 @@ pub fn main() !void {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  lsp_client [--pp-json | --dump] lsp_server [arguments]
-        \\        --pp-json pretty-print the result JSON from server.
-        \\        --dump dump the raw response messages
+        \\Usage:  lsp_client [--json | --pp-json | --dump | --stderr ] lsp_server [arguments]
+        \\        --json    print the JSON result from server.
+        \\        --pp-json pretty-print the JSON result from server.
+        \\        --dump    dump the raw response messages.
+        \\        --stderr  print LSP server's stderr to this process' stderr.
         \\
         \\e.g.    lsp_client /zls/zls.exe
         \\e.g.    lsp_client --pp-json /zls/zls.exe
@@ -75,14 +78,16 @@ fn usage() void {
 // Poorman's quick and dirty command line argument parsing.
 const CmdArgs = struct {
     arg_itr:        std.process.ArgIterator,
-    cmd_argv:       std.ArrayList([]const u8),
+    cmd_argv:       ArrayList([]const u8),
+    json:           bool = false,
     pp_json:        bool = false,
     dump:           bool = false,
+    stderr:         bool = false,
 
     fn init(alloc: Allocator) !@This() {
         return .{
             .arg_itr = try std.process.argsWithAllocator(alloc),
-            .cmd_argv = std.ArrayList([]const u8).init(alloc),
+            .cmd_argv = ArrayList([]const u8).init(alloc),
         };
     }
 
@@ -96,13 +101,12 @@ const CmdArgs = struct {
         _ = argv.next();            // skip this program's name.
         while (argv.next())|argz| {
             const arg = std.mem.sliceTo(argz, 0);
-            if (std.mem.eql(u8, arg, "--pp-json")) {
-                self.pp_json = true;
-            } else if (std.mem.eql(u8, arg, "--dump")) {
-                self.dump = true;
-            } else {
-                try self.cmd_argv.append(arg);  // collect the sub-process cmd and args.
-            }
+            if (false) {}
+            else if (std.mem.eql(u8, arg, "--json"))    { self.json = true; }
+            else if (std.mem.eql(u8, arg, "--pp-json")) { self.pp_json = true; }
+            else if (std.mem.eql(u8, arg, "--dump"))    { self.dump = true; }
+            else if (std.mem.eql(u8, arg, "--stderr"))  { self.stderr = true; }
+            else { try self.cmd_argv.append(arg); } // collect the lsp-server cmd and args.
         }
 
         if (self.cmd_argv.items.len == 0) return error.MissingCmd;
@@ -115,7 +119,7 @@ fn request_worker(in_stdin: std.fs.File) !void {
     const alloc = gpa.allocator();
     const in_writer = in_stdin.writer();
     var id: i64 = 1;
-    var buf = std.ArrayList(u8).init(alloc);
+    var buf = ArrayList(u8).init(alloc);
     defer buf.deinit();
 
     std.debug.print("\n[==== request_worker ====] starts\n", .{});
@@ -205,16 +209,16 @@ fn request_worker(in_stdin: std.fs.File) !void {
     std.debug.print("\n[==== request_worker ====] exits\n", .{});
 }
 
-fn response_worker(child_stdout: std.fs.File, pp_json: bool, dump: bool) !void {
+fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
     const out_reader = child_stdout.reader();
-    std.debug.print("[response_worker] starts (pp_json: {}, dump: {})\n", .{pp_json, dump});
+    std.debug.print("[---- response_worker ---] starts\n", .{});
 
-    if (dump) {
+    if (args.dump) {
         // Dump the raw messages from LSP server.
-        var buf = std.ArrayList(u8).init(alloc);
+        var buf = ArrayList(u8).init(alloc);
         defer buf.deinit();
         var chunk: [1024]u8 = undefined;
         while (true) {
@@ -226,14 +230,16 @@ fn response_worker(child_stdout: std.fs.File, pp_json: bool, dump: bool) !void {
             std.debug.print("\n[---- response_worker ---] LSP server response:\n{s}\n\n", .{buf.items});
         }
     } else {
-        // Use ZigJR's ResponseDispatcher to process the response messages.
+        // Use ZigJR's RequestDispatcher and ResponseDispatcher to process the response messages.
         var req_dispatcher = ReqDispatcher {
-            .out_buf = std.ArrayList(u8).init(alloc),
-            .json_opt = if (pp_json) .{ .whitespace = .indent_2 } else .{},
+            .out_buf = ArrayList(u8).init(alloc),
+            .log_json = (args.json or args.pp_json),
+            .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
         var res_dispatcher = ResDispatcher {
-            .out_buf = std.ArrayList(u8).init(alloc),
-            .json_opt = if (pp_json) .{ .whitespace = .indent_2 } else .{},
+            .out_buf = ArrayList(u8).init(alloc),
+            .log_json = (args.json or args.pp_json),
+            .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
 
         try messagesByContentLength(alloc, out_reader, std.io.getStdErr().writer(),
@@ -241,21 +247,26 @@ fn response_worker(child_stdout: std.fs.File, pp_json: bool, dump: bool) !void {
                                     ResponseDispatcher.implBy(&res_dispatcher), .{});
     }
 
-    std.debug.print("[response_worker] exits\n", .{});
+    std.debug.print("[---- response_worker ---] exits\n", .{});
 }
 
+// The server_to_client notifications/events from the LSP server are sent
+// as JSON-RPC requests. Handle them with a RequestDispatcher in the response_worker.
 const ReqDispatcher = struct {
-    out_buf:    std.ArrayList(u8),
+    out_buf:    ArrayList(u8),
+    log_json:   bool,
     json_opt:   StringifyOptions,
 
     pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
-        // In here it just prints out the JSON.
-        self.out_buf.clearRetainingCapacity();
-        try std.json.stringify(req.params, self.json_opt, self.out_buf.writer());
-        std.debug.print("\n[---- response_worker ---] LSP server request method: {s}, id: {any}\n{s}\n\n",
-                        .{req.method, req.id, self.out_buf.items});
+        std.debug.print("\n[---- response_worker ---] LSP server request, method: {s}, id: {any}\n",
+                        .{req.method, req.id});
+        if (self.log_json) {
+            self.out_buf.clearRetainingCapacity();
+            try std.json.stringify(req.params, self.json_opt, self.out_buf.writer());
+            std.debug.print("{s}\n", .{self.out_buf.items});
+        }
         return DispatchResult.asNone();
     }
 
@@ -269,17 +280,19 @@ const ReqDispatcher = struct {
 };
 
 const ResDispatcher = struct {
-    out_buf:    std.ArrayList(u8),
+    out_buf:    ArrayList(u8),
+    log_json:   bool,
     json_opt:   StringifyOptions,
 
     pub fn dispatch(self: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
-        // In here it just prints out the JSON.
-        self.out_buf.clearRetainingCapacity();
-        try std.json.stringify(res.result, self.json_opt, self.out_buf.writer());
-        std.debug.print("\n[---- response_worker ---] LSP server response id: {any}\n{s}\n\n",
-                        .{res.id.num, self.out_buf.items});
+        std.debug.print("\n[---- response_worker ---] LSP server response id: {any}\n", .{res.id.num});
+        if (self.log_json) {
+            self.out_buf.clearRetainingCapacity();
+            try std.json.stringify(res.result, self.json_opt, self.out_buf.writer());
+            std.debug.print("{s}\n", .{self.out_buf.items});
+        }
     }
 };
 
