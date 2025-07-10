@@ -166,6 +166,17 @@ const CounterDispatcher = struct {
 };
 
 
+fn fallbackHandler(ctx: anytype, alloc: Allocator, request: RpcRequest) !void {
+    _=ctx;
+    _=alloc;
+    _=request;
+    // const buf = std.ArrayList(u8).init(alloc);
+    // try std.json.stringify(params, .{}, buf.writer());
+    // std.debug.print("{s}\n", .{buf.items});
+}
+
+
+
 test "Response to a request of hello method" {
     const alloc = gpa.allocator();
     {

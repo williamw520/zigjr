@@ -21,6 +21,7 @@ const RpcId = zigjr.RpcId;
 const writeContentLengthRequest = zigjr.frame.writeContentLengthRequest;
 const responsesByContentLength = zigjr.stream.responsesByContentLength;
 const messagesByContentLength = zigjr.stream.messagesByContentLength;
+const RpcRegistry = zigjr.RpcRegistry;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const ResponseDispatcher = zigjr.ResponseDispatcher;
 const RpcRequest = zigjr.RpcRequest;
@@ -230,36 +231,49 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
             std.debug.print("\n[---- response_worker ---] LSP server response:\n{s}\n\n", .{buf.items});
         }
     } else {
-        // Use ZigJR's RequestDispatcher and ResponseDispatcher to process the response messages.
-        var req_dispatcher = ReqDispatcher {
+        // LSP server can send 'server_to_client' notifications/events as JSON-RPC requests.
+        // Use ZigJR's RpcRegistry and Fallback to process the request messages.
+        var req_registry = zigjr.RpcRegistry.init(alloc);
+        defer req_registry.deinit();
+        try req_registry.add("window/logMessage", window_logMessage);
+        var fallback_handler = ReqWildcardHandler {
             .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
+        req_registry.setFallback(&fallback_handler);
+
+        // Use ZigJR's ResponseDispatcher to process the response messages.
         var res_dispatcher = ResDispatcher {
             .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
 
+        // Use the generic 'messagesByContentLength' to handle both requests and responses.
         try messagesByContentLength(alloc, out_reader, std.io.getStdErr().writer(),
-                                    RequestDispatcher.implBy(&req_dispatcher),
+                                    RequestDispatcher.implBy(&req_registry),
                                     ResponseDispatcher.implBy(&res_dispatcher), .{});
     }
 
     std.debug.print("[---- response_worker ---] exits\n", .{});
 }
 
-// The server_to_client notifications/events from the LSP server are sent
-// as JSON-RPC requests. Handle them with a RequestDispatcher in the response_worker.
-const ReqDispatcher = struct {
+// Handler for the 'window/logMessage' request
+fn window_logMessage(params: LogMessageParams) void {
+    std.debug.print("\n[---- response_worker ---] LSP server request, method: 'window_logMessage', type: {}\n",
+                    .{params.@"type"});
+    std.debug.print("{s}\n", .{params.message});
+}
+
+const ReqWildcardHandler = struct {
     out_buf:    ArrayList(u8),
     log_json:   bool,
     json_opt:   StringifyOptions,
 
-    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        // res.result has the result JSON object from server.
-        // res.id is the request id; dispatch based on the id recorded in request_worker().
+    pub fn handle(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        // req.result has the result JSON object from server.
+        // req.id is the request id; dispatch based on the id recorded in request_worker().
         std.debug.print("\n[---- response_worker ---] LSP server request, method: {s}, id: {any}\n",
                         .{req.method, req.id});
         if (self.log_json) {
@@ -268,14 +282,6 @@ const ReqDispatcher = struct {
             std.debug.print("{s}\n", .{self.out_buf.items});
         }
         return DispatchResult.asNone();
-    }
-
-    pub fn dispatchEnd(_: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        switch (dresult) {
-            .none => {},
-            .result => {},
-            .err => {},
-        }
     }
 };
 
@@ -357,3 +363,16 @@ const Position = struct {
     character: u32,
 };
 
+const LogMessageParams = struct {
+    @"type": MessageType,
+    message: []const u8,
+};
+
+const MessageType = enum(u32) {
+    Error = 1,
+    Warning = 2,
+    Info = 3,
+    Log = 4,
+    Debug = 5,
+    _,
+};

@@ -168,7 +168,7 @@ const HandlerInfo = struct {
 
 // Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
 
-inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) HandlerInfo {
+pub inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) HandlerInfo {
     const fn_info       = getFnInfo(handler_fn);
     const params        = fn_info.params;
     const ctx_type      = @TypeOf(context);
