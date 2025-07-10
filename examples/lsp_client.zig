@@ -228,20 +228,22 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
             try buf.appendSlice(chunk[0..chunk_len]);
             if (chunk_len == 1024)
                 continue;   // if the msg aligns at 1024, will read the next msg and combine both.
-            std.debug.print("\n[---- response_worker ---] LSP server response:\n{s}\n\n", .{buf.items});
+            std.debug.print("\n[---- response_worker ---] Server json:\n{s}\n\n", .{buf.items});
         }
     } else {
         // LSP server can send 'server_to_client' notifications/events as JSON-RPC requests.
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
         var req_registry = zigjr.RpcRegistry.init(alloc);
         defer req_registry.deinit();
-        try req_registry.add("window/logMessage", window_logMessage);
-        var fallback_handler = ReqWildcardHandler {
+        var fallback_handler = ReqExtHandlers {
             .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
-        req_registry.setFallback(&fallback_handler);
+        req_registry.setExtHandlers(&fallback_handler);
+
+        // Comment out this to see the fallback_handler being called.
+        try req_registry.add("window/logMessage", window_logMessage);
 
         // Use ZigJR's ResponseDispatcher to process the response messages.
         var res_dispatcher = ResDispatcher {
@@ -259,23 +261,22 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     std.debug.print("[---- response_worker ---] exits\n", .{});
 }
 
-// Handler for the 'window/logMessage' request
-fn window_logMessage(params: LogMessageParams) void {
-    std.debug.print("\n[---- response_worker ---] LSP server request, method: 'window_logMessage', type: {}\n",
-                    .{params.@"type"});
-    std.debug.print("{s}\n", .{params.message});
-}
-
-const ReqWildcardHandler = struct {
+const ReqExtHandlers = struct {
     out_buf:    ArrayList(u8),
     log_json:   bool,
     json_opt:   StringifyOptions,
 
-    pub fn handle(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    pub fn onBefore(_: *@This(), _: Allocator, req: RpcRequest) void {
         // req.result has the result JSON object from server.
         // req.id is the request id; dispatch based on the id recorded in request_worker().
-        std.debug.print("\n[---- response_worker ---] LSP server request, method: {s}, id: {any}\n",
+        std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
                         .{req.method, req.id});
+    }
+
+    pub fn onAfter(_: *@This(), _: Allocator, _: RpcRequest, _: DispatchResult) void {
+    }
+
+    pub fn fallback(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
         if (self.log_json) {
             self.out_buf.clearRetainingCapacity();
             try std.json.stringify(req.params, self.json_opt, self.out_buf.writer());
@@ -285,6 +286,11 @@ const ReqWildcardHandler = struct {
     }
 };
 
+// Handler for the 'window/logMessage' request from server.
+fn window_logMessage(params: LogMessageParams) void {
+    std.debug.print("type:    {}\nmessage: {s}\n", .{params.@"type", params.message});
+}
+
 const ResDispatcher = struct {
     out_buf:    ArrayList(u8),
     log_json:   bool,
@@ -293,7 +299,7 @@ const ResDispatcher = struct {
     pub fn dispatch(self: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
-        std.debug.print("\n[---- response_worker ---] LSP server response id: {any}\n", .{res.id.num});
+        std.debug.print("\n[---- response_worker ---] Server sent response, id: {any}\n", .{res.id.num});
         if (self.log_json) {
             self.out_buf.clearRetainingCapacity();
             try std.json.stringify(res.result, self.json_opt, self.out_buf.writer());
@@ -368,11 +374,11 @@ const LogMessageParams = struct {
     message: []const u8,
 };
 
-const MessageType = enum(u32) {
+const MessageType = enum(i64) {
     Error = 1,
     Warning = 2,
     Info = 3,
     Log = 4,
     Debug = 5,
-    _,
 };
+
