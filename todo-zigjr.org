@@ -1,42 +1,63 @@
 
-TODOs
-* DONE Add dispatcher.free() to free on the DispatchResult. Let the dispatcher handle freeing memory.
-* DONE Add inc(), dec(), and get() to CounterDispatcher test.
-* DONE Add notification testing.  Just use CounterDispatcher.
-* DONE Test on float number in request and response messages.
-* DONE Add check for notification request.
-* DONE Add batch response message builder.
-* DONE Add batch dispatching in msg_handler.
-* DONE Add parsing batch result.
-* DONE Rename RpcMessage to RpcRequestMessage.
-* DONE Add test on parsing empty batch request.
-* DONE Add test on parsing empty batch response.
-* DONE Add test on parsing batch requests with reader.
-* DONE Add delimiter based request streaming API.
-* DONE Add Content-Length request header based streaming API.
-* DONE Add running dispatcher on response JSON, on RpcResponse, and on RpcResponse batch.
-* DONE Add delimiter based response streaming API.
-* DONE Add Content-Length header based response streaming API.
-* DONE Message logging.
-* DONE Rename run() to dispatch() on dispatcher.
-* DONE Compact JSON output.
-* DONE Return DispatchResult for the Callable.invocation.
-* DONE Registration of function with arbitrary parameters.
-* DONE Invoke function with arbitrary parameters.
-* DONE Registration of function with arbitrary return type.
-* DONE Capture the function return value and convert to JSON result.
-* DONE Convert JSON to native values.
-* DONE Use ArenaAllocator for each request handling invocation to avoid complicated cleanup.
-* DONE Add dispatching registry.
-* DONE Rename directory handler to rpc.
-* DONE Allow struct objects in array params.
-* DONE Add Hello example for a simple start.
-* DONE Add Calc example for various function handlers, parameter types, and return types.
-* DONE Add streaming example.
-* DONE Support handling arbitrary Value params in the array parameters of a handler function.
-* DONE Add LSP client example.
-* DONE Add fallback handler for RpcRegistry.
-* DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
-* TODO Add network server and client example.
-* TODO Add request and notification message builders.
+* TODOs
+** DONE Add dispatcher.free() to free on the DispatchResult. Let the dispatcher handle freeing memory.
+** DONE Add inc(), dec(), and get() to CounterDispatcher test.
+** DONE Add notification testing.  Just use CounterDispatcher.
+** DONE Test on float number in request and response messages.
+** DONE Add check for notification request.
+** DONE Add batch response message builder.
+** DONE Add batch dispatching in msg_handler.
+** DONE Add parsing batch result.
+** DONE Rename RpcMessage to RpcRequestMessage.
+** DONE Add test on parsing empty batch request.
+** DONE Add test on parsing empty batch response.
+** DONE Add test on parsing batch requests with reader.
+** DONE Add delimiter based request streaming API.
+** DONE Add Content-Length request header based streaming API.
+** DONE Add running dispatcher on response JSON, on RpcResponse, and on RpcResponse batch.
+** DONE Add delimiter based response streaming API.
+** DONE Add Content-Length header based response streaming API.
+** DONE Message logging.
+** DONE Rename run() to dispatch() on dispatcher.
+** DONE Compact JSON output.
+** DONE Return DispatchResult for the Callable.invocation.
+** DONE Registration of function with arbitrary parameters.
+** DONE Invoke function with arbitrary parameters.
+** DONE Registration of function with arbitrary return type.
+** DONE Capture the function return value and convert to JSON result.
+** DONE Convert JSON to native values.
+** DONE Use ArenaAllocator for each request handling invocation to avoid complicated cleanup.
+** DONE Add dispatching registry.
+** DONE Rename directory handler to rpc.
+** DONE Allow struct objects in array params.
+** DONE Add Hello example for a simple start.
+** DONE Add Calc example for various function handlers, parameter types, and return types.
+** DONE Add streaming example.
+** DONE Support handling arbitrary Value params in the array parameters of a handler function.
+** DONE Add LSP client example.
+** DONE Add fallback handler for RpcRegistry.
+** DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
+** TODO Add network server and client example.
+** TODO Add request and notification message builders.
+
+
+* Releases
+- Release 1.1
+  * Add Universal message handling.
+    * Message-based parsing, for both request and response.
+    * Message-based execution via rpc_pipeline.runMessage(), for both request and response.
+    * Message-based streaming, handling both request and response in the stream.
+  * RpcRegistry supports extended handlers: pre-dispatch, post-dispatch, and fallback handler.
+  * Fallback handler for handling any unregistered request methods.
+  * Add RpcRequest.parseRpcRequestOwned() to handle memory ownership of passed in JSON string.
+  * Add RpcResponse.parseRpcResponseOwned() to handle memory ownership of passed in JSON string.
+  * Remove error union from the return value of response.parseRpcResponse().
+  * Add readHttpHeaders() to parse all HTTP-style headers, not just Content-Length.
+  * Add the LSP client example.
+
+- Release 1.0.1
+  * Minor bug fixes.
+
+- Release 1.0
+  * Feature completed.  Initial release.
 

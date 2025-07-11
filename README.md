@@ -26,6 +26,7 @@ This small library is packed with the following features:
 * [Invocation and Cleanup](#invocation-and-cleanup)
 * [Handler Function](#handler-function)
 * [Extended Handlers](#extended-handlers)
+* [Universal Message Handling](#universal-message-handling)
 * [Transport](#transport)
 * [Project Build](#project-build)
 * [Examples](#examples)
@@ -475,6 +476,20 @@ const MyExtHandlers = struct {
 };
 ```
 
+## Universal Message Handling
+
+Some servers (e.g. LSP server) can send both responses to a client's requests and 
+its own server-to-client requests in the same channel. A client needs to be able
+to handle both JSON RPC responses and requests in the same channel. 
+ZigJR provides universal message handling functions to handle message that is either a request or a response.
+
+* `stream.messagesByContentLength()`: handles a stream of mixed requests and responses.
+* `rpc_pipeline.runMessage()`: handles one message of either a request or response.
+* `message.parseRpcMessage()`: parses one message of either a request or response.
+
+See the [lsp_client.zig](examples/lsp_client.zig) example on how to handle a mix of requests and responses
+in a stream.
+
 
 ## Transport
 
@@ -609,6 +624,12 @@ The LSP client example is a rudimentary LSP client illustrating how to build a J
 It spawns the LSP server as a sub-process, communicating it via its stdin and stdout.
 It creates a thread for the `request_worker()` to send LSP request messages to the server's stdin,
 and another thread for the `response_worker()` to read LSP responses and requests from the server's stdout.
+
+Since a LSP server can send both responses to client's requests and its own server-to-client requests,
+lsp_client uses `stream.messagesByContentLength()` to handle both incoming JSON RPC responses and requests.
+
+It uses `RpcRegistry` plus `ExtHandlers` and `ResponseDispatcher` to handle the requests and responses in
+a central place.
 
 The `request_worker()` sends a number of LSP requests to the server to illustrate how the LSP protocol works.
 - `initialize` - tells the LSP server the client's capabilities and starts the session.
