@@ -25,10 +25,10 @@ This small library is packed with the following features:
 * [Custom Dispatcher](#custom-dispatcher)
 * [Invocation and Cleanup](#invocation-and-cleanup)
 * [Handler Function](#handler-function)
+* [Extended Handlers](#extended-handlers)
 * [Transport](#transport)
 * [Project Build](#project-build)
 * [Examples](#examples)
-* [Run the MCP Server Example](#run-the-mcp-server-example)
 * [License](#license)
 * [References](#references)
 
@@ -439,6 +439,43 @@ const MyLogger = struct {
 };
 ```
 
+## Extended Handlers
+
+`RpcRegistry` supports setting up of pre-handler, post-handler, and fallback handler
+for each request. Before dispatching a request to its method's handler, the
+`onBefore()` handler is called, giving a chance to do pre-handling on every request.
+After the handler for a request has returned, the `onAfter()` handler is called,
+giving a chance to do post-handling on every request.
+
+If a request's method has no registered handler, the `fallback()` handler is called.
+
+The extended handlers are set up via `setExtHandlers()` on `RpcRegistry`. For example,
+
+```zig
+{
+        var registry = zigjr.RpcRegistry.init(alloc);
+        defer registry.deinit();
+        var ext_handlers = MyExtHandlers {};
+        registry.setExtHandlers(&ext_handlers);
+}
+
+const MyExtHandlers = struct {
+    pub fn onBefore(self: *@This(), alloc: Allocator, req: RpcRequest) void {
+        std.debug.print("Before handling request, method: {s}, id: {any}\n", .{req.method, req.id});
+    }
+
+    pub fn onAfter(self: *@This(), alloc: Allocator, req: RpcRequest, res: DispatchResult) void {
+        std.debug.print("After handling request, result: {any}\n", .{res});
+    }
+
+    pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        std.debug.print("Got request, method: {s}, id: {any}\n", .{req.method, req.id});
+        return DispatchResult.asNone();
+    }
+};
+```
+
+
 ## Transport
 
 A few words on message transport. ZigJR doesn't deal with transport at all. 
@@ -459,6 +496,7 @@ The project has a number of examples showing how to build applications with ZigJ
 * [calc.zig](examples/calc.zig): Showcase different kinds of handler functions.
 * [dispatcher_hello.zig](examples/dispatcher_hello.zig): Custom dispatcher.
 * [mcp_hello.zig](examples/mcp_hello.zig): A basic MCP server written from the ground up.
+* [lsp_client.zig](examples/lsp_client.zig): A LSP client interacting LSP server.
 
 Check out [examples](examples) for other examples.
 
@@ -513,7 +551,7 @@ zig-out/bin/calc.exe < data/calc_divide_99.json
 zig-out/bin/calc.exe < data/calc_divide_by_0.json
 ```
 
-## Run the MCP Server Example
+### Run the MCP Server Example
 
 The `mcp_hello` executible can be run standalone on a console for testing its message handling,
 or run as an embedded subprocess in a MCP host.
@@ -563,6 +601,54 @@ mcphost --config config-mcp-hello.json --provider-api-key YOUR-API-KEY --model g
 
 Type `hello`, `hello Joe` or `hello Joe 10` in the prompt for testing. The `log.txt` file captures the interaction.
 
+### Run the LSP Client Example
+
+The LSP client 
+
+The LSP client example is a rudimentary LSP client illustrating how to build a JSON RPC client.
+It spawns the LSP server as a sub-process, communicating it via its stdin and stdout.
+It creates a thread for the `request_worker()` to send LSP request messages to the server's stdin,
+and another thread for the `response_worker()` to read LSP responses and requests from the server's stdout.
+
+The `request_worker()` sends a number of LSP requests to the server to illustrate how the LSP protocol works.
+- `initialize` - tells the LSP server the client's capabilities and starts the session.
+- `initialized` - tells the server the client is ready; server will send requests to client after this.
+- `textDocument/didOpen` - tells the server a file has been loaded; send the file content over.
+- `textDocument/definition` - gets the definition at a position of the file.
+- `textDocument/hover` - gets hovering information at a position of the file.
+- `textDocument/signatureHelp` - gets function signature description.
+- `textDocument/completion` - gets completion information to complete typing by the user.
+- `shutdown`
+- `exit`
+
+#### Sample Runs of lsp_client
+
+This runs the ZLS executible as the embedded LSP server. Runs the lsp_client in minimum mode.
+```shell
+    lsp_client  /opt/zls/zls.exe
+```
+
+This dumps the LSP message's payload as JSON string.
+```shell
+    lsp_client --json /opt/zls/zls.exe
+```
+
+This pretty-prints the LSP message's JSON payload.
+```shell
+    lsp_client --pp-json /opt/zls/zls.exe
+```
+
+This dumps the LSP message in raw format, i.e. with the message frame headers.
+```shell
+    lsp_client --dump /opt/zls/zls.exe
+```
+
+The `--stderr` option pipes the LSP server subprocess' stderr to stderr.
+```shell
+    lsp_client --dump --stderr /opt/zls/zls.exe
+```
+
+
 ## License
 
 ZigJR is [MIT licensed](./LICENSE).
@@ -571,4 +657,5 @@ ZigJR is [MIT licensed](./LICENSE).
 
 - [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 - [MCP Schema](https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema)
+- [LSP Specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)
 

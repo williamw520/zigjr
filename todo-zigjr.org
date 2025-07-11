@@ -34,6 +34,9 @@ TODOs
 * DONE Add Calc example for various function handlers, parameter types, and return types.
 * DONE Add streaming example.
 * DONE Support handling arbitrary Value params in the array parameters of a handler function.
+* DONE Add LSP client example.
+* DONE Add fallback handler for RpcRegistry.
+* DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
 * TODO Add network server and client example.
 * TODO Add request and notification message builders.
 

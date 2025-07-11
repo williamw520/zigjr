@@ -235,12 +235,12 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
         var req_registry = zigjr.RpcRegistry.init(alloc);
         defer req_registry.deinit();
-        var fallback_handler = ReqExtHandlers {
+        var ext_handlers = ReqExtHandlers {
             .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
-        req_registry.setExtHandlers(&fallback_handler);
+        req_registry.setExtHandlers(&ext_handlers);
 
         // Comment out this to see the fallback_handler being called.
         try req_registry.add("window/logMessage", window_logMessage);
