@@ -511,7 +511,7 @@ The project has a number of examples showing how to build applications with ZigJ
 * [calc.zig](examples/calc.zig): Showcase different kinds of handler functions.
 * [dispatcher_hello.zig](examples/dispatcher_hello.zig): Custom dispatcher.
 * [mcp_hello.zig](examples/mcp_hello.zig): A basic MCP server written from the ground up.
-* [lsp_client.zig](examples/lsp_client.zig): A LSP client interacting LSP server.
+* [lsp_client.zig](examples/lsp_client.zig): A LSP client interacting with LSP server.
 
 Check out [examples](examples) for other examples.
 
@@ -621,14 +621,14 @@ Type `hello`, `hello Joe` or `hello Joe 10` in the prompt for testing. The `log.
 The LSP client 
 
 The LSP client example is a rudimentary LSP client illustrating how to build a JSON RPC client.
-It spawns the LSP server as a sub-process, communicating it via its stdin and stdout.
-It creates a thread for the `request_worker()` to send LSP request messages to the server's stdin,
-and another thread for the `response_worker()` to read LSP responses and requests from the server's stdout.
+It spawns a LSP server as a sub-process, communicating to it via its stdin and stdout.
+It creates a thread for `request_worker()` to send LSP requests to the server's stdin
+and another thread for `response_worker()` to read LSP responses and requests from the server's stdout.
 
 Since a LSP server can send both responses to client's requests and its own server-to-client requests,
 lsp_client uses `stream.messagesByContentLength()` to handle both incoming JSON RPC responses and requests.
 
-It uses `RpcRegistry` plus `ExtHandlers` and `ResponseDispatcher` to handle the requests and responses in
+It uses `RpcRegistry`, `ExtHandlers` and `ResponseDispatcher` to handle the requests and responses in
 a central place.
 
 The `request_worker()` sends a number of LSP requests to the server to illustrate how the LSP protocol works.
