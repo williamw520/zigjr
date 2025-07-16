@@ -8,55 +8,54 @@
 
 const std = @import("std");
 
+inline fn TPtr(T: type, opaque_ptr: *anyopaque) T {
+    return @as(T, @ptrCast(@alignCast(opaque_ptr)));
+}
 
 /// Logger interface
 pub const Logger = struct {
-    impl_ptr:   *anyopaque,
-    start_fn:   *const fn(impl_ptr: *anyopaque, message: []const u8) void,
-    log_fn:     *const fn(impl_ptr: *anyopaque, source: [] const u8, operation: []const u8, message: []const u8) void,
-    stop_fn:    *const fn(impl_ptr: *anyopaque, message: []const u8) void,
+    impl:       *anyopaque,
+    i_start:    *const fn(impl: *anyopaque, message: []const u8) void,
+    i_log:      *const fn(impl: *anyopaque, source: [] const u8, operation: []const u8, message: []const u8) void,
+    i_stop:     *const fn(impl: *anyopaque, message: []const u8) void,
 
-    // Interface is implemented by the 'impl' object.
+    // The implementation must have these methods.
+    pub fn start(self: @This(), message: []const u8) void {
+        self.i_start(self.impl, message);
+    }
+
+    pub fn log(self: @This(), source: [] const u8, operation: []const u8, message: []const u8) void {
+        self.i_log(self.impl, source, operation, message);
+    }
+
+    pub fn stop(self: @This(), message: []const u8) void {
+        self.i_stop(self.impl, message);
+    }
+
+    // Interface is implemented by the 'impl_obj' object.
     pub fn implBy(impl_obj: anytype) Logger {
-        const ImplType = @TypeOf(impl_obj);
+        const IT = @TypeOf(impl_obj);
 
-        const Thunk = struct {
-            fn start(impl_ptr: *anyopaque, message: []const u8) void {
-                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                impl.start(message);
+        const Delegate = struct {
+            fn start(impl: *anyopaque, message: []const u8) void {
+                TPtr(IT, impl).start(message);
             }
 
-            fn log(impl_ptr: *anyopaque, source: [] const u8, operation: []const u8, message: []const u8) void {
-                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                impl.log(source, operation, message);
+            fn log(impl: *anyopaque, source: [] const u8, operation: []const u8, message: []const u8) void {
+                TPtr(IT, impl).log(source, operation, message);
             }
 
-            fn stop(impl_ptr: *anyopaque, message: []const u8) void {
-                const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                impl.stop(message);
+            fn stop(impl: *anyopaque, message: []const u8) void {
+                TPtr(IT, impl).stop(message);
             }
         };
 
         return .{
-            .impl_ptr = impl_obj,
-            .start_fn = Thunk.start,
-            .log_fn = Thunk.log,
-            .stop_fn = Thunk.stop,
+            .impl = impl_obj,
+            .i_start = Delegate.start,
+            .i_log = Delegate.log,
+            .i_stop = Delegate.stop,
         };
-    }
-
-    // The implementation must have these methods.
-
-    pub fn start(self: @This(), message: []const u8) void {
-        self.start_fn(self.impl_ptr, message);
-    }
-
-    pub fn log(self: @This(), source: [] const u8, operation: []const u8, message: []const u8) void {
-        self.log_fn(self.impl_ptr, source, operation, message);
-    }
-
-    pub fn stop(self: @This(), message: []const u8) void {
-        self.stop_fn(self.impl_ptr, message);
     }
 
 };

@@ -28,7 +28,7 @@ pub const RequestDispatcher = struct {
     pub fn implBy(impl_obj: anytype) RequestDispatcher {
         const ImplType = @TypeOf(impl_obj);
 
-        const Thunk = struct {
+        const Delegate = struct {
             fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatch(alloc, req);
@@ -42,8 +42,8 @@ pub const RequestDispatcher = struct {
 
         return .{
             .impl_ptr = impl_obj,
-            .dispatch_fn = Thunk.dispatch,
-            .dispatchEnd_fn = Thunk.dispatchEnd,
+            .dispatch_fn = Delegate.dispatch,
+            .dispatchEnd_fn = Delegate.dispatchEnd,
         };
     }
 
@@ -69,7 +69,7 @@ pub const ResponseDispatcher = struct {
     pub fn implBy(impl_obj: anytype) ResponseDispatcher {
         const ImplType = @TypeOf(impl_obj);
 
-        const Thunk = struct {
+        const Delegate = struct {
             fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!void {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatch(alloc, res);
@@ -78,7 +78,7 @@ pub const ResponseDispatcher = struct {
 
         return .{
             .impl_ptr = impl_obj,
-            .dispatch_fn = Thunk.dispatch,
+            .dispatch_fn = Delegate.dispatch,
         };
     }
 

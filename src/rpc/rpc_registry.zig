@@ -131,7 +131,7 @@ pub const ExtHandlers = struct {
     fallback_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) anyerror!DispatchResult,
 
     pub fn implBy(impl_obj: anytype) ExtHandlers {
-        const Thunk = struct {
+        const Delegate = struct {
             fn onBefore(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) void {
                 const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
                 impl.onBefore(alloc, request);
@@ -148,9 +148,9 @@ pub const ExtHandlers = struct {
 
         return .{
             .impl_ptr = impl_obj,
-            .onBefore_fn = Thunk.onBefore,
-            .onAfter_fn = Thunk.onAfter,
-            .fallback_fn = Thunk.fallback,
+            .onBefore_fn = Delegate.onBefore,
+            .onAfter_fn = Delegate.onAfter,
+            .fallback_fn = Delegate.fallback,
         };
     }
 

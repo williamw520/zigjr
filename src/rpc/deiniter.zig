@@ -15,7 +15,7 @@ pub const Deiniter = struct {
     deinit_fn:  *const fn(impl_ptr: *anyopaque) void,
 
     pub fn implBy(impl_obj: anytype) @This() {
-        const Thunk = struct {
+        const Delegate = struct {
             fn deinit(impl_ptr: *anyopaque) void {
                 const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
                 impl.deinit();
@@ -24,7 +24,7 @@ pub const Deiniter = struct {
 
         return .{
             .impl_ptr = impl_obj,
-            .deinit_fn = Thunk.deinit,
+            .deinit_fn = Delegate.deinit,
         };
     }
 
@@ -39,7 +39,7 @@ pub const ConstDeiniter = struct {
     deinit_fn:  *const fn(impl_ptr: *const anyopaque) void,
 
     pub fn implBy(impl_obj: anytype) @This() {
-        const Thunk = struct {
+        const Delegate = struct {
             fn deinit(impl_ptr: *const anyopaque) void {
                 const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
                 impl.deinit();
@@ -48,7 +48,7 @@ pub const ConstDeiniter = struct {
 
         return .{
             .impl_ptr = impl_obj,
-            .deinit_fn = Thunk.deinit,
+            .deinit_fn = Delegate.deinit,
         };
     }
 
