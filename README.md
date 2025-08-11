@@ -382,6 +382,13 @@ If your function returns a `void`, it is treated as a Notification, and no respo
 If the return value is already a JSON string, you can wrap it in `zigjr.JsonStr` to avoid double-serialization.
 Declare `zigjr.JsonStr` as the return type of the handler function.
 
+#### `DispatchResult` Return Value
+For lower-level control, you can return a `DispatchResult` from the handler function.
+You can set a returning JSON result or set an error in `DispatchResult`.
+Typically the normal error handling just returns the error code to the client.
+`DispatchResult` let you set the error code, error message, and additional error data
+to send back to the client.
+
 ### Error
 A handler function can have an error union with the return type. Any error returned will be 
 packaged into a JSON-RPC error response with the `InternalError` code.
