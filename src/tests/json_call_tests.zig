@@ -10,6 +10,7 @@ const Value = std.json.Value;
 
 const zigjr = @import("../zigjr.zig");
 const json_call = zigjr.json_call;
+const DispatchResult = zigjr.DispatchResult;
 
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -42,6 +43,13 @@ fn fn0_return_value_with_err() ![]const u8 {
 fn fn0_return_json_str() zigjr.JsonStr {
     return .{
         .json = "{ \"foobar\": 42 }",
+    };
+}
+
+fn fn0_return_json_str_err(alloc: Allocator) !zigjr.JsonStr {
+    const json = try alloc.dupe(u8, "{ \"foobar\": 42 }");
+    return .{
+        .json = json,
     };
 }
 
@@ -96,6 +104,29 @@ fn fn1_alloc_with_err(alloc: Allocator, a: i64) !void {
     // The arena allocator will take care of freeing it.
     _ = try alloc.dupe(u8, "Hello. Allocate some memory without freeing.");
     fn1_alloc_with_err_called = true;
+}
+
+fn fn1_with_dresult_none(a: i64) DispatchResult {
+    _=a;
+    return DispatchResult.asNone();
+}
+
+fn fn1_with_dresult_integer(a: i64) DispatchResult {
+    _=a;
+    const json = "123";
+    return DispatchResult.withResult(json);
+}
+
+fn fn1_with_dresult_integer_err(alloc: Allocator, a: i64) !DispatchResult {
+    const json = try std.json.stringifyAlloc(alloc, a, .{});
+    return DispatchResult.withResult(json);
+}
+
+fn fn1_with_dresult_str_err(alloc: Allocator, a: i64) !DispatchResult {
+    _=a;
+    const result = "abc";
+    const json = try std.json.stringifyAlloc(alloc, result, .{});
+    return DispatchResult.withResult(json);
 }
 
 
@@ -183,6 +214,18 @@ test "Test rpc call on fn0." {
     {
         var ctx = {};
         var h = try json_call.makeRpcHandler(&ctx, fn0_return_json_str, alloc);
+        defer h.deinit();
+        _ = try h.invoke(.{ .null = {} });
+        _ = try h.invoke(.{ .null = {} });
+        _ = try h.invokeJson("");
+        const dresult = try h.invoke(.{ .null = {} });
+        // std.debug.print("result {s}\n", .{dresult.result});
+        try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
+        h.reset();
+    }
+    {
+        var ctx = {};
+        var h = try json_call.makeRpcHandler(&ctx, fn0_return_json_str_err, alloc);
         defer h.deinit();
         _ = try h.invoke(.{ .null = {} });
         _ = try h.invoke(.{ .null = {} });
@@ -348,6 +391,37 @@ test "Test rpc call on fn1." {
         h.reset();
     }
 
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+}
+
+test "Test rpc call on fn1 with DispatchResult." {
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_none, alloc);
+        defer h.deinit();
+        const dres = try h.invoke(.{ .integer = 123 });
+        // std.debug.print("fn1_with_dresult_none: {any}\n", .{dres});
+        try testing.expectEqual(dres, DispatchResult.none);
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer, alloc);
+        defer h.deinit();
+        const dres = try h.invoke(.{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "123");
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer_err, alloc);
+        defer h.deinit();
+        const dres = try h.invoke(.{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "123");
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_str_err, alloc);
+        defer h.deinit();
+        const dres = try h.invoke(.{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "\"abc\"");
+    }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 

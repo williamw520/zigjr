@@ -103,14 +103,17 @@ pub const DispatchResult = union(enum) {
         data:       ?[]const u8 = null, // JSON string for additional error data value.
     },
 
+    /// Create a DispatchResult with no result, for JSON-RPC notification.
     pub fn asNone() Self {
         return .{ .none = {} };
     }
 
-    pub fn withResult(result: []const u8) Self {
-        return .{ .result = result };
+    /// Create a DispatchResult with a result encoded in a JSON string.
+    pub fn withResult(json: []const u8) Self {
+        return .{ .result = json };
     }
 
+    /// Create a DispatchResult with an error.
     pub fn withErr(code: ErrorCode, msg: []const u8) Self {
         return .{
             .err = .{
@@ -120,6 +123,7 @@ pub const DispatchResult = union(enum) {
         };
     }
 
+    /// Create a DispatchResult with the parse error from RpcRequest.
     pub fn withRequestErr(req: RpcRequest) Self {
         return .{
             .err = .{
@@ -129,6 +133,7 @@ pub const DispatchResult = union(enum) {
         };
     }
 
+    /// Create a DispatchResult with the error of anyerror type.
     pub fn withAnyErr(err: anyerror) Self {
         return switch (err) {
             DispatchErrors.MethodNotFound => Self.withErr(

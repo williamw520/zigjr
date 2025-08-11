@@ -164,6 +164,7 @@ const HandlerInfo = struct {
     has_ret_err:    bool,                   // The function has a error union in the return type.
     is_ret_void:    bool,                   // The function has a void return type.
     is_ret_json:    bool,                   // The function has a JsonStr return type.
+    is_ret_dresult: bool,                   // The function has a DispatchResult return type.
 };
 
 // Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
@@ -194,7 +195,8 @@ pub inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) Han
         .obj1_type      = obj1_type,
         .has_ret_err    = isErrorUnion(fn_info.return_type),
         .is_ret_void    = isVoid(fn_info.return_type),
-        .is_ret_json    = fn_info.return_type == JsonStr,
+        .is_ret_json    = isReturnType(fn_info.return_type, JsonStr),
+        .is_ret_dresult = isReturnType(fn_info.return_type, DispatchResult),
     };
 }
 
@@ -242,8 +244,12 @@ inline fn getReturnType(comptime T: ?type) ?type {
     return null;
 }
 
-inline fn isVoid(comptime T: ?type) bool {
-    return getReturnType(T) == void;
+inline fn isVoid(comptime FT: ?type) bool {
+    return getReturnType(FT) == void;
+}
+
+inline fn isReturnType(comptime FT: ?type, comptime return_type: type) bool {
+    return getReturnType(FT) == return_type;
 }
 
 inline fn isErrorUnion(comptime T: ?type) bool {
@@ -336,20 +342,26 @@ fn callF(comptime F: anytype, comptime hinfo: HandlerInfo, args: hinfo.tuple_typ
         return DispatchResult.asNone();
     } else {
         if (hinfo.has_ret_err) {
-            const result = try @call(.auto, F, args);
-            return DispatchResult.withResult(try resultToJson(hinfo, alloc, result));
+            const result = @call(.auto, F, args) catch |e| return e;
+            return toDispatchResult(hinfo, alloc, result);
         } else {
             const result = @call(.auto, F, args);
-            return DispatchResult.withResult(try resultToJson(hinfo, alloc, result));
+            return toDispatchResult(hinfo, alloc, result);
         }
     }
 }
 
-fn resultToJson(comptime hinfo: HandlerInfo, alloc: Allocator, result: anytype) ![]const u8 {
+fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anytype) DispatchErrors!DispatchResult {
     if (hinfo.is_ret_json) {
-        return result.json;     // result is already in JSON; just return it.
+        // result is a JsonStr; return the JSON string.
+        return DispatchResult.withResult(result.json);
+    } else if (hinfo.is_ret_dresult) {
+        // result is already a DispatchResult; just return it.
+        return result;
     } else {
-        return try std.json.stringifyAlloc(alloc, result, .{});
+        // wrap the result in a JSON.
+        const json = try std.json.stringifyAlloc(alloc, result, .{});
+        return DispatchResult.withResult(json);
     }
 }
 
