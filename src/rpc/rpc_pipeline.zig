@@ -71,7 +71,7 @@ pub const RequestPipeline = struct {
         self.logger.log("runRequest", "request_json ", request_json);
         var parsed_request = parseRpcRequest(self.alloc, request_json);
         defer parsed_request.deinit();
-        const writer = response_buf.writer();
+        const writer = response_buf.writer(self.alloc);
         const response_written = switch (parsed_request.request_msg) {
             .batch   => |reqs| try processRpcBatch(self.alloc,  reqs, self.req_dispatcher, writer),
             .request => |req|  try processRpcRequest(self.alloc, req, self.req_dispatcher, "", writer),
@@ -82,11 +82,11 @@ pub const RequestPipeline = struct {
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
     pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
-        var response_buf = ArrayList(u8).init(self.alloc);
+        var response_buf: ArrayList(u8) = .empty;
         if (try self.runRequest(request_json, &response_buf, null)) {
-            return try response_buf.toOwnedSlice();
+            return try response_buf.toOwnedSlice(self.alloc);
         } else {
-            response_buf.deinit();
+            response_buf.deinit(self.alloc);
             return null;
         }
     }
@@ -214,17 +214,15 @@ fn processResponseResult(alloc: Allocator, response_result: RpcResponseResult,
 
 
 pub const MessagePipeline = struct {
-    alloc:          Allocator,
     req_dispatcher: RequestDispatcher,
     res_dispatcher: ResponseDispatcher,
     logger:         zigjr.Logger,
 
-    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
+    pub fn init(req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
                 logger: ?zigjr.Logger) @This() {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[MessagePipeline] Logging starts");
         return .{
-            .alloc = alloc,
             .logger = l,
             .req_dispatcher = req_dispatcher,
             .res_dispatcher = res_dispatcher,
@@ -235,26 +233,27 @@ pub const MessagePipeline = struct {
         self.logger.stop("[MessagePipeline] Logging stops");
     }
 
-    pub fn runMessage(self: @This(), message_json: []const u8, req_response_buf: *ArrayList(u8),
+    pub fn runMessage(self: @This(), alloc: Allocator,
+                      message_json: []const u8, req_response_buf: *ArrayList(u8),
                       headers: ?std.StringHashMap([]const u8)) anyerror!MessageRunResult {
         _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
 
         self.logger.log("runMessage", "message_json ", message_json);
-        var msg_result = parseRpcMessage(self.alloc, message_json);
+        var msg_result = parseRpcMessage(alloc, message_json);
         defer msg_result.deinit();
 
         switch (msg_result) {
             .request_result  => |request_result| {
-                const writer = req_response_buf.writer();
+                const writer = req_response_buf.writer(alloc);
                 const response_written = switch (request_result.request_msg) {
-                    .batch   => |reqs| try processRpcBatch(self.alloc,  reqs, self.req_dispatcher, writer),
-                    .request => |req|  try processRpcRequest(self.alloc, req, self.req_dispatcher, "", writer),
+                    .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
+                    .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
                 };
                 self.logger.log("runMessage", "req_response_json", req_response_buf.items);
                 return if (response_written) .request_has_response else .request_no_response;
             },
             .response_result => |response_result| {
-                try processResponseResult(self.alloc, response_result, self.res_dispatcher);
+                try processResponseResult(alloc, response_result, self.res_dispatcher);
                 return .response_processed;
             },
         }

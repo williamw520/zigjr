@@ -78,6 +78,7 @@ fn usage() void {
 
 // Poorman's quick and dirty command line argument parsing.
 const CmdArgs = struct {
+    alloc:          Allocator,
     arg_itr:        std.process.ArgIterator,
     cmd_argv:       ArrayList([]const u8),
     json:           bool = false,
@@ -87,8 +88,9 @@ const CmdArgs = struct {
 
     fn init(alloc: Allocator) !@This() {
         return .{
+            .alloc = alloc,
             .arg_itr = try std.process.argsWithAllocator(alloc),
-            .cmd_argv = ArrayList([]const u8).init(alloc),
+            .cmd_argv = .empty(),
         };
     }
 

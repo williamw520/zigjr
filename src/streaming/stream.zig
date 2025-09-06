@@ -26,11 +26,11 @@ const frame = @import("frame.zig");
 /// Caller might want to wrap a buffered reader around it.
 pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
                            dispatcher: RequestDispatcher, options: DelimiterOptions) !void {
-    var frame_buf = std.ArrayList(u8).init(alloc); // Each JSON request is a frame.
-    defer frame_buf.deinit();
-    const frame_writer = frame_buf.writer();
-    var response_buf = std.ArrayList(u8).init(alloc);
-    defer response_buf.deinit();
+    var frame_buf: std.ArrayList(u8) = .empty;  // Each JSON request is a frame.
+    defer frame_buf.deinit(alloc);
+    const frame_writer = frame_buf.writer(alloc);
+    var response_buf: std.ArrayList(u8) = .empty;
+    defer response_buf.deinit(alloc);
     var buffered_writer = std.io.bufferedWriter(writer);
     const output_writer = buffered_writer.writer();
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);

@@ -187,15 +187,14 @@ test "Dispatch on the request and response" {
             }
         } {};
 
-        var pipeline = zigjr.pipeline.MessagePipeline.init(alloc,
-                                                           RequestDispatcher.implBy(&req_dispatcher),
+        var pipeline = zigjr.pipeline.MessagePipeline.init(RequestDispatcher.implBy(&req_dispatcher),
                                                            ResponseDispatcher.implBy(&res_dispatcher),
                                                            null);
         defer pipeline.deinit();
 
-        var response_buf = ArrayList(u8).init(alloc);
-        defer response_buf.deinit();
-        const run_req_result = try pipeline.runMessage(
+        var response_buf: ArrayList(u8) = .empty;
+        defer response_buf.deinit(alloc);
+        const run_req_result = try pipeline.runMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         , &response_buf, null);
         try testing.expect(run_req_result == .request_has_response);
@@ -203,9 +202,9 @@ test "Dispatch on the request and response" {
         // std.debug.print("response_buf: {s}\n", .{response_buf.items});
 
         // Feed the response from request back into the message pipeline.
-        var response_buf2 = ArrayList(u8).init(alloc);
-        defer response_buf2.deinit();
-        const run_res_result = try pipeline.runMessage(response_buf.items, &response_buf2, null);
+        var response_buf2: ArrayList(u8) = .empty;
+        defer response_buf2.deinit(alloc);
+        const run_res_result = try pipeline.runMessage(alloc, response_buf.items, &response_buf2, null);
         try testing.expect(run_res_result == .response_processed);
 
     }

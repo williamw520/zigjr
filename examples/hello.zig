@@ -21,16 +21,28 @@ pub fn main() !void {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
 
-        // Register each RPC method with a handling function.
-        try registry.add("hello", hello);
-        try registry.add("hello-name", helloName);
-        try registry.add("hello-xtimes", helloXTimes);
-        try registry.add("substr", substr);
-        try registry.add("say", say);
+        // // Register each RPC method with a handling function.
+        // try registry.add("hello", hello);
+        // try registry.add("hello-name", helloName);
+        // try registry.add("hello-xtimes", helloXTimes);
+        // try registry.add("substr", substr);
+        // try registry.add("say", say);
 
+        // .buffer = &.{},
+        var stdin_buffer: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+        const stdin = &stdin_reader.interface;
+        _=stdin;
+        
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
+        _=stdout;
+        
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
-            std.io.getStdIn().reader(), std.io.getStdOut().writer(),
+            // std.io.getStdIn().reader(), std.io.getStdOut().writer(),
+            stdin_reader, stdout_writer,
             zigjr.RequestDispatcher.implBy(&registry), .{});
     }
 
@@ -48,7 +60,7 @@ fn hello() []const u8 {
 // A handler takes in a string parameter and returns a string with error.
 // It also asks the library for an allocator, which is passed in automatically.
 // Allocated memory is freed automatically, making memory usage simple.
-fn helloName(alloc: Allocator, name: [] const u8) std.fmt.AllocPrintError![]const u8 {
+fn helloName(alloc: Allocator, name: [] const u8) Allocator.Error![]const u8 {
     return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
 }
 

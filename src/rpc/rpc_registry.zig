@@ -25,6 +25,7 @@ const DispatchErrors = zigjr.DispatchErrors;
 const json_call = @import("json_call.zig");
 
 
+/// Implements the RequestDispatcher interface.
 pub const RpcRegistry = struct {
     const Self = @This();
 
