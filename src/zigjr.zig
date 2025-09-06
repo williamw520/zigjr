@@ -59,9 +59,9 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    // _ = @import("tests/request_tests.zig");
+    _ = @import("tests/request_tests.zig");
     // _ = @import("tests/response_tests.zig");
-    _ = @import("tests/message_tests.zig");
+    // _ = @import("tests/message_tests.zig");
     // _ = @import("tests/frame_tests.zig");
     // _ = @import("tests/stream_tests.zig");
     // _ = @import("tests/rpc_registry_tests.zig");

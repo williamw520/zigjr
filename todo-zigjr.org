@@ -37,6 +37,8 @@
 ** DONE Add LSP client example.
 ** DONE Add fallback handler for RpcRegistry.
 ** DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
+** TODO 0.15.1: Convert reader: anytype to reader: Io.Reader
+** TODO 0.15.1: Convert writer: anytype to writer: Io.Writer
 ** TODO Add network server and client example.
 ** TODO Add request and notification message builders.
 
@@ -44,6 +46,10 @@
 ** rpc_pipeline.MessagePipeline.init(), allocator not passed in.
 ** rpc_pipeline.runMessage() needs to pass in an allocator for response_buf.
 
+* Topic for 0.15.1
+** std.json.stringifyAlloc() to std.json.Stringify.valueAlloc(alloc, params, .{});
+    const params_json = try std.json.stringifyAlloc(alloc, params, .{});
+    const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
 
 
 * Releases

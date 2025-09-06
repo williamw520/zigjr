@@ -64,15 +64,16 @@ pub fn makeRequestJson(alloc: Allocator, method: []const u8, params: anytype,
         return JrErrors.InvalidParamsType;
     }
 
-    var output_buf = std.ArrayList(u8).init(alloc);
+    var output_buf: ArrayList(u8) = .empty;
     if (pinfo != .null) {
-        const params_json = try std.json.stringifyAlloc(alloc, params, .{});
+        // const params_json = try std.json.stringifyAlloc(alloc, params, .{});
+        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
         defer alloc.free(params_json);
-        try writeRequestJson(method, params_json, id, output_buf.writer());
+        try writeRequestJson(method, params_json, id, output_buf.writer(alloc));
     } else {
-        try writeRequestJson(method, null, id, output_buf.writer());
+        try writeRequestJson(method, null, id, output_buf.writer(alloc));
     }
-    return try output_buf.toOwnedSlice();
+    return try output_buf.toOwnedSlice(alloc);
 }
 
 /// Write a batch message of request JSONS to the writer.
@@ -90,9 +91,9 @@ pub fn writeBatchRequestJson(request_jsons: []const []const u8, writer: anytype)
 /// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![]const u8 {
-    var output_buf = std.ArrayList(u8).init(alloc);
-    try writeBatchRequestJson(request_jsons, output_buf.writer());
-    return try output_buf.toOwnedSlice();
+    var output_buf: ArrayList(u8) = .empty;
+    try writeBatchRequestJson(request_jsons, output_buf.writer(alloc));
+    return try output_buf.toOwnedSlice(alloc);
 }
 
 
