@@ -117,9 +117,9 @@ pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) Al
 pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
     if (id.isNotification())
         return null;
-    var output_buf = std.ArrayList(u8).init(alloc);
-    try writeResponseJson(id, result_json, output_buf.writer());
-    return try output_buf.toOwnedSlice();
+    var output_buf: ArrayList(u8) = .empty;
+    try writeResponseJson(id, result_json, output_buf.writer(alloc));
+    return try output_buf.toOwnedSlice(alloc);
 }
 
 /// Writer an error response message in JSON to the writer.
@@ -147,9 +147,9 @@ pub fn writeErrorResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
                            msg: []const u8) AllocError![]const u8 {
-    var output_buf = std.ArrayList(u8).init(alloc);
-    try writeErrorResponseJson(id, err_code, msg, output_buf.writer());
-    return try output_buf.toOwnedSlice();
+    var output_buf: ArrayList(u8) = .empty;
+    try writeErrorResponseJson(id, err_code, msg, output_buf.writer(alloc));
+    return try output_buf.toOwnedSlice(alloc);
 }
 
 /// Build an error response message in JSON, with the error data field set.
@@ -177,9 +177,9 @@ pub fn writeErrorDataResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorDataResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
                                  msg: []const u8, data: []const u8) AllocError![]const u8 {
-    var output_buf = std.ArrayList(u8).init(alloc);
-    try writeErrorDataResponseJson(id, err_code, msg, data, output_buf.writer());
-    return try output_buf.toOwnedSlice();
+    var output_buf: ArrayList(u8) = .empty;
+    try writeErrorDataResponseJson(id, err_code, msg, data, output_buf.writer(alloc));
+    return try output_buf.toOwnedSlice(alloc);
 }
 
 

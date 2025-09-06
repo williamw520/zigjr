@@ -40,15 +40,13 @@ var nopLogger = zigjr.NopLogger{};
 
 
 pub const RequestPipeline = struct {
-    alloc:          Allocator,
     req_dispatcher: RequestDispatcher,
     logger:         zigjr.Logger,
 
-    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
+    pub fn init(req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline] Logging starts");
         return .{
-            .alloc = alloc,
             .req_dispatcher = req_dispatcher,
             .logger = l,
         };
@@ -64,39 +62,42 @@ pub const RequestPipeline = struct {
     /// Error is turned into a JSON-RPC error response message.
     /// The function returns a boolean flag indicating whether any response has been written,
     /// as notification requests have no response.
-    pub fn runRequest(self: @This(), request_json: []const u8, response_buf: *ArrayList(u8),
+    pub fn runRequest(self: @This(), alloc: Allocator,
+                      request_json: []const u8, response_buf: *ArrayList(u8),
                       headers: ?std.StringHashMap([]const u8)) AllocError!bool {
         _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
 
         self.logger.log("runRequest", "request_json ", request_json);
-        var parsed_request = parseRpcRequest(self.alloc, request_json);
+        var parsed_request = parseRpcRequest(alloc, request_json);
         defer parsed_request.deinit();
-        const writer = response_buf.writer(self.alloc);
+        const writer = response_buf.writer(alloc);
         const response_written = switch (parsed_request.request_msg) {
-            .batch   => |reqs| try processRpcBatch(self.alloc,  reqs, self.req_dispatcher, writer),
-            .request => |req|  try processRpcRequest(self.alloc, req, self.req_dispatcher, "", writer),
+            .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
+            .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
         };
         self.logger.log("runRequestResult", "response_json", response_buf.items);
         return response_written;
     }
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
-    pub fn runRequestToJson(self: @This(), request_json: []const u8) AllocError!?[]const u8 {
+    pub fn runRequestToJson(self: @This(), alloc: Allocator,
+                            request_json: []const u8) AllocError!?[]const u8 {
         var response_buf: ArrayList(u8) = .empty;
-        if (try self.runRequest(request_json, &response_buf, null)) {
-            return try response_buf.toOwnedSlice(self.alloc);
+        if (try self.runRequest(alloc, request_json, &response_buf, null)) {
+            return try response_buf.toOwnedSlice(alloc);
         } else {
-            response_buf.deinit(self.alloc);
+            response_buf.deinit(alloc);
             return null;
         }
     }
 
     /// Run the request and return the response(s) in a RpcResponseResult. Same as runRequest().
     /// This is mainly for testing.
-    pub fn runRequestToResponse(self: @This(), request_json: []const u8) !RpcResponseResult {
-        const response_json = try self.runRequestToJson(request_json);
+    pub fn runRequestToResponse(self: @This(), alloc: Allocator,
+                                request_json: []const u8) !RpcResponseResult {
+        const response_json = try self.runRequestToJson(alloc, request_json);
         if (response_json) |json| {
-            return parseRpcResponseOwned(self.alloc, json); // response_json needs freeing.
+            return parseRpcResponseOwned(alloc, json);  // response_json needs freeing.
         } else {
             return .{};
         }        
