@@ -39,6 +39,7 @@
 ** DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
 ** TODO 0.15.1: Convert reader: anytype to reader: Io.Reader
 ** TODO 0.15.1: Convert writer: anytype to writer: Io.Writer
+** TODO 0.15.1: Convert deprecated ArrayList.writer() to std.io.Writer.Allocating.
 ** TODO Add network server and client example.
 ** TODO Add request and notification message builders.
 

@@ -18,20 +18,22 @@ const JrErrors = @import("../zigjr.zig").JrErrors;
 
 
 pub const FrameBuf = struct {
+    alloc:      Allocator,
     buf:        ArrayList(u8),
     headers:    StringHashMap([]const u8),
     data_start: usize,
 
     pub fn init(alloc: Allocator) @This() {
         return .{
-            .buf        = ArrayList(u8).init(alloc),
+            .alloc      = alloc,
+            .buf        = .empty,
             .headers    = StringHashMap([]const u8).init(alloc),
             .data_start = 0,
         };
     }
 
     pub fn deinit(self: *@This()) void {
-        self.buf.deinit();
+        self.buf.deinit(self.alloc);
         self.headers.deinit();
     }
 
@@ -39,6 +41,10 @@ pub const FrameBuf = struct {
         self.headers.clearRetainingCapacity();
         self.buf.clearRetainingCapacity();
         self.data_start = 0;
+    }
+
+    pub fn bufWriter(self: *@This()) ArrayList(u8).Writer {
+        return self.buf.writer(self.alloc);
     }
 
     pub fn getContentLength(self: @This()) !?usize {
@@ -51,7 +57,7 @@ pub const FrameBuf = struct {
     pub fn prepareContentBuf(self: *@This(), content_length: usize) !void {
         // Save the content starting offset, and expand items per content_length.
         self.data_start = self.buf.items.len;
-        try self.buf.resize(self.data_start + content_length);
+        try self.buf.resize(self.alloc, self.data_start + content_length);
     }
 
     pub fn nextReadBuf(self: *@This(), offset: usize, remaining: usize) []u8 {
@@ -80,7 +86,7 @@ pub const FrameBuf = struct {
 pub fn readHttpHeaders(reader: anytype, frame_buf: *FrameBuf) !void {
     while (true) {
         const read_idx = frame_buf.buf.items.len;
-        try reader.streamUntilDelimiter(frame_buf.buf.writer(), '\n', null);
+        try reader.streamUntilDelimiter(frame_buf.bufWriter(), '\n', null);
         const line = std.mem.trim(u8, frame_buf.buf.items[read_idx..], "\r\n");
         if (line.len == 0) {    // reach an empty line \r\n
             return;             // caller checks frame_buf.headers.count() for headers.
@@ -147,8 +153,8 @@ pub fn writeContentLengthResponse(alloc: Allocator, writer: anytype,
 /// Build a sequence of data frames into a byte buffer, with a header section
 /// containing the Content-Length header for each frame.
 pub fn makeContentLengthFrames(alloc: Allocator, data_frames: []const []const u8) !ArrayList(u8) {
-    var buffer = ArrayList(u8).init(alloc);
-    const writer = buffer.writer();
+    var buffer: ArrayList(u8) = .empty;
+    const writer = buffer.writer(alloc);
     for (data_frames)|data| try writeContentLengthFrame(writer, data);
     return buffer;
 }
