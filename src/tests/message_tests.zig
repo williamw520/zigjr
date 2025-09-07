@@ -128,10 +128,10 @@ test "Parse response to a request of hello method via " {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        const res_json = try pipeline.runRequestToJson(
+        const res_json = try pipeline.runRequestToJson(alloc, 
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
         defer if (res_json)|json| alloc.free(json);
@@ -153,10 +153,10 @@ test "Parse error from a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        const res_json = try pipeline.runRequestToJson(
+        const res_json = try pipeline.runRequestToJson(alloc, 
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
         );
         defer if (res_json)|json| alloc.free(json);
