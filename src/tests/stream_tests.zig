@@ -21,7 +21,7 @@ const EchoDispatcher = struct {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         }
         return .{
-            .result = try std.json.stringifyAlloc(alloc, params.items[0].string, .{}),
+            .result = try std.json.Stringify.valueAlloc(alloc, params.items[0].string, .{}),
         };
     }
 
@@ -45,7 +45,7 @@ const CounterDispatcher = struct {
             self.count -= 1;
             return .{ .none = {} };     // treat request as notification
         } else if (std.mem.eql(u8, req.method, "get")) {
-            return .{ .result = try std.json.stringifyAlloc(alloc, self.count, .{}) };
+            return .{ .result = try std.json.Stringify.valueAlloc(alloc, self.count, .{}) };
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
@@ -74,9 +74,9 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
         var json_stream = std.io.fixedBufferStream(req_jsons);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         // var logger = zigjr.DbgLogger{};
         // try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher),
@@ -113,16 +113,16 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
                 ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
-        const req_frames = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
-        defer req_frames.deinit();
+        var req_frames = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
+        defer req_frames.deinit(alloc);
         // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
         var json_stream = std.io.fixedBufferStream(req_frames.items);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         // var logger = zigjr.DbgLogger{};
         // try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher),
@@ -161,9 +161,9 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
         var json_stream = std.io.fixedBufferStream(req_jsons);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -196,9 +196,9 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
         var json_stream = std.io.fixedBufferStream(req_jsons);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{ .skip_blank_message = false });
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -236,33 +236,33 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
                 ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
-        var req_frames = std.ArrayList(u8).init(alloc);
-        defer req_frames.deinit();
+        var req_frames: ArrayList(u8) = .empty;
+        defer req_frames.deinit(alloc);
         const garbage_data1 = "abcdesdf\r\n";
-        const valid_frames1 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons1);
+        var valid_frames1   = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons1);
         const garbage_data2 = "sdfadf: sdfads\r\n";
-        const valid_frames2 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons2);
+        var valid_frames2   = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons2);
         const garbage_data3 = "\r\n\r\n\r\n\r\n";
-        const valid_frames3 = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons3);
+        var valid_frames3   = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons3);
         const garbage_data4 = "sdfadf: sdfads\r\n";
-        defer valid_frames1.deinit();
-        defer valid_frames2.deinit();
-        defer valid_frames3.deinit();
-        try req_frames.appendSlice(garbage_data1);
-        try req_frames.appendSlice(valid_frames1.items);
-        try req_frames.appendSlice(garbage_data2);
-        try req_frames.appendSlice(valid_frames2.items);
-        try req_frames.appendSlice(garbage_data3);
-        try req_frames.appendSlice(valid_frames3.items);
-        try req_frames.appendSlice(garbage_data4);
+        defer valid_frames1.deinit(alloc);
+        defer valid_frames2.deinit(alloc);
+        defer valid_frames3.deinit(alloc);
+        try req_frames.appendSlice(alloc, garbage_data1);
+        try req_frames.appendSlice(alloc, valid_frames1.items);
+        try req_frames.appendSlice(alloc, garbage_data2);
+        try req_frames.appendSlice(alloc, valid_frames2.items);
+        try req_frames.appendSlice(alloc, garbage_data3);
+        try req_frames.appendSlice(alloc, valid_frames3.items);
+        try req_frames.appendSlice(alloc, garbage_data4);
         // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
         var json_stream = std.io.fixedBufferStream(req_frames.items);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("response_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -296,9 +296,9 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
         var json_stream = std.io.fixedBufferStream(req_jsons);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         try zigjr.stream.requestsByDelimiter(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("output_jsons: ##\n{s}##\n", .{write_buffer.items});
@@ -347,16 +347,16 @@ test "responsesByLength on JSON responses, single param, id" {
             ,
         };
         // std.debug.print("req_jsons: |{s}|\n", .{req_jsons});
-        const req_frames = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
-        defer req_frames.deinit();
+        var req_frames  = try zigjr.frame.makeContentLengthFrames(alloc, &req_jsons);
+        defer req_frames.deinit(alloc);
         // std.debug.print("frames: |{s}|\n", .{req_frames.items});
 
         var json_stream = std.io.fixedBufferStream(req_frames.items);
         const reader = json_stream.reader();
 
-        var write_buffer = ArrayList(u8).init(alloc);
-        defer write_buffer.deinit();
-        const writer = write_buffer.writer();
+        var write_buffer: ArrayList(u8) = .empty;
+        defer write_buffer.deinit(alloc);
+        const writer = write_buffer.writer(alloc);
 
         try zigjr.stream.requestsByContentLength(alloc, reader, writer, RequestDispatcher.implBy(&dispatcher), .{});
         // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
