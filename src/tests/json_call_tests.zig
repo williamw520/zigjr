@@ -118,14 +118,14 @@ fn fn1_with_dresult_integer(a: i64) DispatchResult {
 }
 
 fn fn1_with_dresult_integer_err(alloc: Allocator, a: i64) !DispatchResult {
-    const json = try std.json.stringifyAlloc(alloc, a, .{});
+    const json = try std.json.Stringify.valueAlloc(alloc, a, .{});
     return DispatchResult.withResult(json);
 }
 
 fn fn1_with_dresult_str_err(alloc: Allocator, a: i64) !DispatchResult {
     _=a;
     const result = "abc";
-    const json = try std.json.stringifyAlloc(alloc, result, .{});
+    const json = try std.json.Stringify.valueAlloc(alloc, result, .{});
     return DispatchResult.withResult(json);
 }
 
