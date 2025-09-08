@@ -360,7 +360,7 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
         return result;
     } else {
         // wrap the result in a JSON.
-        const json = try std.json.stringifyAlloc(alloc, result, .{});
+        const json = try std.json.Stringify.valueAlloc(alloc, result, .{});
         return DispatchResult.withResult(json);
     }
 }

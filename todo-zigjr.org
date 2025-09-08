@@ -41,6 +41,7 @@
 ** TODO 0.15.1: Convert writer: anytype to writer: Io.Writer
 ** TODO 0.15.1: Convert deprecated ArrayList.writer() to std.io.Writer.Allocating.
 ** TODO 0.15.1: migrate std.io.bufferedWriter to new Io.Writer.
+** TODO 0.15.1: get float from std.json.Value.integer/float.
 ** TODO Add network server and client example.
 ** TODO Add request and notification message builders.
 
