@@ -18,13 +18,13 @@ const Allocator = std.mem.Allocator;
 // The source reader to read data from.
 src_reader: std.Io.Reader,
 // The std.Io.Reader interface for this reader implementation.
-interface: std.Io.Reader,
+buf_interface: std.Io.Reader,
 
 
 pub fn init(alloc: Allocator, buf_size: usize, src_reader: std.Io.Reader) Allocator.Error!@This() {
     return .{
         .src_reader = src_reader,
-        .interface = .{
+        .buf_interface = .{
             .vtable = &.{
                 .stream = streamSource,
             },
@@ -36,18 +36,24 @@ pub fn init(alloc: Allocator, buf_size: usize, src_reader: std.Io.Reader) Alloca
 }
 
 pub fn deinit(self: *BufReader, alloc: Allocator) void {
-    alloc.free(self.interface.buffer);
+    alloc.free(self.interface().buffer);
 }
 
-pub fn getBufSize(self: BufReader) usize {
-    return self.interface.buffer.len;
+
+/// Get the std.Io.Reader interface pointer, to avoid an accidental copy.
+pub fn interface(self: *BufReader) *std.Io.Reader {
+    return &self.buf_interface;
 }
 
-/// std.Io.Reader calls self.vtable.stream() fills its buffer.
-/// Reads the data from source to provide the streaming data.
+pub fn getBufSize(self: *const BufReader) usize {
+    return self.buf_interface.buffer.len;
+}
+
+// std.Io.Reader calls self.vtable.stream() fills its buffer.
+// Reads the data from source to provide the streaming data.
 fn streamSource(io_reader: *std.Io.Reader, w: *std.Io.Writer,
                 limit: std.Io.Limit) std.Io.Reader.StreamError!usize {
-    const buf_reader: *BufReader = @alignCast(@fieldParentPtr("interface", io_reader));
+    const buf_reader: *BufReader = @alignCast(@fieldParentPtr("buf_interface", io_reader));
     return buf_reader.src_reader.stream(w, limit);
 }
 
@@ -60,7 +66,7 @@ test "Test buffer size" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 80, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         try std.testing.expectEqualStrings("a", try br.peek(1));
         try std.testing.expectEqualStrings("ab", try br.peek(2));
         try std.testing.expectEqualStrings("abc", try br.peek(3));
@@ -74,7 +80,7 @@ test "Test buffer size" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 3, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         try std.testing.expectEqualStrings("a", try br.peek(1));
         try std.testing.expectEqualStrings("ab", try br.peek(2));
         try std.testing.expectEqualStrings("abc", try br.peek(3));
@@ -88,7 +94,7 @@ test "Test buffer size" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 2, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         try std.testing.expectEqualStrings("a", try br.peek(1));
         try std.testing.expectEqualStrings("ab", try br.peek(2));
         var data1: [1]u8 = undefined;
@@ -114,7 +120,7 @@ test "Test buffered data" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 80, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         _ = try br.peek(1);
         try std.testing.expectEqualStrings("abc", br.buffer[0..3]);
     }
@@ -123,7 +129,7 @@ test "Test buffered data" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 3, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         _ = try br.peek(1);
         try std.testing.expectEqualStrings("abc", br.buffer[0..3]);
     }
@@ -132,7 +138,7 @@ test "Test buffered data" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 2, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         _ = try br.peek(1);
         try std.testing.expectEqualStrings("ab", br.buffer[0..2]);
     }
@@ -141,7 +147,7 @@ test "Test buffered data" {
         const src_reader: std.Io.Reader = .fixed("abc");
         var buf_reader = try BufReader.init(alloc, 2, src_reader);
         defer buf_reader.deinit(alloc);
-        var br = &buf_reader.interface;
+        var br = buf_reader.interface();
         _ = try br.take(1);
         try std.testing.expectEqualStrings("ab", br.buffer[0..2]);
     }
