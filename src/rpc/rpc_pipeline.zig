@@ -65,7 +65,7 @@ pub const RequestPipeline = struct {
     pub fn runRequest(self: @This(), alloc: Allocator,
                       request_json: []const u8, response_buf: *ArrayList(u8),
                       headers: ?std.StringHashMap([]const u8)) AllocError!bool {
-        _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
+        _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
         self.logger.log("runRequest", "request_json ", request_json);
         var parsed_request = parseRpcRequest(alloc, request_json);
@@ -192,7 +192,7 @@ pub const ResponsePipeline = struct {
     /// For batch responses, the first error from the dispatcher stops the processing.
     pub fn runResponse(self: @This(), response_json: []const u8,
                        headers: ?std.StringHashMap([]const u8)) !void {
-        _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
+        _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
         var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
@@ -237,7 +237,7 @@ pub const MessagePipeline = struct {
     pub fn runMessage(self: @This(), alloc: Allocator,
                       message_json: []const u8, req_response_buf: *ArrayList(u8),
                       headers: ?std.StringHashMap([]const u8)) anyerror!MessageRunResult {
-        _=headers;  // frame-level headers. May have character encoding. See FrameBuf.headers in frame.zig.
+        _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
         self.logger.log("runMessage", "message_json ", message_json);
         var msg_result = parseRpcMessage(alloc, message_json);

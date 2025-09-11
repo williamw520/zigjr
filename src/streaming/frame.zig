@@ -15,61 +15,100 @@ const RpcId = @import("../jsonrpc/request.zig").RpcId;
 const makeRequestJson = @import("../jsonrpc/composer.zig").makeRequestJson;
 const makeResponseJson = @import("../jsonrpc/composer.zig").makeResponseJson;
 const JrErrors = @import("../zigjr.zig").JrErrors;
+const BufReader = @import("BufReader.zig");
 
 
-pub const FrameBuf = struct {
-    alloc:      Allocator,
-    buf:        ArrayList(u8),
-    headers:    StringHashMap([]const u8),
-    data_start: usize,
+// Trim header key and value by these characters.
+const TRIM_SET = " \t\r\n";
+
+// Header key and value positions in the FrameData.buf.
+const Pos = [4]usize;
+
+/// The header the content data of a request frame.
+pub const FrameData = struct {
+    alloc:          Allocator,
+    buf:            std.Io.Writer.Allocating,   // The header and content data of the whole frame.
+    header_pos:     ArrayList(Pos),
+    content_start:  usize,
+    content_length: ?usize = null,
 
     pub fn init(alloc: Allocator) @This() {
         return .{
             .alloc      = alloc,
-            .buf        = .empty,
-            .headers    = StringHashMap([]const u8).init(alloc),
-            .data_start = 0,
+            .header_pos = .empty,
+            .buf        = .init(alloc),
+            .content_start = 0,
         };
     }
 
-    pub fn deinit(self: *@This()) void {
-        self.buf.deinit(self.alloc);
-        self.headers.deinit();
+    pub fn deinit(self: *FrameData) void {
+        self.header_pos.deinit(self.alloc);
+        self.buf.deinit();
     }
 
-    pub fn reset(self: *@This()) void {
-        self.headers.clearRetainingCapacity();
+    pub fn reset(self: *FrameData) void {
+        self.header_pos.clearRetainingCapacity();
         self.buf.clearRetainingCapacity();
-        self.data_start = 0;
+        self.content_start = 0;
     }
 
-    pub fn bufWriter(self: *@This()) ArrayList(u8).Writer {
-        return self.buf.writer(self.alloc);
+    fn bufWriter(self: *FrameData) *std.Io.Writer {
+        return &self.buf.writer;
     }
 
-    pub fn getContentLength(self: @This()) !?usize {
-        if (self.headers.get("Content-Length")) |value| {
-            return try std.fmt.parseInt(usize, value, 10);
+    fn bufData(self: *FrameData) []const u8 {
+        return self.buf.written();
+    }
+
+    fn currentPos(self: *FrameData) usize {
+        return self.bufData().len;
+    }
+
+    fn addHeader(self: *FrameData, key_start: usize, key_end: usize,
+                 value_start: usize, value_end: usize) !void {
+        try self.header_pos.append(self.alloc, .{ key_start, key_end, value_start, value_end });
+    }
+
+    pub fn headerCount(self: *const FrameData) usize {
+        return self.header_pos.items.len;
+    }
+
+    /// Get the header key at 'idx'.
+    /// Slice might get invalidated if buf is grown while the frame is being read.
+    pub fn headerKey(self: *FrameData, idx: usize) []const u8 {
+        const start = self.header_pos.items[idx][0];
+        const end   = self.header_pos.items[idx][1];
+        return std.mem.trim(u8, self.bufData()[start..end], TRIM_SET);
+    }
+
+    /// Get the header key at 'idx'.
+    /// Slice might get invalidated if buf is grown while the frame is being read.
+    pub fn headerValue(self: *FrameData, idx: usize) []const u8 {
+        const start = self.header_pos.items[idx][2];
+        const end   = self.header_pos.items[idx][3];
+        return std.mem.trim(u8, self.bufData()[start..end], TRIM_SET);
+    }
+
+    /// Get the header key at 'idx'.
+    /// Slice might get invalidated if buf is grown while the frame is being read.
+    pub fn findHeader(self: *FrameData, key: []const u8) ?[]const u8 {
+        for (0..self.headerCount())|idx| {
+            if (std.mem.eql(u8, key, self.headerKey(idx))) {
+                return self.headerValue(idx);
+            }
         }
         return null;
     }
 
-    pub fn prepareContentBuf(self: *@This(), content_length: usize) !void {
-        // Save the content starting offset, and expand items per content_length.
-        self.data_start = self.buf.items.len;
-        try self.buf.resize(self.alloc, self.data_start + content_length);
+    fn setupContent(self: *FrameData) !void {
+        self.content_start  = self.currentPos();
+        self.content_length = if (self.findHeader("Content-Length")) |value| 
+            try std.fmt.parseInt(usize, value, 10)
+        else null;
     }
 
-    pub fn nextReadBuf(self: *@This(), offset: usize, remaining: usize) []u8 {
-        return self.buf.items[(self.data_start + offset)..][0..remaining];
-    }
-
-    pub fn getContent(self: @This()) []const u8 {
-        return self.buf.items[self.data_start..];
-    }
-
-    pub fn totalBytes(self: @This()) usize {
-        return self.buf.items.len;      // length of headers + content
+    pub fn getContent(self: *FrameData) []const u8 {
+        return self.bufData()[self.content_start..];
     }
 
 };
@@ -81,49 +120,48 @@ pub const FrameBuf = struct {
 ///     Other-Header: VALUE\r\n
 ///     ...
 ///     \r\n
-///     DATA
-/// Caller checks frame_buf.headers.count() for headers read.
-pub fn readHttpHeaders(reader: anytype, frame_buf: *FrameBuf) !void {
+///     CONTENT DATA
+/// Caller checks frame_data.headerCount() for headers read.
+pub fn readHttpHeaders(reader: *std.Io.Reader, frame_data: *FrameData) !void {
     while (true) {
-        const read_idx = frame_buf.buf.items.len;
-        try reader.streamUntilDelimiter(frame_buf.bufWriter(), '\n', null);
-        const line = std.mem.trim(u8, frame_buf.buf.items[read_idx..], "\r\n");
-        if (line.len == 0) {    // reach an empty line \r\n
-            return;             // caller checks frame_buf.headers.count() for headers.
+        const start_pos = frame_data.currentPos();
+        const read_len  = try reader.streamDelimiter(frame_data.bufWriter(), '\n');
+        const end_pos   = frame_data.currentPos();
+        reader.toss(1);             // skip the '\n' char in reader.
+        if (read_len == 0)
+            break;                  // reach an empty line '\n'; end of headers.
+        const line      = frame_data.bufData()[start_pos..end_pos];
+        const trimmed   = std.mem.trim(u8, line, "\r\n");
+        if (trimmed.len == 0) {     // reach an empty line "\r\n"; end of headers.
+            break;                  // caller checks frame_data.headerCount() for headers.
         }
-        var parts       = std.mem.splitScalar(u8, line, ':');
-        const str_key   = parts.next() orelse "";
-        const str_val   = parts.next() orelse "";
-        const trim_key  = std.mem.trim(u8, str_key, " ");
-        const trim_val  = std.mem.trim(u8, str_val, " ");
-        try frame_buf.headers.put(trim_key, trim_val);
+        const colon_pos = if (std.mem.indexOfScalar(u8, line, ':')) |pos| pos else 0;
+        if (colon_pos == 0)
+            continue;               // missing ':" or empty key.
+        const key_start = start_pos;
+        const key_end   = start_pos + colon_pos;
+        const val_start = start_pos + colon_pos + 1;
+        const val_end   = end_pos;  // empty value is acceptable.
+        try frame_data.addHeader(key_start, key_end, val_start, val_end);
     }
+    try frame_data.setupContent();
 }
 
-/// Read a data frame, that has a Content-Length header, into frame_buf.
-/// The headers and the content data are kept in the frame_buf.
-pub fn readContentLengthFrame(reader: anytype, frame_buf: *FrameBuf) !bool {
-    readHttpHeaders(reader, frame_buf) catch |err| {
+/// Read a data frame, that has a Content-Length header, into frame_data.
+/// The headers and the content data are kept in the frame_data.
+pub fn readContentLengthFrame(reader: *std.Io.Reader, frame_data: *FrameData) !bool {
+    readHttpHeaders(reader, frame_data) catch |err| {
         if (err == error.EndOfStream)
             return false;   // no more data.
         return err;         // unrecoverable error while reading from reader.
     };
-    const content_length = try frame_buf.getContentLength() orelse {
+    if (frame_data.content_length == null)
         return JrErrors.MissingContentLengthHeader;
-    };
 
-    try frame_buf.prepareContentBuf(content_length);
-    var read_total: usize = 0;
-    while (read_total < content_length) {
-        const remaining = content_length - read_total;
-        const read_buf  = frame_buf.nextReadBuf(read_total, remaining);
-        const read_len  = try reader.read(read_buf);
-        if (read_len == 0) return error.UnexpectedEof;
-        read_total += read_len;
-    }
-
+    _ = try reader.stream(frame_data.bufWriter(), .unlimited);
     return true;            // has content data.
 }
+
 
 /// Write a data frame to a writer, with a header section containing
 /// the Content-Length header for the data.

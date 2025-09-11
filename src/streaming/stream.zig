@@ -109,7 +109,7 @@ pub const DelimiterOptions = struct {
 /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
 pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytype,
                                dispatcher: RequestDispatcher, options: ContentLengthOptions) !void {
-    var frame_buf = frame.FrameBuf.init(alloc);
+    var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
     var response_buf: ArrayList(u8) = .empty;
     defer response_buf.deinit(alloc);
@@ -149,7 +149,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
 /// and handle each one with the dispatcher.
 pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
                                 dispatcher: ResponseDispatcher, options: ContentLengthOptions) !void {
-    var frame_buf = frame.FrameBuf.init(alloc);
+    var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
@@ -187,7 +187,7 @@ var nopLogger = zigjr.NopLogger{};
 pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: anytype,
                                req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
                                options: ContentLengthOptions) !void {
-    var frame_buf = frame.FrameBuf.init(alloc);
+    var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
     var req_response_buf = ArrayList(u8).init(alloc);
     defer req_response_buf.deinit();

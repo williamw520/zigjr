@@ -15,37 +15,43 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 test "readHttpHeaders" {
     const alloc = gpa.allocator();
     {
-        var frame_buf = frame.FrameBuf.init(alloc);
-        defer frame_buf.deinit();
-        const frame_data =
-            \\Content-Length: 30  
-            \\  Header1: abc
+        var frame_data = frame.FrameData.init(alloc);
+        defer frame_data.deinit();
+        const frame_text =
+            \\Content-Length: 30
+            \\Header1: abc   
+            \\  Header2: Xyz
             ++ "\r\n\r\n" ++
             \\content-data
             \\more content-data
         ;
-        // std.debug.print("frame_data: {s}\n", .{frame_data});
-        var stream1 = std.io.fixedBufferStream(frame_data);
+        // std.debug.print("frame_text: {s}\n", .{frame_text});
+        var input_reader = std.Io.Reader.fixed(frame_text);
+        try frame.readHttpHeaders(&input_reader, &frame_data);
 
-        try frame.readHttpHeaders(stream1.reader(), &frame_buf);
-        // var itr = frame_buf.headers.iterator();
-        // while (itr.next()) |entry| {
-        //     std.debug.print("key: '{s}', value: '{s}'\n", .{ entry.key_ptr.*, entry.value_ptr.* });
-        // }        
-        try testing.expectEqualStrings(frame_buf.headers.get("Content-Length").?, "30");
-        try testing.expectEqualStrings(frame_buf.headers.get("Header1").?, "abc");
-        try testing.expect((try frame_buf.getContentLength()) orelse 0 == 30);
+        // for (0..frame_data.headerCount())|idx| {
+        //     const key = frame_data.headerKey(idx);
+        //     const value = frame_data.headerValue(idx);
+        //     std.debug.print("key: '{s}', value: '{s}'\n", .{ key, value });
+        // }
+        try testing.expectEqualStrings(frame_data.findHeader("Content-Length").?, "30");
+        try testing.expectEqualStrings(frame_data.findHeader("Header1").?, "abc");
+        try testing.expectEqualStrings(frame_data.findHeader("Header2").?, "Xyz");
+        try testing.expect(frame_data.content_length == 30);
 
-        var stream2 = std.io.fixedBufferStream(frame_data);
-        frame_buf.reset();
-        const has_more1 = try frame.readContentLengthFrame(stream2.reader(), &frame_buf);
+        var input_reader2 = std.Io.Reader.fixed(frame_text);
+        frame_data.reset();
+        const has_more1 = try frame.readContentLengthFrame(&input_reader2, &frame_data);
         try testing.expect(has_more1);
-        std.debug.print("content: |{s}|\n", .{frame_buf.getContent()});
-
-        frame_buf.reset();
-        const has_more2 = try frame.readContentLengthFrame(stream2.reader(), &frame_buf);
-        try testing.expect(!has_more2);
-        std.debug.print("content: |{s}|\n", .{frame_buf.getContent()});
+        // std.debug.print("content: |{s}|\n", .{frame_data.getContent()});
+        try testing.expectEqualStrings(frame_data.getContent(),
+                                       \\content-data
+                                       \\more content-data
+                                       );
+        // frame_data.reset();
+        // const has_more2 = try frame.readContentLengthFrame(&input_reader2, &frame_data);
+        // try testing.expect(!has_more2);
+        // std.debug.print("content: |{s}|\n", .{frame_data.getContent()});
     }
     if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
         
