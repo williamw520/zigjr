@@ -57,3 +57,40 @@ test "readHttpHeaders" {
         
 }
 
+test "writeContentLengthFrame" {
+    const alloc = gpa.allocator();
+    {
+        var w = std.Io.Writer.Allocating.init(alloc);
+        defer w.deinit();
+        try frame.writeContentLengthFrame(&w.writer, "abc");
+        try testing.expectEqualStrings(w.written(),
+                                       "Content-Length: 3\r\n\r\nabc");
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+        
+}
+
+test "writeContentLengthFrames" {
+    const alloc = gpa.allocator();
+    {
+        const data = [_][]const u8{
+            \\abc
+                ,
+            \\efgh
+                ,
+            \\ijk
+        };
+
+        var w = std.Io.Writer.Allocating.init(alloc);
+        defer w.deinit();
+        try frame.writeContentLengthFrames(&w.writer, &data);
+        try testing.expectEqualStrings(w.written(),
+                                       "Content-Length: 3\r\n\r\nabc" ++
+                                       "Content-Length: 4\r\n\r\nefgh" ++
+                                       "Content-Length: 3\r\n\r\nijk"
+                                       );
+    }
+    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+        
+}
+    

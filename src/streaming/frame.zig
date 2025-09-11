@@ -165,9 +165,15 @@ pub fn readContentLengthFrame(reader: *std.Io.Reader, frame_data: *FrameData) !b
 
 /// Write a data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
-pub fn writeContentLengthFrame(writer: anytype, content: []const u8) !void {
+pub fn writeContentLengthFrame(writer: *std.Io.Writer, content: []const u8) !void {
     try writer.print("Content-Length: {d}\r\n\r\n", .{content.len});
     try writer.writeAll(content);
+}
+
+/// Write a sequence of data frames into a writer,
+/// where each frame with a header section containing the Content-Length header.
+pub fn writeContentLengthFrames(writer: *std.Io.Writer, frame_contents: []const []const u8) !void {
+    for (frame_contents)|content| try writeContentLengthFrame(writer, content);
 }
 
 /// Write a request data frame to a writer, with a header section containing
@@ -186,15 +192,6 @@ pub fn writeContentLengthResponse(alloc: Allocator, writer: anytype,
     const json = try makeResponseJson(alloc, id, result_json);
     defer alloc.free(json);
     try writeContentLengthFrame(writer, json);
-}
-
-/// Build a sequence of data frames into a byte buffer, with a header section
-/// containing the Content-Length header for each frame.
-pub fn makeContentLengthFrames(alloc: Allocator, data_frames: []const []const u8) !ArrayList(u8) {
-    var buffer: ArrayList(u8) = .empty;
-    const writer = buffer.writer(alloc);
-    for (data_frames)|data| try writeContentLengthFrame(writer, data);
-    return buffer;
 }
 
 
