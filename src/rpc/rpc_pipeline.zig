@@ -18,6 +18,8 @@ const RpcRequest = zigjr.RpcRequest;
 const RpcId = zigjr.RpcId;
 const RpcRequestResult = zigjr.RpcRequestResult;
 
+const FrameData = zigjr.frame.FrameData;
+
 const parseRpcResponse = zigjr.parseRpcResponse;
 const parseRpcResponseOwned = zigjr.parseRpcResponseOwned;
 const RpcResponse = zigjr.RpcResponse;
@@ -39,13 +41,16 @@ const DispatchResult = @import ("dispatcher.zig").DispatchResult;
 var nopLogger = zigjr.NopLogger{};
 
 
+pub const RequestOpts = struct {
+};
+
 pub const RequestPipeline = struct {
     req_dispatcher: RequestDispatcher,
     logger:         zigjr.Logger,
 
     pub fn init(req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
-        l.start("[RequestPipeline] Logging starts");
+        l.start("[RequestPipeline.init] Logging starts");
         return .{
             .req_dispatcher = req_dispatcher,
             .logger = l,
@@ -53,7 +58,7 @@ pub const RequestPipeline = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        self.logger.stop("[RequestPipeline] Logging stops");
+        self.logger.stop("[RequestPipeline.deinit] Logging stops");
     }
 
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
@@ -63,30 +68,30 @@ pub const RequestPipeline = struct {
     /// The function returns a boolean flag indicating whether any response has been written,
     /// as notification requests have no response.
     pub fn runRequest(self: @This(), alloc: Allocator,
-                      request_json: []const u8, response_buf: *ArrayList(u8),
-                      headers: ?std.StringHashMap([]const u8)) AllocError!bool {
-        _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
+                      request_json: []const u8, writer: *std.Io.Writer,
+                      req_opts: RequestOpts) std.Io.Writer.Error!bool {
+        _=req_opts;
 
-        self.logger.log("runRequest", "request_json ", request_json);
+        self.logger.log("RequestPipeline.runRequest", "request ", request_json);
         var parsed_request = parseRpcRequest(alloc, request_json);
         defer parsed_request.deinit();
-        const writer = response_buf.writer(alloc);
         const response_written = switch (parsed_request.request_msg) {
             .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
             .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
         };
-        self.logger.log("runRequestResult", "response_json", response_buf.items);
+        // TODO: Add a duplicate writer to write to logger.
+        // self.logger.log("RequestPipeline.runRequest", "response", response_buf.written());
         return response_written;
     }
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
     pub fn runRequestToJson(self: @This(), alloc: Allocator,
-                            request_json: []const u8) AllocError!?[]const u8 {
-        var response_buf: ArrayList(u8) = .empty;
-        if (try self.runRequest(alloc, request_json, &response_buf, null)) {
+                            request_json: []const u8) std.Io.Writer.Error!?[]const u8 {
+        var response_buf = std.Io.Writer.Allocating.init(alloc);
+        defer response_buf.deinit();
+        if (try self.runRequest(alloc, request_json, &response_buf, .{})) {
             return try response_buf.toOwnedSlice(alloc);
         } else {
-            response_buf.deinit(alloc);
             return null;
         }
     }
@@ -105,7 +110,7 @@ pub const RequestPipeline = struct {
 };
 
 fn processRpcBatch(alloc: Allocator, reqs: []RpcRequest, dispatcher: RequestDispatcher,
-                writer: anytype) AllocError!bool {
+                   writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     var has_output: bool = false;
     try writer.writeAll("[");
     for (reqs) |req| {
@@ -121,16 +126,16 @@ fn processRpcBatch(alloc: Allocator, reqs: []RpcRequest, dispatcher: RequestDisp
 /// Handle request's error, dispatch the request, and write the response.
 /// Returns true if a response message is written, false for not as notification has no response.
 fn processRpcRequest(alloc: Allocator, req: RpcRequest, req_dispatcher: RequestDispatcher,
-                     delimiter: []const u8, writer: anytype) AllocError!bool {
+                     delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     if (try handleRequestError(req, writer)) return true;
-    errdefer req_dispatcher.dispatchEnd(alloc, req, DispatchResult.asNone());   // for AllocError
+    errdefer req_dispatcher.dispatchEnd(alloc, req, DispatchResult.asNone());   // for std.Io.Writer.Error
     const dresult = try dispatchRequest(alloc, req, req_dispatcher);
     const written = try writeResponse(dresult, req, delimiter, writer);
     req_dispatcher.dispatchEnd(alloc, req, dresult);
     return written;
 }
 
-fn handleRequestError(req: RpcRequest, writer: anytype) AllocError!bool {
+fn handleRequestError(req: RpcRequest, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     if (req.hasError()) {   // request has parsing or validation error.
         try composer.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
         return true;
@@ -139,7 +144,7 @@ fn handleRequestError(req: RpcRequest, writer: anytype) AllocError!bool {
 }
 
 fn dispatchRequest(alloc: Allocator, req: RpcRequest,
-                  req_dispatcher: RequestDispatcher) AllocError!DispatchResult {
+                  req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
     return req_dispatcher.dispatch(alloc, req) catch |err| {
         // Turn dispatching error into DispatchResult.err.
         // Handle errors here so dispatchers don't have to worry about error handling.
@@ -147,7 +152,8 @@ fn dispatchRequest(alloc: Allocator, req: RpcRequest,
     };
 }
 
-fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8, writer: anytype) AllocError!bool {
+fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8,
+                 writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     switch (dresult) {
         .none => {
             return false;       // notification request has no response written.

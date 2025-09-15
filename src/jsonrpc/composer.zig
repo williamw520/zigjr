@@ -20,8 +20,9 @@ const AllocError = errors.AllocError;
 
 
 /// Write a request message in JSON string to the writer.
-pub fn writeRequestJson(method: []const u8, params_json: ?[]const u8,
-                        id: RpcId, writer: anytype) JrErrors!void {
+pub fn writeRequestJson(method: []const u8, params_json: ?[]const u8, id: RpcId,
+                        writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    // TODO: Rewrite. Output jsonrpc, method; switch on id; then params_json.
     if (params_json) |params| {
         switch (id) {
             .num => try writer.print(
@@ -55,6 +56,24 @@ pub fn writeRequestJson(method: []const u8, params_json: ?[]const u8,
     }
 }
 
+/// Write a JSON request built with the method, params, and id to the writer.
+pub fn writeRequest(alloc: Allocator, method: []const u8, params: anytype, id: RpcId,
+                    writer: *std.Io.Writer) JrErrors!void {
+    const pinfo = @typeInfo(@TypeOf(params));
+    if (pinfo != .array and pinfo != .@"struct" and pinfo != .null) {
+        return JrErrors.InvalidParamsType;
+    }
+
+    if (pinfo != .null) {
+        // TODO: direct write to writer, without output to string.
+        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
+        defer alloc.free(params_json);
+        try writeRequestJson(method, params_json, id, writer);
+    } else {
+        try writeRequestJson(method, null, id, writer);
+    }
+}
+
 /// Build a request message in JSON string.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeRequestJson(alloc: Allocator, method: []const u8, params: anytype,
@@ -64,20 +83,20 @@ pub fn makeRequestJson(alloc: Allocator, method: []const u8, params: anytype,
         return JrErrors.InvalidParamsType;
     }
 
-    var output_buf: ArrayList(u8) = .empty;
+    var output_buf = std.Io.Writer.Allocating.init(alloc);
     if (pinfo != .null) {
-        // const params_json = try std.json.stringifyAlloc(alloc, params, .{});
         const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
         defer alloc.free(params_json);
-        try writeRequestJson(method, params_json, id, output_buf.writer(alloc));
+        try writeRequestJson(method, params_json, id, &output_buf.writer);
     } else {
-        try writeRequestJson(method, null, id, output_buf.writer(alloc));
+        try writeRequestJson(method, null, id, &output_buf.writer);
     }
     return try output_buf.toOwnedSlice(alloc);
 }
 
 /// Write a batch message of request JSONS to the writer.
-pub fn writeBatchRequestJson(request_jsons: []const []const u8, writer: anytype) AllocError!void {
+pub fn writeBatchRequestJson(request_jsons: []const []const u8,
+                             writer: *std.Io.Writer) std.Io.Writer.Error!void {
     var count: usize = 0;
     try writer.writeAll("[");
     for (request_jsons) |json| {
@@ -90,8 +109,9 @@ pub fn writeBatchRequestJson(request_jsons: []const []const u8, writer: anytype)
 
 /// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8) JrErrors![]const u8 {
-    var output_buf: ArrayList(u8) = .empty;
+/// TODO: remove use Writer.Allocating with writeBatchRequestJson().
+pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8) std.Io.Writer.Error![]const u8 {
+    var output_buf = std.Io.Writer.Allocating.init(alloc);
     try writeBatchRequestJson(request_jsons, output_buf.writer(alloc));
     return try output_buf.toOwnedSlice(alloc);
 }
@@ -99,7 +119,8 @@ pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8)
 
 /// Write a normal response message in JSON to the writer.
 /// Return true for valid response.  For message id that shouldn't have a response, false is returned.
-pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) AllocError!void {
+pub fn writeResponseJson(id: RpcId, result_json: []const u8,
+                         writer: *std.Io.Writer) std.Io.Writer.Error!void {
     switch (id) {
         .num => try writer.print(
             \\{{"jsonrpc": "2.0", "result": {s}, "id": {}}}
@@ -114,7 +135,7 @@ pub fn writeResponseJson(id: RpcId, result_json: []const u8, writer: anytype) Al
 /// Build a normal response message in JSON string.
 /// For message id that shouldn't have a response, null is returned.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) AllocError!?[]const u8 {
+pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) std.Io.Writer.Error!?[]const u8 {
     if (id.isNotification())
         return null;
     var output_buf: ArrayList(u8) = .empty;
@@ -124,7 +145,7 @@ pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) Al
 
 /// Writer an error response message in JSON to the writer.
 pub fn writeErrorResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
-                              writer: anytype) AllocError!void {
+                              writer: *std.Io.Writer) std.Io.Writer.Error!void {
     const code: i32 = @intFromEnum(err_code);
     const err_msg = if (msg.len == 0) @tagName(err_code) else msg;
     switch (id) {
@@ -146,7 +167,7 @@ pub fn writeErrorResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
 /// Build an error response message in JSON string.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
-                           msg: []const u8) AllocError![]const u8 {
+                           msg: []const u8) std.Io.Writer.Error![]const u8 {
     var output_buf: ArrayList(u8) = .empty;
     try writeErrorResponseJson(id, err_code, msg, output_buf.writer(alloc));
     return try output_buf.toOwnedSlice(alloc);
@@ -155,7 +176,7 @@ pub fn makeErrorResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
 /// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn writeErrorDataResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
-                                  data: []const u8, writer: anytype) AllocError!void {
+                                  data: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     const code: i32 = @intFromEnum(err_code);
     switch (id) {
         .num => try writer.print(
@@ -176,7 +197,7 @@ pub fn writeErrorDataResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u
 /// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorDataResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
-                                 msg: []const u8, data: []const u8) AllocError![]const u8 {
+                                 msg: []const u8, data: []const u8) std.Io.Writer.Error![]const u8 {
     var output_buf: ArrayList(u8) = .empty;
     try writeErrorDataResponseJson(id, err_code, msg, data, output_buf.writer(alloc));
     return try output_buf.toOwnedSlice(alloc);

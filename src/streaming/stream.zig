@@ -19,46 +19,40 @@ const JrErrors = zigjr.JrErrors;
 const frame = @import("frame.zig");
 
 
+const TRIM_SET = " \t\r\n";
+
 
 /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
 /// handle each one with the dispatcher, and write the JSON responses to the writer.
 /// The writer is buffered internally.  The reader is not buffered.
 /// Caller might want to wrap a buffered reader around it.
-pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
+pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
                            dispatcher: RequestDispatcher, options: DelimiterOptions) !void {
-    var frame_buf: ArrayList(u8) = .empty;  // Each JSON request is a frame.
-    defer frame_buf.deinit(alloc);
-    const frame_writer = frame_buf.writer(alloc);
-    var response_buf: ArrayList(u8) = .empty;
-    defer response_buf.deinit(alloc);
-    // var buffered_writer = std.io.bufferedWriter(writer);
-    // const output_writer = buffered_writer.writer();
-    const output_writer = writer;
-    var pipeline = zigjr.RequestPipeline.init(dispatcher, null);
+    var frame_buf = std.Io.Writer.Allocating.init(alloc);
+    defer frame_buf.deinit();
+
+    var pipeline = zigjr.RequestPipeline.init(dispatcher, options.logger);
     defer pipeline.deinit();
 
-    options.logger.start("[requestsByDelimiter] Logging starts");
-    defer { options.logger.stop("[requestsByDelimiter] Logging stops"); }
+    options.logger.start("[stream.requestsByDelimiter] Logging starts");
+    defer { options.logger.stop("[stream.requestsByDelimiter] Logging stops"); }
 
     while (true) {
         frame_buf.clearRetainingCapacity();
-        reader.streamUntilDelimiter(frame_writer, options.request_delimiter, null) catch |e| {
+        _ = reader.streamDelimiter(&frame_buf.writer, options.request_delimiter) catch |e| {
             switch (e) {
                 error.EndOfStream => break,
                 else => return e,   // unrecoverable error while reading from reader.
             }
         };
+        reader.toss(1);             // skip the delimiter char in reader.
 
-        const request_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
+        const request_json = std.mem.trim(u8, frame_buf.written(), TRIM_SET);
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        options.logger.log("requestsByDelimiter", "receive request", request_json);
-        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
-        if (try pipeline.runRequest(alloc, request_json, &response_buf, null)) {
-            try output_writer.writeAll(response_buf.items);
-            try output_writer.writeByte(options.response_delimiter);
-            // try buffered_writer.flush();     // TODO: 0.15.1 migration
-            options.logger.log("requestsByDelimiter", "return response", response_buf.items);
+        if (try pipeline.runRequest(alloc, request_json, writer, .{})) {
+            try writer.writeByte(options.response_delimiter);
+            try writer.flush();
         }
     }
 }
@@ -66,29 +60,30 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: anytype, writer: anytype,
 
 /// Runs a loop to read a stream of JSON response messages (frames) from the reader,
 /// and handle each one with the dispatcher.
-pub fn responsesByDelimiter(alloc: Allocator, reader: anytype,
+pub fn responsesByDelimiter(alloc: Allocator, reader: *std.Io.Reader,
                             dispatcher: ResponseDispatcher, options: DelimiterOptions) !void {
-    var frame_buf: ArrayList(u8) = .empty;
-    defer frame_buf.deinit(alloc);
-    const frame_writer = frame_buf.writer(alloc);
+    var frame_buf = std.Io.Writer.Allocating.init(alloc);
+    defer frame_buf.deinit();
+
     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
-    options.logger.start("[streamResponses] Logging starts");
-    defer { options.logger.stop("[streamResponses] Logging stops"); }
+    options.logger.start("[stream.responsesByDelimiter] Logging starts");
+    defer { options.logger.stop("[stream.responsesByDelimiter] Logging stops"); }
 
     while (true) {
         frame_buf.clearRetainingCapacity();
-        reader.streamUntilDelimiter(frame_writer, options.response_delimiter, null) catch |e| {
+        _ = reader.streamDelimiter(&frame_buf.writer, options.request_delimiter) catch |e| {
             switch (e) {
                 error.EndOfStream => break,
                 else => return e,   // unrecoverable error while reading from reader.
             }
         };
+        reader.toss(1);             // skip the delimiter char in reader.
 
-        const response_json = std.mem.trim(u8, frame_buf.items, " \t\r\n");
+        const response_json = std.mem.trim(u8, frame_buf.written(), TRIM_SET);
         if (options.skip_blank_message and response_json.len == 0) continue;
 
-        options.logger.log("streamResponses", "receive response", response_json);
+        options.logger.log("stream.responsesByDelimiter", "receive response", response_json);
         pipeline.runResponse(response_json, null) catch |err| {
             var stderr_writer = std.fs.File.stderr().writer(&.{});
             const stderr = &stderr_writer.interface;
@@ -107,24 +102,22 @@ pub const DelimiterOptions = struct {
 
 /// Runs a loop to read a stream of JSON request messages (frames) from the reader,
 /// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
-pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytype,
+pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
                                dispatcher: RequestDispatcher, options: ContentLengthOptions) !void {
-    var frame_buf = frame.FrameData.init(alloc);
-    defer frame_buf.deinit();
-    var response_buf: ArrayList(u8) = .empty;
-    defer response_buf.deinit(alloc);
-    // var buffered_writer = std.io.bufferedWriter(writer);
-    // const output_writer = buffered_writer.writer();
+    options.logger.start("[stream.requestsByContentLength] Logging starts");
+    defer { options.logger.stop("[stream.requestsByContentLength] Logging stops"); }
+
+    var frame_data = frame.FrameData.init(alloc);
+    defer frame_data.deinit();
+    var response_buf = std.Io.Writer.Allocating.init(alloc);
+    defer response_buf.deinit();
     const output_writer = writer;
     var pipeline = zigjr.RequestPipeline.init(dispatcher, null);
     defer pipeline.deinit();
 
-    options.logger.start("[requestsByContentLength] Logging starts");
-    defer { options.logger.stop("[requestsByContentLength] Logging stops"); }
-
     while (true) {
-        frame_buf.reset();
-        const has_more = frame.readContentLengthFrame(reader, &frame_buf) catch |err| {
+        frame_data.reset();
+        const has_more = frame.readContentLengthFrame(reader, &frame_data) catch |err| {
             if (err == JrErrors.MissingContentLengthHeader and options.recover_on_missing_header) {
                 continue;
             }
@@ -133,14 +126,16 @@ pub fn requestsByContentLength(alloc: Allocator, reader: anytype, writer: anytyp
         if (!has_more)
             break;
 
-        const request_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
+        const request_json = std.mem.trim(u8, frame_data.getContent(), " \t");
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
-        if (try pipeline.runRequest(alloc, request_json, &response_buf, frame_buf.headers)) {
-            try frame.writeContentLengthFrame(output_writer, response_buf.items);
-            // try buffered_writer.flush();     // TODO: 0.15.1 migration.
-            options.logger.log("requestsByContentLength", "return response", response_buf.items);
+        options.logger.log("stream.requestsByContentLength", "request ", request_json);
+        if (try pipeline.runRequest(alloc, request_json, &response_buf.writer, .{})) {
+            try frame.writeContentLengthFrame(output_writer, response_buf.written());
+            options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
+        } else {
+            options.logger.log("stream.requestsByContentLength", "response", "");
         }
     }
 }
@@ -153,8 +148,8 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
     defer frame_buf.deinit();
     const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
 
-    options.logger.start("[streamResponses] Logging starts");
-    defer { options.logger.stop("[streamResponses] Logging stops"); }
+    options.logger.start("[stream.responsesByContentLength] Logging starts");
+    defer { options.logger.stop("[stream.responsesByContentLength] Logging stops"); }
 
     while (true) {
         frame_buf.reset();
@@ -164,7 +159,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
         const response_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
         if (options.skip_blank_message and response_json.len == 0) continue;
 
-        options.logger.log("streamResponses", "receive response", response_json);
+        options.logger.log("stream.responsesByContentLength", "receive response", response_json);
         pipeline.runResponse(response_json, null) catch |err| {
             var stderr_writer = std.fs.File.stderr().writer(&.{});
             const stderr = &stderr_writer.interface;
@@ -197,8 +192,8 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
     var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
     defer pipeline.deinit();
 
-    options.logger.start("[messagesByContentLength] Logging starts");
-    defer { options.logger.stop("[messagesByContentLength] Logging stops"); }
+    options.logger.start("[stream.messagesByContentLength] Logging starts");
+    defer { options.logger.stop("[stream.messagesByContentLength] Logging stops"); }
 
     while (true) {
         frame_buf.reset();
@@ -214,13 +209,13 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
             .request_has_response => {
                 try frame.writeContentLengthFrame(req_output_writer, req_response_buf.items);
                 // try req_buffered_writer.flush(); // TODO: 0.15.1 migration
-                options.logger.log("messagesByContentLength", "request_has_response", req_response_buf.items);
+                options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.items);
             },
             .request_no_response => {
-                options.logger.log("messagesByContentLength", "request_no_response", "");
+                options.logger.log("stream.messagesByContentLength", "request_no_response", "");
             },
             .response_processed => {
-                options.logger.log("messagesByContentLength", "response_processed", "");
+                options.logger.log("stream.messagesByContentLength", "response_processed", "");
             },
         }
     }

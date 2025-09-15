@@ -155,11 +155,12 @@ pub fn readContentLengthFrame(reader: *std.Io.Reader, frame_data: *FrameData) !b
             return false;   // no more data.
         return err;         // unrecoverable error while reading from reader.
     };
-    if (frame_data.content_length == null)
+    if (frame_data.content_length) |len| {
+        _ = try reader.stream(frame_data.bufWriter(), .limited(len));
+        return true;            // has content data.
+    } else {
         return JrErrors.MissingContentLengthHeader;
-
-    _ = try reader.stream(frame_data.bufWriter(), .unlimited);
-    return true;            // has content data.
+    }
 }
 
 
@@ -173,8 +174,18 @@ pub fn writeContentLengthFrame(writer: *std.Io.Writer, content: []const u8) !voi
 /// Write a sequence of data frames into a writer,
 /// where each frame with a header section containing the Content-Length header.
 pub fn writeContentLengthFrames(writer: *std.Io.Writer, frame_contents: []const []const u8) !void {
-    for (frame_contents)|content| try writeContentLengthFrame(writer, content);
+    for (frame_contents)|content|
+        try writeContentLengthFrame(writer, content);
 }
+
+/// Write a sequence of data frames into a writer,
+/// where each frame with a header section containing the Content-Length header.
+pub fn allocContentLengthFrames(alloc: Allocator, frame_contents: []const []const u8) !std.Io.Writer.Allocating {
+    var alloc_writer = std.Io.Writer.Allocating.init(alloc);
+    try writeContentLengthFrames(&alloc_writer.writer, frame_contents);
+    return alloc_writer;
+}
+
 
 /// Write a request data frame to a writer, with a header section containing
 /// the Content-Length header for the data.

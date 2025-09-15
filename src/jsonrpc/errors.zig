@@ -6,6 +6,8 @@
 // MIT License.  See the LICENSE file.
 //
 
+const std = @import("std");
+
 // JSON-RPC 2.0 error codes.
 pub const ErrorCode = enum(i32) {
     None = 0,
@@ -41,6 +43,8 @@ pub const JrErrors = error {
     RequiredU8ArrayForString,
 } || error {
     OutOfMemory,
+} || error {
+    WriteFailed,    // std.Io.Writer.Error.WriteFailed
 };
 
 pub const AllocError = error{ OutOfMemory };
