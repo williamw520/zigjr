@@ -37,9 +37,9 @@ pub fn main() !void {
         const stdout = &stdout_writer.interface;
 
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-        try zigjr.stream.requestsByDelimiter(alloc,
-            stdin, stdout,
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
             zigjr.RequestDispatcher.implBy(&registry), .{});
+        try stdout.flush();
     }
 
     if (gpa.detectLeaks()) {

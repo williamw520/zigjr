@@ -52,22 +52,26 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     // RequestDispatcher interface implemented by the 'registry' registry.
     const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
+    var stdin_buffer: [1024]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
+
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    var logger = MyLogger{};
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
-        var logger = MyLogger{};
-        try zigjr.stream.requestsByDelimiter(alloc,
-                                             std.io.getStdIn().reader(),
-                                             std.io.getStdOut().writer(),
-                                             dispatcher, .{ .logger = zigjr.Logger.implBy(&logger) });
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
+                                             .{ .logger = zigjr.Logger.implBy(&logger) });
     } else if (args.by_length) {
         // Handle streaming of requests separated by the Content-Length header.
-        try zigjr.stream.requestsByContentLength(alloc,
-                                                 std.io.getStdIn().reader(),
-                                                 std.io.getStdOut().writer(),
-                                                 dispatcher, .{});
+        try zigjr.stream.requestsByContentLength(alloc, stdin, stdout, dispatcher, .{});
     } else {
         usage();
     }
+    try stdout.flush();
 }
 
 const Basic = struct {
