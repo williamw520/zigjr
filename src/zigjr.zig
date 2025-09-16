@@ -64,10 +64,10 @@ test {
     _ = @import("tests/message_tests.zig");
     _ = @import("tests/frame_tests.zig");
     _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/rpc_registry_tests.zig");
-    // _ = @import("tests/json_call_tests.zig");
-    // _ = @import("tests/misc_tests.zig");
-    // _ = @import("streaming/BufReader.zig");
+    _ = @import("tests/rpc_registry_tests.zig");
+    _ = @import("tests/json_call_tests.zig");
+    _ = @import("tests/misc_tests.zig");
+    _ = @import("streaming/BufReader.zig");
 
 }
 
