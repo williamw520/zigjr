@@ -22,27 +22,23 @@ pub fn main() !void {
         defer registry.deinit();
 
         // // Register each RPC method with a handling function.
-        // try registry.add("hello", hello);
-        // try registry.add("hello-name", helloName);
-        // try registry.add("hello-xtimes", helloXTimes);
-        // try registry.add("substr", substr);
-        // try registry.add("say", say);
+        try registry.add("hello", hello);
+        try registry.add("hello-name", helloName);
+        try registry.add("hello-xtimes", helloXTimes);
+        try registry.add("substr", substr);
+        try registry.add("say", say);
 
-        // .buffer = &.{},
         var stdin_buffer: [1024]u8 = undefined;
         var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
         const stdin = &stdin_reader.interface;
-        _=stdin;
-        
+
         var stdout_buffer: [1024]u8 = undefined;
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
-        _=stdout;
-        
+
         // Read requests from stdin, dispatch to handlers, and write responses to stdout.
         try zigjr.stream.requestsByDelimiter(alloc,
-            // std.io.getStdIn().reader(), std.io.getStdOut().writer(),
-            stdin_reader, stdout_writer,
+            stdin, stdout,
             zigjr.RequestDispatcher.implBy(&registry), .{});
     }
 
@@ -67,10 +63,9 @@ fn helloName(alloc: Allocator, name: [] const u8) Allocator.Error![]const u8 {
 // This one takes one more parameter. Note that i64 is JSON's integer type.
 fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
     const repeat: usize = if (0 < times and times < 100) @intCast(times) else 1;
-    var buf = std.ArrayList(u8).init(alloc);
-    var writer = buf.writer();
-    for (0..repeat) |_| try writer.print("Hello {s}! ", .{name});
-    return buf.items;
+    var buf = std.Io.Writer.Allocating.init(alloc);
+    for (0..repeat) |_| try buf.writer.print("Hello {s}! ", .{name});
+    return buf.written();
 }
 
 fn substr(name: [] const u8, start: i64, len: i64) []const u8 {
