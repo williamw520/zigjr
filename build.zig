@@ -27,11 +27,11 @@ pub fn build(b: *std.Build) void {
     hello_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "hello", .root_module = hello_mod }));
 
-    // var hello_single_opt = commonOptions;
-    // hello_single_opt.root_source_file = b.path("examples/hello_single.zig");
-    // const hello_single_mod = b.createModule(hello_single_opt);
-    // hello_single_mod.addImport("zigjr", zigjr_mod);
-    // b.installArtifact(b.addExecutable(.{ .name = "hello_single", .root_module = hello_single_mod }));
+    var hello_single_opt = commonOptions;
+    hello_single_opt.root_source_file = b.path("examples/hello_single.zig");
+    const hello_single_mod = b.createModule(hello_single_opt);
+    hello_single_mod.addImport("zigjr", zigjr_mod);
+    b.installArtifact(b.addExecutable(.{ .name = "hello_single", .root_module = hello_single_mod }));
 
     // var calc_opt = commonOptions;
     // calc_opt.root_source_file = b.path("examples/calc.zig");
