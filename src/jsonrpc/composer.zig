@@ -16,7 +16,7 @@ const RpcId = @import("request.zig").RpcId;
 const errors = @import("errors.zig");
 const ErrorCode = errors.ErrorCode;
 const JrErrors = errors.JrErrors;
-const AllocError = errors.AllocError;
+const WriteAllocError = errors.WriteAllocError;
 
 
 /// Write a request message in JSON string to the writer.
@@ -91,7 +91,7 @@ pub fn makeRequestJson(alloc: Allocator, method: []const u8, params: anytype,
     } else {
         try writeRequestJson(method, null, id, &output_buf.writer);
     }
-    return try output_buf.toOwnedSlice(alloc);
+    return try output_buf.toOwnedSlice();
 }
 
 /// Write a batch message of request JSONS to the writer.
@@ -110,10 +110,10 @@ pub fn writeBatchRequestJson(request_jsons: []const []const u8,
 /// Build a batch message of request JSONS.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 /// TODO: remove use Writer.Allocating with writeBatchRequestJson().
-pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8) std.Io.Writer.Error![]const u8 {
+pub fn makeBatchRequestJson(alloc: Allocator, request_jsons: []const []const u8) WriteAllocError![]const u8 {
     var output_buf = std.Io.Writer.Allocating.init(alloc);
-    try writeBatchRequestJson(request_jsons, output_buf.writer(alloc));
-    return try output_buf.toOwnedSlice(alloc);
+    try writeBatchRequestJson(request_jsons, &output_buf.writer);
+    return try output_buf.toOwnedSlice();
 }
 
 
@@ -135,12 +135,12 @@ pub fn writeResponseJson(id: RpcId, result_json: []const u8,
 /// Build a normal response message in JSON string.
 /// For message id that shouldn't have a response, null is returned.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
-pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) std.Io.Writer.Error!?[]const u8 {
+pub fn makeResponseJson(alloc: Allocator, id: RpcId, result_json: []const u8) WriteAllocError!?[]const u8 {
     if (id.isNotification())
         return null;
-    var output_buf: ArrayList(u8) = .empty;
-    try writeResponseJson(id, result_json, output_buf.writer(alloc));
-    return try output_buf.toOwnedSlice(alloc);
+    var output_buf = std.Io.Writer.Allocating.init(alloc);
+    try writeResponseJson(id, result_json, &output_buf.writer);
+    return try output_buf.toOwnedSlice();
 }
 
 /// Writer an error response message in JSON to the writer.
@@ -167,10 +167,10 @@ pub fn writeErrorResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u8,
 /// Build an error response message in JSON string.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
-                           msg: []const u8) std.Io.Writer.Error![]const u8 {
-    var output_buf: ArrayList(u8) = .empty;
-    try writeErrorResponseJson(id, err_code, msg, output_buf.writer(alloc));
-    return try output_buf.toOwnedSlice(alloc);
+                             msg: []const u8) WriteAllocError![]const u8 {
+    var output_buf = std.Io.Writer.Allocating.init(alloc);
+    try writeErrorResponseJson(id, err_code, msg, &output_buf.writer);
+    return try output_buf.toOwnedSlice();
 }
 
 /// Build an error response message in JSON, with the error data field set.
@@ -197,10 +197,10 @@ pub fn writeErrorDataResponseJson(id: RpcId, err_code: ErrorCode, msg: []const u
 /// Build an error response message in JSON, with the error data field set.
 /// Caller needs to call alloc.free() on the returned message to free the memory.
 pub fn makeErrorDataResponseJson(alloc: Allocator, id: RpcId, err_code: ErrorCode,
-                                 msg: []const u8, data: []const u8) std.Io.Writer.Error![]const u8 {
-    var output_buf: ArrayList(u8) = .empty;
-    try writeErrorDataResponseJson(id, err_code, msg, data, output_buf.writer(alloc));
-    return try output_buf.toOwnedSlice(alloc);
+                                 msg: []const u8, data: []const u8) WriteAllocError![]const u8 {
+    var output_buf = std.Io.Writer.Allocating.init(alloc);
+    try writeErrorDataResponseJson(id, err_code, msg, data, &output_buf.writer);
+    return try output_buf.toOwnedSlice();
 }
 
 

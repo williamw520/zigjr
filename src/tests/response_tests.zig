@@ -169,11 +169,11 @@ const CounterDispatcher = struct {
 
 fn fallbackHandler(ctx: anytype, alloc: Allocator, request: RpcRequest) !void {
     _=ctx;
-    _=alloc;
-    _=request;
-    // const buf = ArrayList(u8).init(alloc);
-    // try std.json.Stringify.valueAlloc(params, .{}, buf.writer());
-    // std.debug.print("{s}\n", .{buf.items});
+    // _=alloc;
+    // _=request;
+    const req_json = try std.json.Stringify.valueAlloc(alloc, request, .{});
+    defer alloc.free(req_json);
+    std.debug.print("{s}\n", .{req_json});
 }
 
 
@@ -185,14 +185,14 @@ test "Response to a request of hello method" {
         var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        var response_buf: ArrayList(u8) = .empty;
-        defer response_buf.deinit(alloc);
+        var response_buf = std.Io.Writer.Allocating.init(alloc);
+        defer response_buf.deinit();
         _ = try pipeline.runRequest(alloc, 
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-            , &response_buf, null);
+            , &response_buf.writer, .{});
         // std.debug.print("response: {s}\n", .{response_buf.items});
 
-        var parsed_res = zigjr.parseRpcResponse(alloc, response_buf.items);
+        var parsed_res = zigjr.parseRpcResponse(alloc, response_buf.written());
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -628,10 +628,10 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        var response_buf: ArrayList(u8) = .empty;
-        defer response_buf.deinit(alloc);
-        _ = try pipeline.runRequest(alloc, batch_req_json, &response_buf, null);
-        const batch_res_json = response_buf.items;
+        var response_buf = std.Io.Writer.Allocating.init(alloc);
+        defer response_buf.deinit();
+        _ = try pipeline.runRequest(alloc, batch_req_json, &response_buf.writer, .{});
+        const batch_res_json = response_buf.written();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
@@ -742,10 +742,10 @@ test "Handle empty batch response" {
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch()).len == 0);
 
-        var batch_res_buf: ArrayList(u8) = .empty;
-        defer batch_res_buf.deinit(alloc);
-        _ = try pipeline.runRequest(alloc, batch_req_json, &batch_res_buf, null);
-        const batch_res_json = batch_res_buf.items;
+        var batch_res_buf = std.Io.Writer.Allocating.init(alloc);
+        defer batch_res_buf.deinit();
+        _ = try pipeline.runRequest(alloc, batch_req_json, &batch_res_buf.writer, .{});
+        const batch_res_json = batch_res_buf.written();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
@@ -765,12 +765,12 @@ test "Dispatch on the response to a request of float add" {
         var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        var response_buf: ArrayList(u8) = .empty;
-        defer response_buf.deinit(alloc);
+        var response_buf = std.Io.Writer.Allocating.init(alloc);
+        defer response_buf.deinit();
         _ = try pipeline.runRequest(alloc, 
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
-            , &response_buf, null);
-        const res_json = response_buf.items;
+            , &response_buf.writer, .{});
+        const res_json = response_buf.written();
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var my_dispatcher = struct {

@@ -32,6 +32,7 @@ const RpcMessageResult = zigjr.RpcMessageResult;
 const ErrorCode = zigjr.errors.ErrorCode;
 const JrErrors = zigjr.errors.JrErrors;
 const AllocError = zigjr.errors.AllocError;
+const WriteAllocError = zigjr.errors.WriteAllocError;
 
 const composer = zigjr.composer;
 
@@ -86,11 +87,11 @@ pub const RequestPipeline = struct {
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
     pub fn runRequestToJson(self: @This(), alloc: Allocator,
-                            request_json: []const u8) std.Io.Writer.Error!?[]const u8 {
+                            request_json: []const u8) WriteAllocError!?[]const u8 {
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        if (try self.runRequest(alloc, request_json, &response_buf, .{})) {
-            return try response_buf.toOwnedSlice(alloc);
+        if (try self.runRequest(alloc, request_json, &response_buf.writer, .{})) {
+            return try response_buf.toOwnedSlice();
         } else {
             return null;
         }
@@ -241,9 +242,9 @@ pub const MessagePipeline = struct {
     }
 
     pub fn runMessage(self: @This(), alloc: Allocator,
-                      message_json: []const u8, req_response_buf: *ArrayList(u8),
-                      headers: ?std.StringHashMap([]const u8)) anyerror!MessageRunResult {
-        _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
+                      message_json: []const u8, writer: *std.Io.Writer,
+                      req_opts: RequestOpts) anyerror!MessageRunResult {
+        _=req_opts;
 
         self.logger.log("runMessage", "message_json ", message_json);
         var msg_result = parseRpcMessage(alloc, message_json);
@@ -251,12 +252,12 @@ pub const MessagePipeline = struct {
 
         switch (msg_result) {
             .request_result  => |request_result| {
-                const writer = req_response_buf.writer(alloc);
                 const response_written = switch (request_result.request_msg) {
                     .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
                     .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
                 };
-                self.logger.log("runMessage", "req_response_json", req_response_buf.items);
+                // TODO: Add a duplicate writer to write to logger.
+                // self.logger.log("runMessage", "req_response_json", req_response_buf.items);
                 return if (response_written) .request_has_response else .request_no_response;
             },
             .response_result => |response_result| {

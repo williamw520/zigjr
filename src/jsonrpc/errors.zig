@@ -41,12 +41,11 @@ pub const JrErrors = error {
     RequiredF64Float,
     RequiredU8SliceForString,
     RequiredU8ArrayForString,
-} || error {
-    OutOfMemory,
-} || error {
-    WriteFailed,    // std.Io.Writer.Error.WriteFailed
-};
+} || WriteAllocError;
 
-pub const AllocError = error{ OutOfMemory };
+pub const WriteAllocError = error{
+    WriteFailed,    // std.Io.Writer.Error.WriteFailed
+    OutOfMemory,
+};
 
 
