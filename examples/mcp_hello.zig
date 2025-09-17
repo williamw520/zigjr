@@ -31,7 +31,8 @@ pub fn main() !void {
     {
         // Use a file-based logger since the executable is run in a MCP host
         // as a sub-process and cannot log to the host's stdout.
-        var logger = try zigjr.FileLogger.init("log.txt");
+        var log_buf: [1024]u8 = undefined;
+        var logger = try zigjr.FileLogger.init("log.txt", &log_buf);
         defer logger.deinit();
 
         var registry = zigjr.RpcRegistry.init(alloc);
@@ -47,11 +48,16 @@ pub fn main() !void {
         // RpcRegistry has implemented the RequestDispatcher interface.
         const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
+        var stdin_buffer: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+        const stdin = &stdin_reader.interface;
+
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
+
         // Starts the JSON streaming pipeline from stdin to stdout.
-        try zigjr.stream.requestsByDelimiter(alloc,
-                                             std.io.getStdIn().reader(),
-                                             std.io.getStdOut().writer(),
-                                             dispatcher,
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
                                              .{ .logger = Logger.implBy(&logger) });
     }
 
@@ -95,22 +101,22 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
                   params: ListToolsRequest_params) !ListToolsResult {
     const msg = try allocPrint(alloc, "params: {any}", .{params});
     logger.log("mcp_tools_list", "tools/list", msg);
-    var tools = std.ArrayList(Tool).init(alloc);
+    var tools: std.ArrayList(Tool) = .empty;
 
     const helloTool = Tool.init(alloc, "hello", "Replying a 'Hello World' when called.");
-    try tools.append(helloTool);
+    try tools.append(alloc, helloTool);
 
     var helloNameTool = Tool.init(alloc, "hello-name", "Replying a 'Hello NAME' when called with a NAME.");
     try helloNameTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloNameTool.inputSchema.addRequired("name");
-    try tools.append(helloNameTool);
+    try tools.append(alloc, helloNameTool);
 
     var helloXTimesTool = Tool.init(alloc, "hello-xtimes", "Replying a 'Hello NAME NUMBER' repeated X times when called with a NAME and a number.");
     try helloXTimesTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloXTimesTool.inputSchema.addRequired("name");
     try helloXTimesTool.inputSchema.addProperty("times", "integer", "The number of times to repeat");
     try helloXTimesTool.inputSchema.addRequired("times");
-    try tools.append(helloXTimesTool);
+    try tools.append(alloc, helloXTimesTool);
 
     return .{
         .tools = tools,
@@ -140,11 +146,11 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !C
         const name = arguments.get("name") orelse Value{ .string = "not set" };
         const times = arguments.get("times") orelse Value{ .integer = 1 };
         const repeat: usize = if (0 < times.integer and times.integer < 100) @intCast(times.integer) else 1;
-        var buf = std.ArrayList(u8).init(alloc);
-        var writer = buf.writer();
+        var buf = std.Io.Writer.Allocating.init(alloc);
+        var writer = &buf.writer;
         for (0..repeat) |_| try writer.print("Hello {s}! ", .{name.string});
         var ctr = CallToolResult.init(alloc);
-        try ctr.addTextContent(buf.items);
+        try ctr.addTextContent(buf.written());
         return ctr;
     } else {
         var ctr = CallToolResult.init(alloc);
@@ -264,7 +270,7 @@ const InputSchema = struct {
         return .{
             .alloc = alloc,
             .properties = jsonObject(alloc),
-            .required = std.ArrayList([]const u8).init(alloc),
+            .required = .empty,
         };
     }
 
@@ -295,7 +301,7 @@ const InputSchema = struct {
     }
 
     pub fn addRequired(self: *@This(), field_name: []const u8) !void {
-        try self.required.append(field_name);
+        try self.required.append(self.alloc, field_name);
     }
 
 };
@@ -336,22 +342,24 @@ const ToolAnnotations = struct {
 };
 
 const CallToolResult = struct {
+    alloc:              Allocator,
     _meta:              ?Value = null,
     content:            std.ArrayList(Content),
     isError:            bool = false,
 
     pub fn init(alloc: Allocator) @This() {
         return .{
-            .content = std.ArrayList(Content).init(alloc),
+            .alloc = alloc,
+            .content = .empty
         };
     }
 
     pub fn addTextContent(self: *@This(), text: []const u8) !void {
-        try self.content.append(Content{ .text = TextContent{ .text = text } });
+        try self.content.append(self.alloc, Content{ .text = TextContent{ .text = text } });
     }
     
     pub fn addImageContent(self: *@This(), data: []const u8, mineType: []const u8) !void {
-        try self.content.append(Content {
+        try self.content.append(self.alloc, Content {
             .image = ImageContent {
                 .data = data,
                 .mimeType = mineType,
@@ -360,7 +368,7 @@ const CallToolResult = struct {
     }
     
     pub fn addAudioContent(self: *@This(), data: []const u8, mineType: []const u8) !void {
-        try self.content.append(Content {
+        try self.content.append(self.alloc, Content {
             .audio = AudioContent {
                 .data = data,
                 .mimeType = mineType,
