@@ -91,14 +91,16 @@ pub const DbgLogger = struct {
 pub const FileLogger = struct {
     count: usize = 0,
     file: std.fs.File,
-    writer: std.fs.File.Writer,
+    fwriter: std.fs.File.Writer,
 
-    pub fn init(file_path: []const u8) !FileLogger {
+    /// Create a FileLogger to log to the file at 'file_path',
+    /// using 'buffer' for the Writer buffer.
+    pub fn init(file_path: []const u8, buffer: []u8) !FileLogger {
         const file = try fileOpenIf(file_path);
         try file.seekFromEnd(0);    // seek to end for appending to file.
         return .{
             .file = file,
-            .writer = file.writer(),
+            .fwriter = file.writer(buffer),
         };
     }
 
@@ -108,20 +110,22 @@ pub const FileLogger = struct {
 
     pub fn start(self: *@This(), message: []const u8) void {
         const ts_sec = std.time.timestamp();
-        self.writer.print("Timestamp {d} - {s}\n", .{ts_sec, message})
+        self.fwriter.interface.print("Timestamp {d} - {s}\n", .{ts_sec, message})
             catch |err| std.debug.print("Error while printing in start(). {any}\n", .{err});
     }
 
     pub fn log(self: *@This(), source: []const u8, operation: []const u8, message: []const u8) void {
         self.count += 1;
-        self.writer.print("{}: [{s}] {s} - {s}\n", .{self.count, source, operation, message})
+        self.fwriter.interface.print("{}: [{s}] {s} - {s}\n", .{self.count, source, operation, message})
             catch |err| std.debug.print("Error while printing in log(). {any}\n", .{err});
     }
     
     pub fn stop(self: *@This(), message: []const u8) void {
         const ts_sec = std.time.timestamp();
-        self.writer.print("Timestamp {d} - {s}\n\n", .{ts_sec, message})
+        self.fwriter.interface.print("Timestamp {d} - {s}\n\n", .{ts_sec, message})
             catch |err| std.debug.print("Error while printing in stop(). {any}\n", .{err});
+        self.fwriter.interface.flush()
+            catch |err| std.debug.print("Error while flushing in stop(). {any}\n", .{err});
     }
 
     fn fileOpenIf(file_path: []const u8) !std.fs.File {

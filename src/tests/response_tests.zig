@@ -602,9 +602,11 @@ test "Handle batch requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
     {
         var impl = CounterDispatcher{};
-        var dbg_logger = zigjr.DbgLogger{};
+        var logger = zigjr.DbgLogger{};
+        // var buf: [1024]u8 = undefined;
+        // var logger = try zigjr.FileLogger.init("log.txt", &buf);
         var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl),
-                                                           zigjr.Logger.implBy(&dbg_logger));
+                                                           zigjr.Logger.implBy(&logger));
         defer pipeline.deinit();
         const req_jsons = [_][]const u8{
             \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
