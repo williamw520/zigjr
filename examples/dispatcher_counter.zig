@@ -8,7 +8,6 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const stringifyAlloc = std.json.stringifyAlloc;
 
 const zigjr = @import("zigjr");
 const RpcRequest = zigjr.RpcRequest;
@@ -21,13 +20,18 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
+        var stdin_buffer: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+        const stdin = &stdin_reader.interface;
+
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
+
         // RequestDispatcher interface implemented by the custom dispatcher.
         var dispatcher_impl = CounterDispatcher{};
         const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
-        try zigjr.stream.requestsByDelimiter(alloc,
-                                             std.io.getStdIn().reader(),
-                                             std.io.getStdOut().writer(),
-                                             dispatcher, .{});
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
     }
 
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }
@@ -45,7 +49,7 @@ const CounterDispatcher = struct {
             self.count -= 1;
             return DispatchResult.asNone(); // treat request as notification
         } else if (std.mem.eql(u8, req.method, "get")) {
-            return DispatchResult.withResult(try stringifyAlloc(alloc, self.count, .{}));
+            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(alloc, self.count, .{}));
         } else {
             return DispatchResult.withErr(ErrorCode.MethodNotFound, "");
         }

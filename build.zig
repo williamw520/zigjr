@@ -51,11 +51,11 @@ pub fn build(b: *std.Build) void {
     dispatcher_hello_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "dispatcher_hello", .root_module = dispatcher_hello_mod }));
 
-    // var dispatcher_counter_opt = commonOptions;
-    // dispatcher_counter_opt.root_source_file = b.path("examples/dispatcher_counter.zig");
-    // const dispatcher_counter_mod = b.createModule(dispatcher_counter_opt);
-    // dispatcher_counter_mod.addImport("zigjr", zigjr_mod);
-    // b.installArtifact(b.addExecutable(.{ .name = "dispatcher_counter", .root_module = dispatcher_counter_mod }));
+    var dispatcher_counter_opt = commonOptions;
+    dispatcher_counter_opt.root_source_file = b.path("examples/dispatcher_counter.zig");
+    const dispatcher_counter_mod = b.createModule(dispatcher_counter_opt);
+    dispatcher_counter_mod.addImport("zigjr", zigjr_mod);
+    b.installArtifact(b.addExecutable(.{ .name = "dispatcher_counter", .root_module = dispatcher_counter_mod }));
 
     // var mcp_hello_opt = commonOptions;
     // mcp_hello_opt.root_source_file = b.path("examples/mcp_hello.zig");
