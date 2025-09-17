@@ -1,5 +1,7 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
+**(Note: This project has been migrated to use the new API in Zig 0.15.1)**
+
 ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
 with message streaming on top, and a smart function dispatcher that turns native Zig functions 
 into RPC handlers. It aims to make building JSON-RPC applications in Zig simple and straightforward.
@@ -53,8 +55,7 @@ which are mapped to the JSON data types automatically.
     try registry.add("substr", substr);
     try registry.add("weigh-cat", weigh);
 
-    try zigjr.stream.requestsByDelimiter(alloc, 
-        std.io.getStdIn().reader(), std.io.getStdOut().writer(), 
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
         RequestDispatcher.implBy(&registry), .{});
 }
 
