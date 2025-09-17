@@ -184,12 +184,10 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
                                options: ContentLengthOptions) !void {
     var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
-    var req_response_buf = ArrayList(u8).init(alloc);
+    var req_response_buf = std.Io.Writer.Allocating.init(alloc);
     defer req_response_buf.deinit();
-    // var req_buffered_writer = std.io.bufferedWriter(req_writer);
-    // const req_output_writer = req_buffered_writer.writer();
     const req_output_writer = req_writer;
-    var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
+    var pipeline = zigjr.MessagePipeline.init(req_dispatcher, res_dispatcher, options.logger);
     defer pipeline.deinit();
 
     options.logger.start("[stream.messagesByContentLength] Logging starts");
@@ -204,12 +202,12 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
         if (options.skip_blank_message and message_json.len == 0) continue;
 
         req_response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
-        const run_result = try pipeline.runMessage(message_json, &req_response_buf, null);
+        const run_result = try pipeline.runMessage(alloc, message_json, &req_response_buf.writer, .{});
         switch (run_result) {
             .request_has_response => {
-                try frame.writeContentLengthFrame(req_output_writer, req_response_buf.items);
-                // try req_buffered_writer.flush(); // TODO: 0.15.1 migration
-                options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.items);
+                try frame.writeContentLengthFrame(req_output_writer, req_response_buf.written());
+                try req_output_writer.flush();
+                options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.written());
             },
             .request_no_response => {
                 options.logger.log("stream.messagesByContentLength", "request_no_response", "");

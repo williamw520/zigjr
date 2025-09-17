@@ -189,7 +189,7 @@ pub fn allocContentLengthFrames(alloc: Allocator, frame_contents: []const []cons
 
 /// Write a request data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
-pub fn writeContentLengthRequest(alloc: Allocator, writer: anytype,
+pub fn writeContentLengthRequest(alloc: Allocator, writer: *std.Io.Writer,
                                  method: []const u8, params: anytype, id: RpcId) !void {
     const json = try makeRequestJson(alloc, method, params, id);
     defer alloc.free(json);
@@ -198,7 +198,7 @@ pub fn writeContentLengthRequest(alloc: Allocator, writer: anytype,
 
 /// Write a request data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
-pub fn writeContentLengthResponse(alloc: Allocator, writer: anytype,
+pub fn writeContentLengthResponse(alloc: Allocator, writer: *std.Io.Writer,
                                   result_json: []const u8, id: RpcId) !void {
     const json = try makeResponseJson(alloc, id, result_json);
     defer alloc.free(json);
