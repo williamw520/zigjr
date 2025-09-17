@@ -8,7 +8,6 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const stringifyAlloc = std.json.stringifyAlloc;
 
 const zigjr = @import("zigjr");
 const RpcRequest = zigjr.RpcRequest;
@@ -21,13 +20,18 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     {
+        var stdin_buffer: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+        const stdin = &stdin_reader.interface;
+
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
+
         // RequestDispatcher interface implemented by the custom dispatcher.
         var dispatcher_impl = HelloDispatcher{};
         const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
-        try zigjr.stream.requestsByDelimiter(alloc,
-                                             std.io.getStdIn().reader(),
-                                             std.io.getStdOut().writer(),
-                                             dispatcher, .{});
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
     }
 
     if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
@@ -39,14 +43,14 @@ const HelloDispatcher = struct {
     pub fn dispatch(_: @This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             // Result needs to be in JSON.
-            return DispatchResult.withResult(try stringifyAlloc(alloc, "Hello World", .{}));
+            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(alloc, "Hello World", .{}));
         } else if (std.mem.eql(u8, req.method, "hello-name")) {
             if (req.params == .array) {
                 const items = req.params.array.items;
                 if (items.len > 0 and items[0] == .string) {
                     const result = try std.fmt.allocPrint(alloc, "Hello {s}", .{ items[0].string });
                     defer alloc.free(result);
-                    return DispatchResult.withResult(try stringifyAlloc(alloc, result, .{}));
+                    return DispatchResult.withResult(try std.json.Stringify.valueAlloc(alloc, result, .{}));
                 }
             }
             return DispatchResult.withErr(ErrorCode.InvalidParams, "Invalid params.");
@@ -57,7 +61,7 @@ const HelloDispatcher = struct {
                     const result = try std.fmt.allocPrint(alloc, "Hello {s} X {} times",
                                                           .{ items[0].string, items[1].integer });
                     defer alloc.free(result);
-                    return DispatchResult.withResult(try stringifyAlloc(alloc, result, .{}));
+                    return DispatchResult.withResult(try std.json.Stringify.valueAlloc(alloc, result, .{}));
                 }
             }
             return DispatchResult.withErr(ErrorCode.InvalidParams, "Invalid params.");
