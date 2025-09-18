@@ -115,6 +115,7 @@ pub const FrameData = struct {
 
 
 /// Read the HTTP-style headers of a data frame.
+/// Content not read yet after this call. Use `readContentLengthFrame()` instead.
 /// The data frame has the format of:
 ///     Content-Length: DATA_LENGTH\r\n
 ///     Other-Header: VALUE\r\n
