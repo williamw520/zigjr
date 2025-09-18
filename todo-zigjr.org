@@ -37,11 +37,11 @@
 ** DONE Add LSP client example.
 ** DONE Add fallback handler for RpcRegistry.
 ** DONE Add pre-dispatch and post-dispatch handlers for RpcRegistry.
-** TODO 0.15.1: Convert reader: anytype to reader: Io.Reader
-** TODO 0.15.1: Convert writer: anytype to writer: Io.Writer
-** TODO 0.15.1: Convert deprecated ArrayList.writer() to std.io.Writer.Allocating.
-** TODO 0.15.1: migrate std.io.bufferedWriter to new Io.Writer.
-** TODO 0.15.1: get float from std.json.Value.integer/float.
+** DONE 0.15.1: Convert reader: anytype to reader: Io.Reader
+** DONE 0.15.1: Convert writer: anytype to writer: Io.Writer
+** DONE 0.15.1: Convert deprecated ArrayList.writer() to std.io.Writer.Allocating.
+** DONE 0.15.1: migrate std.io.bufferedWriter to new Io.Writer.
+** DONE 0.15.1: get float from std.json.Value.integer/float.
 ** TODO Add network server and client example.
 ** TODO Add request and notification message builders.
 
@@ -49,13 +49,10 @@
 ** rpc_pipeline.MessagePipeline.init(), allocator not passed in.
 ** rpc_pipeline.runMessage() needs to pass in an allocator for response_buf.
 
-* Topic for 0.15.1
-** std.json.stringifyAlloc() to std.json.Stringify.valueAlloc(alloc, params, .{});
-    const params_json = try std.json.stringifyAlloc(alloc, params, .{});
-    const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
-
-
 * Releases
+- Releases 1.3
+  * Breaking change! Migrated to use Zig 0.15.1 API.
+
 - Release 1.1
   * Add Universal message handling.
     * Message-based parsing, for both request and response.
