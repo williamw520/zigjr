@@ -1,6 +1,6 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
-**(Note: This project has been migrated to use the new API in Zig 0.15.1)**
+**(Note: Version 1.3.0 has been migrated to use the new API in Zig 0.15.1. There are breaking changes.)**
 
 ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
 with message streaming on top, and a smart function dispatcher that turns native Zig functions 
@@ -79,7 +79,8 @@ fn weigh(cat: CatInfo) f64 {
     return cat.weight;
 }
 ```
-Check [hello.zig](examples/hello.zig) for a complete example.  
+Check [hello.zig](examples/hello.zig) for a complete example. 
+See the example on how to obtain the `std.Io.Reader` based `stdin` and `std.Io.Writer` based `stdout`.
 
 Sample request and response messages.
 ```
@@ -94,7 +95,7 @@ Response: {"jsonrpc": "2.0", "result": "Hello Spiderman", "id": 2}
 ## Installation
 
 Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page,
-and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.0.0.tar.gz
+and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.3.0.zip
 
 Use `zig fetch` to add the ZigJR package to your project's dependencies. Replace `<VERSION>` with the version you selected.
 ```shell
@@ -160,12 +161,13 @@ reading requests from `stdin` and writing responses to `stdout`.
     try registry.add("add", addTwoNums);
 
     const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-    try zigjr.stream.requestsByContentLength(alloc, std.io.getStdIn().reader(), 
-        std.io.getStdOut().writer(), dispatcher, .{});
+    try zigjr.stream.requestsByContentLength(alloc, stdin, stdout, dispatcher, .{});
 }
 
 fn addTwoNums(a: i64, b: i64) i64 { return a + b; }
 ```
+See [hello.zig](examples/hello.zig) on how to obtain the `std.Io.Reader` based `stdin` and `std.Io.Writer` based `stdout`.
+
 
 This example streams messages from one in-memory buffer to another, 
 using a newline character (`\n`) as a delimiter.
@@ -180,16 +182,15 @@ using a newline character (`\n`) as a delimiter.
         \\{"jsonrpc": "2.0", "method": "add", "params": [3, 4], "id": 2}
         \\{"jsonrpc": "2.0", "method": "add", "params": [5, 6], "id": 3}
     ;
-    var in_stream = std.io.fixedBufferStream(req_jsons);
+    var reader = std.Io.Reader.fixed(req_jsons);
 
-    var out_buf = ArrayList(u8).init(alloc);
+    var out_buf = std.Io.Writer.Allocating.init(alloc);
     defer out_buf.deinit();
 
     const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-    try zigjr.stream.requestsByDelimiter(alloc, in_stream.reader(), 
-        out_buf.writer(), dispatcher, .{});
+    try zigjr.stream.requestsByDelimiter(alloc, &reader, &out_buf.writer, dispatcher, .{});
 
-    std.debug.print("output_jsons: {s}\n", .{out_buf.items});
+    std.debug.print("output_jsons: {s}\n", .{out_buf.written()});
 }
 ```
 
@@ -210,17 +211,17 @@ dispatching, and response composition.
     defer pipeline.deinit();
 
     // Run the individual requests to the pipeline.
-    const response_json1 = pipeline.runRequestToJson(
+    const response_json1 = try pipeline.runRequestToJson(alloc, 
         \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
     );
     defer alloc.free(response_json1);
 
-    const response_json2 = pipeline.runRequestToJson(
+    const response_json2 = try pipeline.runRequestToJson(alloc, 
         \\{"jsonrpc": "2.0", "method": "add", "params": [3, 4], "id": 2}
     );
     defer alloc.free(response_json2);
 
-    const response_json3 = pipeline.runRequestToJson(
+    const response_json3 = try pipeline.runRequestToJson(alloc, 
         \\{"jsonrpc": "2.0", "method": "add", "params": [5, 6], "id": 3}
     );
     defer alloc.free(response_json3);
@@ -258,6 +259,8 @@ const zigjr = @import("zigjr");
     defer alloc.free(msg2);
 }
 ```
+See [composer.zig](src/jsonrpc/composer.zig) for other API methods.  
+
 
 ## Dispatcher
 The dispatcher is the entry point for handling incoming RPC messages. 
@@ -420,11 +423,13 @@ This example uses a `DbgLogger` in a request pipeline. This logger prints to `st
 This example uses a `FileLogger` in a request stream. This logger writes to a file.
 File based logging is great in situations where the stdout is not available, e.g.
 when running as a sub-process in a MCP host.
+
+Note: `log_buf` is required for the new std.Io.Writer API.
 ```zig
-    var logger = try zigjr.FileLogger.init("log.txt");
+    var log_buf: [1024]u8 = undefined;
+    var logger = try zigjr.FileLogger.init("log.txt",  &log_buf);
     defer logger.deinit();
-    try zigjr.stream.requestsByDelimiter(alloc,
-        std.io.getStdIn().reader(), std.io.getStdOut().writer(),
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, 
         dispatcher, .{ .logger = Logger.implBy(&logger) });
 ```
 #### Custom Logger
@@ -627,6 +632,8 @@ Type `hello`, `hello Joe` or `hello Joe 10` in the prompt for testing. The `log.
 ### Run the LSP Client Example
 
 The LSP client 
+
+**(Note: This example is not working after migrating to Zig 0.15.1, pending update.)**
 
 The LSP client example is a rudimentary LSP client illustrating how to build a JSON RPC client.
 It spawns a LSP server as a sub-process, communicating to it via its stdin and stdout.
