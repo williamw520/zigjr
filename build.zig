@@ -63,11 +63,11 @@ pub fn build(b: *std.Build) void {
     mcp_hello_mod.addImport("zigjr", zigjr_mod);
     b.installArtifact(b.addExecutable(.{ .name = "mcp_hello", .root_module = mcp_hello_mod }));
 
-    // var lsp_client_opt = commonOptions;
-    // lsp_client_opt.root_source_file = b.path("examples/lsp_client.zig");
-    // const lsp_client_mod = b.createModule(lsp_client_opt);
-    // lsp_client_mod.addImport("zigjr", zigjr_mod);
-    // b.installArtifact(b.addExecutable(.{ .name = "lsp_client", .root_module = lsp_client_mod }));
+    var lsp_client_opt = commonOptions;
+    lsp_client_opt.root_source_file = b.path("examples/lsp_client.zig");
+    const lsp_client_mod = b.createModule(lsp_client_opt);
+    lsp_client_mod.addImport("zigjr", zigjr_mod);
+    b.installArtifact(b.addExecutable(.{ .name = "lsp_client", .root_module = lsp_client_mod }));
 
     // End of building examples
 

@@ -6,6 +6,8 @@
 // MIT License.  See the LICENSE file.
 //
 
+// Note: For now this example doesn't work on Windows with the Zig 0.15.1 changes.
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
@@ -14,7 +16,7 @@ const ArrayList = std.ArrayList;
 const Value = std.json.Value;
 const ObjectMap = std.json.ObjectMap;
 const allocPrint = std.fmt.allocPrint;
-const StringifyOptions = std.json.StringifyOptions;
+const StringifyOptions = std.json.Stringify.Options;
 
 const zigjr = @import("zigjr");
 const RpcId = zigjr.RpcId;
@@ -40,7 +42,7 @@ pub fn main() !void {
         var args = try CmdArgs.init(alloc);
         defer args.deinit();
         args.parse() catch { usage(); return; };
-        std.debug.print("[lsp_client] LSP server cmd: {s}\n", .{ args.cmd_argv.items });
+        std.debug.print("[lsp_client] LSP server cmd: {s}\n", .{ args.cmd_argv.items[0] });
 
         var child = std.process.Child.init(args.cmd_argv.items, alloc);
         child.stdin_behavior    = .Pipe;
@@ -90,13 +92,13 @@ const CmdArgs = struct {
         return .{
             .alloc = alloc,
             .arg_itr = try std.process.argsWithAllocator(alloc),
-            .cmd_argv = .empty(),
+            .cmd_argv = .empty,
         };
     }
 
     fn deinit(self: *@This()) void {
         self.arg_itr.deinit();
-        self.cmd_argv.deinit();
+        self.cmd_argv.deinit(self.alloc);
     }
 
     fn parse(self: *@This()) !void {
@@ -109,7 +111,7 @@ const CmdArgs = struct {
             else if (std.mem.eql(u8, arg, "--pp-json")) { self.pp_json = true; }
             else if (std.mem.eql(u8, arg, "--dump"))    { self.dump = true; }
             else if (std.mem.eql(u8, arg, "--stderr"))  { self.stderr = true; }
-            else { try self.cmd_argv.append(arg); } // collect the lsp-server cmd and args.
+            else { try self.cmd_argv.append(self.alloc, arg); } // collect the lsp-server cmd and args.
         }
 
         if (self.cmd_argv.items.len == 0) return error.MissingCmd;
@@ -120,14 +122,14 @@ const CmdArgs = struct {
 fn request_worker(in_stdin: std.fs.File) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
-    const in_writer = in_stdin.writer();
+    var writer_buf: [1024]u8 = undefined;
+    var in_fwriter = in_stdin.writer(&writer_buf);
+    const in_writer = &in_fwriter.interface;
     var id: i64 = 1;
-    var buf = ArrayList(u8).init(alloc);
-    defer buf.deinit();
 
     std.debug.print("\n[==== request_worker ====] starts\n", .{});
 
-    std.time.sleep(1_000_000_000);  // Wait a bit to let the LSP server to come up.
+    std.Thread.sleep(1_000_000_000);  // Wait a bit to let the LSP server to come up.
     std.debug.print("\n[==== request_worker ====] Send 'initialize' message. id: {}\n", .{id});
     const initializeParams = InitializeParams {
         .rootUri = "file:///tmp",
@@ -136,12 +138,12 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "initialize", initializeParams, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'initialized' notification. id: none\n", .{});
     try writeContentLengthRequest(alloc, in_writer, "initialized", InitializedParams{}, RpcId.ofNone());
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'textDocument/didOpen' notification. id: none\n", .{});
     const didOpenTextDocumentParams = DidOpenTextDocumentParams {
         .textDocument = TextDocumentItem {
@@ -161,7 +163,7 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "textDocument/didOpen", didOpenTextDocumentParams, RpcId.ofNone());
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'textDocument/definition' message. id: {}\n", .{id});
     const definitionParams = DefinitionParams {
         .textDocument = .{ .uri = "file:///tmp/foo.zig" },
@@ -170,7 +172,7 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "textDocument/definition", definitionParams, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'textDocument/hover' message. id: {}\n", .{id});
     const hoverParams = HoverParams {
         .textDocument = .{ .uri = "file:///tmp/foo.zig" },
@@ -179,7 +181,8 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "textDocument/hover", hoverParams, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
+
     std.debug.print("\n[==== request_worker ====] Send 'textDocument/signatureHelp' message. id: {}\n", .{id});
     const signatureHelpParams = SignatureHelpParams {
         .textDocument = .{ .uri = "file:///tmp/foo.zig" },
@@ -188,7 +191,7 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "textDocument/signatureHelp", signatureHelpParams, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'textDocument/completion' message. id: {}\n", .{id});
     const completionParams = CompletionParams {
         .textDocument = .{ .uri = "file:///tmp/foo.zig" },
@@ -197,17 +200,17 @@ fn request_worker(in_stdin: std.fs.File) !void {
     try writeContentLengthRequest(alloc, in_writer, "textDocument/completion", completionParams, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'shutdown' request. id: {}\n", .{id});
     try writeContentLengthRequest(alloc, in_writer, "shutdown", null, RpcId.of(id));
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     std.debug.print("\n[==== request_worker ====] Send 'exit' notification\n", .{});
     try writeContentLengthRequest(alloc, in_writer, "exit", null, RpcId.ofNone());
     id += 1;
 
-    std.time.sleep(1_000_000_000);
+    std.Thread.sleep(1_000_000_000);
     in_stdin.close();   // send an EOF signal to subprocess in case shutdown/exit didn't work.
     std.debug.print("\n[==== request_worker ====] exits\n", .{});
 }
@@ -216,18 +219,20 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
 
-    const out_reader = child_stdout.reader();
+    var reader_buf: [1024]u8 = undefined;
+    var out_freader = child_stdout.readerStreaming(&reader_buf);
+    var out_reader = &out_freader.interface;
     std.debug.print("[---- response_worker ---] starts\n", .{});
 
     if (args.dump) {
         // Dump the raw messages from LSP server.
-        var buf = ArrayList(u8).init(alloc);
-        defer buf.deinit();
+        var buf: ArrayList(u8) = .empty;
+        defer buf.deinit(alloc);
         var chunk: [1024]u8 = undefined;
         while (true) {
-            const chunk_len = try out_reader.read(&chunk);
+            const chunk_len = try out_reader.readSliceShort(&chunk);
             if (chunk_len == 0) break;
-            try buf.appendSlice(chunk[0..chunk_len]);
+            try buf.appendSlice(alloc, chunk[0..chunk_len]);
             if (chunk_len == 1024)
                 continue;   // if the msg aligns at 1024, will read the next msg and combine both.
             std.debug.print("\n[---- response_worker ---] Server json:\n{s}\n\n", .{buf.items});
@@ -238,7 +243,6 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
         var req_registry = zigjr.RpcRegistry.init(alloc);
         defer req_registry.deinit();
         var ext_handlers = ReqExtHandlers {
-            .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
@@ -249,13 +253,16 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
 
         // Use ZigJR's ResponseDispatcher to process the response messages.
         var res_dispatcher = ResDispatcher {
-            .out_buf = ArrayList(u8).init(alloc),
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
 
+        var stderr_buffer: [1024]u8 = undefined;
+        var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+        const stderr = &stderr_writer.interface;
+
         // Use the generic 'messagesByContentLength' to handle both requests and responses.
-        try messagesByContentLength(alloc, out_reader, std.io.getStdErr().writer(),
+        try messagesByContentLength(alloc, out_reader, stderr,
                                     RequestDispatcher.implBy(&req_registry),
                                     ResponseDispatcher.implBy(&res_dispatcher), .{});
     }
@@ -264,7 +271,6 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
 }
 
 const ReqExtHandlers = struct {
-    out_buf:    ArrayList(u8),
     log_json:   bool,
     json_opt:   StringifyOptions,
 
@@ -278,11 +284,11 @@ const ReqExtHandlers = struct {
     pub fn onAfter(_: *@This(), _: Allocator, _: RpcRequest, _: DispatchResult) void {
     }
 
-    pub fn fallback(self: *@This(), _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
         if (self.log_json) {
-            self.out_buf.clearRetainingCapacity();
-            try std.json.stringify(req.params, self.json_opt, self.out_buf.writer());
-            std.debug.print("{s}\n", .{self.out_buf.items});
+            const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, self.json_opt);
+            defer alloc.free(params_json);
+            std.debug.print("{s}\n", .{params_json});
         }
         return DispatchResult.asNone();
     }
@@ -294,18 +300,17 @@ fn window_logMessage(params: LogMessageParams) void {
 }
 
 const ResDispatcher = struct {
-    out_buf:    ArrayList(u8),
     log_json:   bool,
     json_opt:   StringifyOptions,
 
-    pub fn dispatch(self: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+    pub fn dispatch(self: *@This(), alloc: Allocator, res: RpcResponse) anyerror!void {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
         std.debug.print("\n[---- response_worker ---] Server sent response, id: {any}\n", .{res.id.num});
         if (self.log_json) {
-            self.out_buf.clearRetainingCapacity();
-            try std.json.stringify(res.result, self.json_opt, self.out_buf.writer());
-            std.debug.print("{s}\n", .{self.out_buf.items});
+            const result_json = try std.json.Stringify.valueAlloc(alloc, res.result, self.json_opt);
+            defer alloc.free(result_json);
+            std.debug.print("{s}\n", .{result_json});
         }
     }
 };
