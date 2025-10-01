@@ -1,6 +1,6 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
-**(Note: Version 1.3.0 has been migrated to use the new API in Zig 0.15.1. There are breaking changes.)**
+**(Note: Version 1.3.0+ has been migrated to use the new API in Zig 0.15.1. There are breaking changes.)**
 
 ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
 with message streaming on top, and a smart function dispatcher that turns native Zig functions 
@@ -95,7 +95,7 @@ Response: {"jsonrpc": "2.0", "result": "Hello Spiderman", "id": 2}
 ## Installation
 
 Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page,
-and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.3.0.zip
+and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.3.1.zip
 
 Use `zig fetch` to add the ZigJR package to your project's dependencies. Replace `<VERSION>` with the version you selected.
 ```shell
