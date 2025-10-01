@@ -36,32 +36,29 @@ const MyErrors = error{ MissingCfg, MissingCmd, MissingSourceFile };
 /// A LSP client example that spawns a LSP server as a sub-process and
 /// talks to it over the stdin/stdout transport.
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
-    {
-        var args = try CmdArgs.init(alloc);
-        defer args.deinit();
-        args.parse() catch { usage(); return; };
-        std.debug.print("[lsp_client] LSP server cmd: {s}\n", .{ args.cmd_argv.items[0] });
 
-        var child = std.process.Child.init(args.cmd_argv.items, alloc);
-        child.stdin_behavior    = .Pipe;
-        child.stdout_behavior   = .Pipe;
-        child.stderr_behavior   = if (args.stderr) .Inherit else .Ignore;
-        try child.spawn();
+    var args = try CmdArgs.init(alloc);
+    defer args.deinit();
+    args.parse() catch { usage(); return; };
+    std.debug.print("[lsp_client] LSP server cmd: {s}\n", .{ args.cmd_argv.items[0] });
 
-        const request_thread    = try Thread.spawn(.{}, request_worker,  .{ child.stdin.? });
-        const response_thread   = try Thread.spawn(.{}, response_worker, .{ child.stdout.?, args });
+    var child = std.process.Child.init(args.cmd_argv.items, alloc);
+    child.stdin_behavior    = .Pipe;
+    child.stdout_behavior   = .Pipe;
+    child.stderr_behavior   = if (args.stderr) .Inherit else .Ignore;
+    try child.spawn();
 
-        request_thread.join();
-        response_thread.join();
+    const request_thread    = try Thread.spawn(.{}, request_worker,  .{ child.stdin.? });
+    const response_thread   = try Thread.spawn(.{}, response_worker, .{ child.stdout.?, args });
 
-        child.stdin = null; // already closed by the request_worker; clear so it won't be closed again.
-        _ = try child.wait();
-    }
-    if (gpa.detectLeaks()) {
-        std.debug.print("Memory leak detected!\n", .{});
-    }    
+    request_thread.join();
+    response_thread.join();
+
+    child.stdin = null; // already closed by the request_worker; clear so it won't be closed again.
+    _ = try child.wait();
 }
 
 fn usage() void {
@@ -120,7 +117,7 @@ const CmdArgs = struct {
 };
 
 fn request_worker(in_stdin: std.fs.File) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     var writer_buf: [1024]u8 = undefined;
     var in_fwriter = in_stdin.writer(&writer_buf);
@@ -216,7 +213,7 @@ fn request_worker(in_stdin: std.fs.File) !void {
 }
 
 fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
 
     var reader_buf: [1024]u8 = undefined;

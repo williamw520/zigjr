@@ -13,7 +13,7 @@ const json_call = zigjr.json_call;
 const DispatchResult = zigjr.DispatchResult;
 
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 
 var fn0_called = false;

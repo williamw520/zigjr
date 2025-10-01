@@ -13,55 +13,50 @@ const zigjr = @import("zigjr");
 
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    {
-        // Create a registry for the JSON-RPC registry.
-        var registry = zigjr.RpcRegistry.init(alloc);
-        defer registry.deinit();
+    // Create a registry for the JSON-RPC registry.
+    var registry = zigjr.RpcRegistry.init(alloc);
+    defer registry.deinit();
 
-        // Register each RPC method with a handling function.
-        try registry.add("hello", hello);
-        try registry.add("hello-name", helloName);
-        try registry.add("hello-xtimes", helloXTimes);
-        try registry.add("say", say);
+    // Register each RPC method with a handling function.
+    try registry.add("hello", hello);
+    try registry.add("hello-name", helloName);
+    try registry.add("hello-xtimes", helloXTimes);
+    try registry.add("say", say);
 
-        // RequestDispatcher interface implemented by the 'registry' registry.
-        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-        var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
-        defer pipeline.deinit();
+    // RequestDispatcher interface implemented by the 'registry' registry.
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    defer pipeline.deinit();
 
-        // Read a JSON-RPC request JSON from StdIn.
-        var stdin_buffer: [256]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
-        const stdin = &stdin_reader.interface;
-        var read_buf = std.Io.Writer.Allocating.init(alloc);
-        defer read_buf.deinit();
-        const read_len = stdin.streamDelimiter(&read_buf.writer, '\n') catch |err| blk: {
-            switch (err) {
-                std.Io.Reader.StreamError.EndOfStream => break :blk read_buf.written().len,
-                else => return err,
-            }
-        };
-        if (read_len > 0) {
-            std.debug.print("Request:  {s}\n", .{read_buf.written()});
-
-            // Dispatch the JSON-RPC request to the handler, with result in response JSON.
-            if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-                defer alloc.free(response);
-                std.debug.print("Response: {s}\n", .{response});
-            } else {
-                std.debug.print("No response\n", .{});
-            }
-        } else {
-            usage();
+    // Read a JSON-RPC request JSON from StdIn.
+    var stdin_buffer: [256]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
+    var read_buf = std.Io.Writer.Allocating.init(alloc);
+    defer read_buf.deinit();
+    const read_len = stdin.streamDelimiter(&read_buf.writer, '\n') catch |err| blk: {
+        switch (err) {
+            std.Io.Reader.StreamError.EndOfStream => break :blk read_buf.written().len,
+            else => return err,
         }
-    }
+    };
+    if (read_len > 0) {
+        std.debug.print("Request:  {s}\n", .{read_buf.written()});
 
-    if (gpa.detectLeaks()) {
-        std.debug.print("Memory leak detected!\n", .{});
-    }    
+        // Dispatch the JSON-RPC request to the handler, with result in response JSON.
+        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
+            defer alloc.free(response);
+            std.debug.print("Response: {s}\n", .{response});
+        } else {
+            std.debug.print("No response\n", .{});
+        }
+    } else {
+        usage();
+    }
 }
 
 

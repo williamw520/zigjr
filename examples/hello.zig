@@ -13,38 +13,33 @@ const zigjr = @import("zigjr");
 
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    {
-        // Create a registry for the JSON-RPC handlers.
-        var registry = zigjr.RpcRegistry.init(alloc);
-        defer registry.deinit();
+    // Create a registry for the JSON-RPC handlers.
+    var registry = zigjr.RpcRegistry.init(alloc);
+    defer registry.deinit();
 
-        // // Register each RPC method with a handling function.
-        try registry.add("hello", hello);
-        try registry.add("hello-name", helloName);
-        try registry.add("hello-xtimes", helloXTimes);
-        try registry.add("substr", substr);
-        try registry.add("say", say);
+    // // Register each RPC method with a handling function.
+    try registry.add("hello", hello);
+    try registry.add("hello-name", helloName);
+    try registry.add("hello-xtimes", helloXTimes);
+    try registry.add("substr", substr);
+    try registry.add("say", say);
 
-        var stdin_buffer: [1024]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
-        const stdin = &stdin_reader.interface;
+    var stdin_buffer: [1024]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
 
-        var stdout_buffer: [1024]u8 = undefined;
-        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-        const stdout = &stdout_writer.interface;
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
-        // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
-            zigjr.RequestDispatcher.implBy(&registry), .{});
-        try stdout.flush();
-    }
-
-    if (gpa.detectLeaks()) {
-        std.debug.print("Memory leak detected!\n", .{});
-    }    
+    // Read requests from stdin, dispatch to handlers, and write responses to stdout.
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
+                                         zigjr.RequestDispatcher.implBy(&registry), .{});
+    try stdout.flush();
 }
 
 

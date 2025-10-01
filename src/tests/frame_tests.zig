@@ -9,7 +9,7 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const frame = @import("../streaming/frame.zig");
     
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 
 test "readHttpHeaders" {

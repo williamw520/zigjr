@@ -15,15 +15,13 @@ const zigjr = @import("zigjr");
 
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    {
-        const alloc = gpa.allocator();
-        var args = try CmdArgs.init(alloc);
-        defer args.deinit();
-        args.parse() catch { usage(); return; };
-        try runExample(alloc, args);
-    }
-    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var args = try CmdArgs.init(alloc);
+    defer args.deinit();
+    args.parse() catch { usage(); return; };
+    try runExample(alloc, args);
 }
 
 fn runExample(alloc: Allocator, args: CmdArgs) !void {

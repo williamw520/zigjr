@@ -18,7 +18,7 @@ const JrErrors = zigjr.JrErrors;
 const DispatchErrors = zigjr.DispatchErrors;
 
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 
 const HelloDispatcher = struct {

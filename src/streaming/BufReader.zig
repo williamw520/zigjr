@@ -59,7 +59,7 @@ fn streamSource(io_reader: *std.Io.Reader, w: *std.Io.Writer,
 
 
 test "Test buffer size" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     // buffered size bigger than source buffer size
     {
@@ -113,7 +113,7 @@ test "Test buffer size" {
 }
 
 test "Test buffered data" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     // buffered size bigger than source buffer size, with peek()
     {

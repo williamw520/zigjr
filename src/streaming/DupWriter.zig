@@ -72,7 +72,7 @@ fn sendFileDup(io_w: *std.Io.Writer, file_reader: *std.fs.File.Reader, limit: st
 
 
 test "Write dup with .write()" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         var writer1 = std.Io.Writer.Allocating.init(alloc);
@@ -96,7 +96,7 @@ test "Write dup with .write()" {
 }
 
 test "Write dup with streaming" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         var reader: std.Io.Reader = .fixed("abc");
@@ -120,7 +120,7 @@ test "Write dup with streaming" {
 }
 
 test "Write dup with streaming, small buffer" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         var reader: std.Io.Reader = .fixed("0123456789012345678901234567890123456789");
@@ -144,7 +144,7 @@ test "Write dup with streaming, small buffer" {
 }
 
 test "Write dup with .write() and enableWriter2" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         var writer1 = std.Io.Writer.Allocating.init(alloc);

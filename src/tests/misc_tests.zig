@@ -11,7 +11,7 @@ const Array = std.json.Array;
 const Deiniter = @import("../rpc/deiniter.zig").Deiniter;
 const ConstDeiniter = @import("../rpc/deiniter.zig").ConstDeiniter;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 
 fn foo(a: u8, b: i32) void { std.debug.print("foo: a={}, b={}\n", .{a, b}); }

@@ -14,64 +14,61 @@ const zigjr = @import("zigjr");
 
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    {
-        var stash = Stash.init(alloc);
-        defer stash.deinit();
+    var stash = Stash.init(alloc);
+    defer stash.deinit();
 
-        var registry = zigjr.RpcRegistry.init(alloc);
-        defer registry.deinit();
+    var registry = zigjr.RpcRegistry.init(alloc);
+    defer registry.deinit();
 
-        try registry.add("add", Basic.add);                 // register functions in a struct scope.
-        try registry.add("subtract", Basic.subtract);
-        try registry.add("multiply", Basic.multiply);
-        try registry.add("divide", Basic.divide);
-        try registry.add("pow", raiseToPower);              // register function from any scope.
-        try registry.add("logNum", logNum);                 // function with no result.
-        try registry.addWithCtx("inc", &g_sum, increase);   // attach a context to the function.
-        try registry.addWithCtx("dec", &g_sum, decrease);   // attach the same context to another function.
-        try registry.addWithCtx("load", &stash,Stash.load); // handler on a struct object context.
-        try registry.addWithCtx("save", &stash,Stash.save); // handler on a struct object context.
-        try registry.add("weigh-cat", weighCat);            // function with a struct parameter.
-        try registry.add("make-cat", makeCat);              // function returns a struct parameter.
-        try registry.add("clone-cat", cloneCat);            // function returns an array.
-        try registry.add("desc-cat", descCat);              // function returns a tuple.
-        try registry.add("add-weight", addWeight);
+    try registry.add("add", Basic.add);                 // register functions in a struct scope.
+    try registry.add("subtract", Basic.subtract);
+    try registry.add("multiply", Basic.multiply);
+    try registry.add("divide", Basic.divide);
+    try registry.add("pow", raiseToPower);              // register function from any scope.
+    try registry.add("logNum", logNum);                 // function with no result.
+    try registry.addWithCtx("inc", &g_sum, increase);   // attach a context to the function.
+    try registry.addWithCtx("dec", &g_sum, decrease);   // attach the same context to another function.
+    try registry.addWithCtx("load", &stash,Stash.load); // handler on a struct object context.
+    try registry.addWithCtx("save", &stash,Stash.save); // handler on a struct object context.
+    try registry.add("weigh-cat", weighCat);            // function with a struct parameter.
+    try registry.add("make-cat", makeCat);              // function returns a struct parameter.
+    try registry.add("clone-cat", cloneCat);            // function returns an array.
+    try registry.add("desc-cat", descCat);              // function returns a tuple.
+    try registry.add("add-weight", addWeight);
 
-        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-        var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
-        defer pipeline.deinit();
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    defer pipeline.deinit();
 
-        // Read a JSON-RPC request JSON from StdIn.
-        var stdin_buffer: [256]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
-        const stdin = &stdin_reader.interface;
-        var read_buf = std.Io.Writer.Allocating.init(alloc);
-        defer read_buf.deinit();
-        const read_len = stdin.streamDelimiter(&read_buf.writer, '\n') catch |err| blk: {
-            switch (err) {
-                std.Io.Reader.StreamError.EndOfStream => break :blk read_buf.written().len,
-                else => return err,
-            }
-        };
-
-        if (read_len > 0) {
-            std.debug.print("Request:  {s}\n", .{read_buf.written()});
-
-            if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-                defer alloc.free(response);
-                std.debug.print("Response: {s}\n", .{response});
-            } else {
-                std.debug.print("No response\n", .{});
-            }
-        } else {
-            usage();
+    // Read a JSON-RPC request JSON from StdIn.
+    var stdin_buffer: [256]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
+    var read_buf = std.Io.Writer.Allocating.init(alloc);
+    defer read_buf.deinit();
+    const read_len = stdin.streamDelimiter(&read_buf.writer, '\n') catch |err| blk: {
+        switch (err) {
+            std.Io.Reader.StreamError.EndOfStream => break :blk read_buf.written().len,
+            else => return err,
         }
-    }
+    };
 
-    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }    
+    if (read_len > 0) {
+        std.debug.print("Request:  {s}\n", .{read_buf.written()});
+
+        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
+            defer alloc.free(response);
+            std.debug.print("Response: {s}\n", .{response});
+        } else {
+            std.debug.print("No response\n", .{});
+        }
+    } else {
+        usage();
+    }
 }
 
 

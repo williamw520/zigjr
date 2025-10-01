@@ -16,25 +16,22 @@ const ErrorCode = zigjr.ErrorCode;
 
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    {
-        var stdin_buffer: [1024]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
-        const stdin = &stdin_reader.interface;
+    var stdin_buffer: [1024]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
 
-        var stdout_buffer: [1024]u8 = undefined;
-        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-        const stdout = &stdout_writer.interface;
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
-        // RequestDispatcher interface implemented by the custom dispatcher.
-        var dispatcher_impl = CounterDispatcher{};
-        const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
-        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
-    }
-
-    if (gpa.detectLeaks()) { std.debug.print("Memory leak detected!\n", .{}); }
+    // RequestDispatcher interface implemented by the custom dispatcher.
+    var dispatcher_impl = CounterDispatcher{};
+    const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
 }
 
 

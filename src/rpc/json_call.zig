@@ -518,7 +518,7 @@ fn ValueAs(comptime ParamType: type) type {
 
 
 test "Test simple JSON value conversion." {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         _=alloc;
@@ -547,7 +547,7 @@ test "Test simple JSON value conversion." {
 }
 
 test "Test simple JSON value conversion on invalid JSON values." {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         _=alloc;
@@ -562,7 +562,7 @@ test "Test simple JSON value conversion on invalid JSON values." {
 }
 
 test "Test JSON value conversion with alloc." {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     const alloc = gpa.allocator();
     {
         const x = try ValueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });

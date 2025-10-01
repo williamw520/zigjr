@@ -11,7 +11,7 @@ const ErrorCode = zigjr.ErrorCode;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 const EchoDispatcher = struct {
     pub fn dispatch(_: *@This(), alloc: Allocator, req: zigjr.RpcRequest) !DispatchResult {

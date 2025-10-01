@@ -25,45 +25,40 @@ const Logger = zigjr.Logger;
 ///     hello-name: replies "Hello 'NAME'!" when called with a name.
 ///     hello-xtimes: replies "Hello 'NAME'" X times when called with a name and a number.
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    {
-        // Use a file-based logger since the executable is run in a MCP host
-        // as a sub-process and cannot log to the host's stdout.
-        var log_buf: [1024]u8 = undefined;
-        var logger = try zigjr.FileLogger.init("log.txt", &log_buf);
-        defer logger.deinit();
+    // Use a file-based logger since the executable is run in a MCP host
+    // as a sub-process and cannot log to the host's stdout.
+    var log_buf: [1024]u8 = undefined;
+    var logger = try zigjr.FileLogger.init("log.txt", &log_buf);
+    defer logger.deinit();
 
-        var registry = zigjr.RpcRegistry.init(alloc);
-        defer registry.deinit();
+    var registry = zigjr.RpcRegistry.init(alloc);
+    defer registry.deinit();
 
-        // Register the MCP RPC methods.
-        // Pass the logger in as the context so handlers can also log to the log file.
-        try registry.addWithCtx("initialize", &logger, mcp_initialize);
-        try registry.addWithCtx("notifications/initialized", &logger, mcp_notifications_initialized);
-        try registry.addWithCtx("tools/list", &logger, mcp_tools_list);
-        try registry.addWithCtx("tools/call", &logger, mcp_tools_call);
+    // Register the MCP RPC methods.
+    // Pass the logger in as the context so handlers can also log to the log file.
+    try registry.addWithCtx("initialize", &logger, mcp_initialize);
+    try registry.addWithCtx("notifications/initialized", &logger, mcp_notifications_initialized);
+    try registry.addWithCtx("tools/list", &logger, mcp_tools_list);
+    try registry.addWithCtx("tools/call", &logger, mcp_tools_call);
 
-        // RpcRegistry has implemented the RequestDispatcher interface.
-        const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    // RpcRegistry has implemented the RequestDispatcher interface.
+    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
 
-        var stdin_buffer: [1024]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
-        const stdin = &stdin_reader.interface;
+    var stdin_buffer: [1024]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
 
-        var stdout_buffer: [1024]u8 = undefined;
-        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-        const stdout = &stdout_writer.interface;
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
-        // Starts the JSON streaming pipeline from stdin to stdout.
-        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
-                                             .{ .logger = Logger.implBy(&logger) });
-    }
-
-    if (gpa.detectLeaks()) {
-        std.debug.print("Memory leak detected!\n", .{});
-    }    
+    // Starts the JSON streaming pipeline from stdin to stdout.
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
+                                         .{ .logger = Logger.implBy(&logger) });
 }
 
 // The MCP message handlers.

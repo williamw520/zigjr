@@ -17,7 +17,7 @@ const DispatchResult = zigjr.DispatchResult;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa = std.heap.DebugAllocator(.{}){};
 
 
 test "Parsing valid request, single integer param, integer id" {
