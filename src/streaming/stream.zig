@@ -31,7 +31,7 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
     var frame_buf = std.Io.Writer.Allocating.init(alloc);
     defer frame_buf.deinit();
 
-    var pipeline = zigjr.RequestPipeline.init(dispatcher, options.logger);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
     options.logger.start("[stream.requestsByDelimiter] Logging starts");
@@ -112,7 +112,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
     var response_buf = std.Io.Writer.Allocating.init(alloc);
     defer response_buf.deinit();
     const output_writer = writer;
-    var pipeline = zigjr.RequestPipeline.init(dispatcher, null);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
     while (true) {
@@ -187,7 +187,7 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
     var req_response_buf = std.Io.Writer.Allocating.init(alloc);
     defer req_response_buf.deinit();
     const req_output_writer = req_writer;
-    var pipeline = zigjr.MessagePipeline.init(req_dispatcher, res_dispatcher, options.logger);
+    var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
     defer pipeline.deinit();
 
     options.logger.start("[stream.messagesByContentLength] Logging starts");

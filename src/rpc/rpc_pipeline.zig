@@ -41,6 +41,8 @@ const ResponseDispatcher = @import ("dispatcher.zig").ResponseDispatcher;
 const DispatchResult = @import ("dispatcher.zig").DispatchResult;
 var nopLogger = zigjr.NopLogger{};
 
+const DupWriter = @import("../streaming/DupWriter.zig");
+
 
 pub const RequestOpts = struct {
 };
@@ -48,18 +50,21 @@ pub const RequestOpts = struct {
 pub const RequestPipeline = struct {
     req_dispatcher: RequestDispatcher,
     logger:         zigjr.Logger,
+    buf_writer:     std.Io.Writer.Allocating,
 
-    pub fn init(req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
+    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline.init] Logging starts");
         return .{
             .req_dispatcher = req_dispatcher,
             .logger = l,
+            .buf_writer = std.Io.Writer.Allocating.init(alloc),
         };
     }
 
-    pub fn deinit(self: *@This()) void {
+    pub fn deinit(self: *RequestPipeline) void {
         self.logger.stop("[RequestPipeline.deinit] Logging stops");
+        self.buf_writer.deinit();
     }
 
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
@@ -68,7 +73,7 @@ pub const RequestPipeline = struct {
     /// Error is turned into a JSON-RPC error response message.
     /// The function returns a boolean flag indicating whether any response has been written,
     /// as notification requests have no response.
-    pub fn runRequest(self: @This(), alloc: Allocator,
+    pub fn runRequest(self: *RequestPipeline, alloc: Allocator,
                       request_json: []const u8, writer: *std.Io.Writer,
                       req_opts: RequestOpts) std.Io.Writer.Error!bool {
         _=req_opts;
@@ -76,17 +81,20 @@ pub const RequestPipeline = struct {
         self.logger.log("RequestPipeline.runRequest", "request ", request_json);
         var parsed_request = parseRpcRequest(alloc, request_json);
         defer parsed_request.deinit();
+        self.buf_writer.clearRetainingCapacity();
         const response_written = switch (parsed_request.request_msg) {
-            .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
-            .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
+            .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, &self.buf_writer.writer),
+            .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", &self.buf_writer.writer),
         };
-        // TODO: Add a duplicate writer to write to logger.
-        // self.logger.log("RequestPipeline.runRequest", "response", response_buf.written());
+        if (response_written) {
+            try writer.writeAll(self.buf_writer.written());
+            self.logger.log("RequestPipeline.runRequest", "response", self.buf_writer.written());
+        }
         return response_written;
     }
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
-    pub fn runRequestToJson(self: @This(), alloc: Allocator,
+    pub fn runRequestToJson(self: *RequestPipeline, alloc: Allocator,
                             request_json: []const u8) WriteAllocError!?[]const u8 {
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
@@ -99,7 +107,7 @@ pub const RequestPipeline = struct {
 
     /// Run the request and return the response(s) in a RpcResponseResult. Same as runRequest().
     /// This is mainly for testing.
-    pub fn runRequestToResponse(self: @This(), alloc: Allocator,
+    pub fn runRequestToResponse(self: *RequestPipeline, alloc: Allocator,
                                 request_json: []const u8) !RpcResponseResult {
         const response_json = try self.runRequestToJson(alloc, request_json);
         if (response_json) |json| {
@@ -184,7 +192,7 @@ pub const ResponsePipeline = struct {
     alloc:          Allocator,
     res_dispatcher: ResponseDispatcher,
 
-    pub fn init(alloc: Allocator, res_dispatcher: ResponseDispatcher) @This() {
+    pub fn init(alloc: Allocator, res_dispatcher: ResponseDispatcher) ResponsePipeline {
         return .{
             .alloc = alloc,
             .res_dispatcher = res_dispatcher,
@@ -197,7 +205,7 @@ pub const ResponsePipeline = struct {
     /// Any parse error is returned to the caller and the dispatcher is not called.
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
-    pub fn runResponse(self: @This(), response_json: []const u8,
+    pub fn runResponse(self: ResponsePipeline, response_json: []const u8,
                        headers: ?std.StringHashMap([]const u8)) !void {
         _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
@@ -225,23 +233,26 @@ pub const MessagePipeline = struct {
     req_dispatcher: RequestDispatcher,
     res_dispatcher: ResponseDispatcher,
     logger:         zigjr.Logger,
+    buf_writer:     std.Io.Writer.Allocating,
 
-    pub fn init(req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
-                logger: ?zigjr.Logger) @This() {
+    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
+                logger: ?zigjr.Logger) MessagePipeline {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[MessagePipeline] Logging starts");
         return .{
             .logger = l,
             .req_dispatcher = req_dispatcher,
             .res_dispatcher = res_dispatcher,
+            .buf_writer = std.Io.Writer.Allocating.init(alloc),
         };
     }
 
-    pub fn deinit(self: *@This()) void {
+    pub fn deinit(self: *MessagePipeline) void {
         self.logger.stop("[MessagePipeline] Logging stops");
+        self.buf_writer.deinit();
     }
 
-    pub fn runMessage(self: @This(), alloc: Allocator,
+    pub fn runMessage(self: *MessagePipeline, alloc: Allocator,
                       message_json: []const u8, writer: *std.Io.Writer,
                       req_opts: RequestOpts) anyerror!MessageRunResult {
         _=req_opts;
@@ -249,16 +260,21 @@ pub const MessagePipeline = struct {
         self.logger.log("runMessage", "message_json ", message_json);
         var msg_result = parseRpcMessage(alloc, message_json);
         defer msg_result.deinit();
+        self.buf_writer.clearRetainingCapacity();
 
         switch (msg_result) {
             .request_result  => |request_result| {
                 const response_written = switch (request_result.request_msg) {
-                    .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, writer),
-                    .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", writer),
+                    .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, &self.buf_writer.writer),
+                    .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", &self.buf_writer.writer),
                 };
-                // TODO: Add a duplicate writer to write to logger.
-                // self.logger.log("runMessage", "req_response_json", req_response_buf.items);
-                return if (response_written) .request_has_response else .request_no_response;
+                if (response_written) {
+                    self.logger.log("runMessage", "req_response_json", self.buf_writer.written());
+                    try writer.writeAll(self.buf_writer.written());
+                    return .request_has_response;
+                } else {
+                    return .request_no_response;
+                }
             },
             .response_result => |response_result| {
                 try processResponseResult(alloc, response_result, self.res_dispatcher);

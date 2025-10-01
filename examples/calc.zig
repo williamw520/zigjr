@@ -41,7 +41,7 @@ pub fn main() !void {
         try registry.add("add-weight", addWeight);
 
         const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-        var pipeline = zigjr.RequestPipeline.init(dispatcher, null);
+        var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
         defer pipeline.deinit();
 
         // Read a JSON-RPC request JSON from StdIn.

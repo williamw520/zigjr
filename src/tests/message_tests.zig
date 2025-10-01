@@ -128,7 +128,7 @@ test "Parse response to a request of hello method via " {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const res_json = try pipeline.runRequestToJson(alloc, 
@@ -153,7 +153,7 @@ test "Parse error from a request of unknown method, expect error" {
     const alloc = gpa.allocator();
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(RequestDispatcher.implBy(&impl), null);
+        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         const res_json = try pipeline.runRequestToJson(alloc, 
@@ -187,7 +187,7 @@ test "Dispatch on the request and response" {
             }
         } {};
 
-        var pipeline = zigjr.pipeline.MessagePipeline.init(RequestDispatcher.implBy(&req_dispatcher),
+        var pipeline = zigjr.pipeline.MessagePipeline.init(alloc, RequestDispatcher.implBy(&req_dispatcher),
                                                            ResponseDispatcher.implBy(&res_dispatcher),
                                                            null);
         defer pipeline.deinit();
