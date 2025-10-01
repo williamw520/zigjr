@@ -68,7 +68,7 @@ test {
     _ = @import("tests/json_call_tests.zig");
     _ = @import("tests/misc_tests.zig");
     _ = @import("streaming/BufReader.zig");
-
+    _ = @import("streaming/DupWriter.zig");
 }
 
 
