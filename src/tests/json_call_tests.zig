@@ -13,9 +13,6 @@ const json_call = zigjr.json_call;
 const DispatchResult = zigjr.DispatchResult;
 
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
-
 var fn0_called = false;
 var fn0_with_err_called = false;
 var fn0_alloc_called = false;
@@ -156,9 +153,19 @@ fn fn_cat(a: CatInfo) void {
     fn_cat_called = true;
 }
 
+var fn_opt1_int_a: ?usize = null;
+
+fn fn_opt1_int(a: ?usize) void {
+    std.debug.print("fn_opt1_int called, a:{any}\n", .{a});
+    fn_opt1_int_a = a;
+}
+
+
 
 
 test "Test rpc call on fn0." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     {
         var ctx = {};
@@ -255,12 +262,12 @@ test "Test rpc call on fn0." {
         fn0_alloc_called = false;
         h.reset();
     }
-
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 
 test "Test rpc call on fn1." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     var ctx = {};
     {
@@ -390,11 +397,11 @@ test "Test rpc call on fn1." {
         
         h.reset();
     }
-
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 test "Test rpc call on fn1 with DispatchResult." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     var ctx = {};
     {
@@ -422,10 +429,11 @@ test "Test rpc call on fn1 with DispatchResult." {
         const dres = try h.invoke(.{ .integer = 123 });
         try testing.expectEqualStrings(dres.result, "\"abc\"");
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 test "Test rpc call on fn4." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     var ctx = {};
     {
@@ -435,10 +443,11 @@ test "Test rpc call on fn4." {
         try testing.expect(fn4_called);
         h.reset();
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 test "Test rpc call on fn_cat." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     var ctx = {};
     {
@@ -454,7 +463,6 @@ test "Test rpc call on fn_cat." {
         try testing.expect(fn_cat_called);
         h.reset();
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
 }
 
 
