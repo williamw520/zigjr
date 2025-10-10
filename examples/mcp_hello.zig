@@ -79,7 +79,7 @@ fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
             .name = "zigjr mcp_hello",
             .version = "1.0.0",
         },
-        .instructions = "Hello world",
+        .instructions = "It has a number of tools for replying to the 'hello' requests.",
         .capabilities = ServerCapabilities {
             .tools = .{},                   // server capable of doing tools
         },
