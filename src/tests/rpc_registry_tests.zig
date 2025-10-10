@@ -270,6 +270,34 @@ fn fn_json_value_int_value(value1: std.json.Value, b: i64, value3: std.json.Valu
 }
 
 
+var fn_opt1_int_a: ?isize = null;
+
+fn fn_opt1_int(a: ?isize) void {
+    // std.debug.print("fn_opt1_int called, a:{any}\n", .{a});
+    fn_opt1_int_a = a;
+}
+
+var fn_opt1_str_a: ?[]const u8 = null;
+
+fn fn_opt1_str(alloc: Allocator, a: ?[]const u8) ![]const u8 {
+    // std.debug.print("fn_opt1_str called, a:{any}\n", .{a});
+    fn_opt1_str_a = a;
+    if (a)|str| {
+        return str;
+    } else {
+        return try allocPrint(alloc, "a is null", .{});
+    }
+}
+
+var fn_opt1_cat_a: ?CatInfo = null;
+
+fn fn_opt1_cat(a: ?CatInfo) void {
+    // std.debug.print("fn_opt1_cat called, a:{any}\n", .{a});
+    fn_opt1_cat_a = a;
+}
+
+
+
 const Standalone = struct {
     flag:   bool = false,
 };
@@ -1212,6 +1240,92 @@ test "rpc_registry register standalone functions on standalone object." {
             defer res_result.deinit();
             try testing.expect((try res_result.response()).resultEql("flag value is: false"));
         }
+    }
+
+}
+
+test "rpc_registry register functions with an optional parameter." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var registry = zigjr.RpcRegistry.init(alloc);
+        defer registry.deinit();
+        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&registry), null);
+        defer pipeline.deinit();
+
+        try registry.add("fn_opt1_int", fn_opt1_int);
+        try registry.add("fn_opt1_str", fn_opt1_str);
+        try registry.add("fn_opt1_cat", fn_opt1_cat);
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn_opt1_int_a == null);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", .{123}, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn_opt1_int_a == 123);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn_opt1_str_a == null);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", .{"abc"}, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn_opt1_cat_a == null);
+        }
+
+        {
+            const cat1 = CatInfo { .cat_name = "cat1", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", cat1, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
+            defer alloc.free(res_json);
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
+        }
+
     }
 
 }

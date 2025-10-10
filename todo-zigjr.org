@@ -42,6 +42,9 @@
 ** DONE 0.15.1: Convert deprecated ArrayList.writer() to std.io.Writer.Allocating.
 ** DONE 0.15.1: migrate std.io.bufferedWriter to new Io.Writer.
 ** DONE 0.15.1: get float from std.json.Value.integer/float.
+** DONE Add support for single optional parameter in json_call.
+** DONE Add support for single optional parameter in rpc_pipeline.
+** DONE Support optional "params" in JSON RPC 2.0.
 ** TODO Add network server and client example.
 ** TODO Add request and notification message builders.
 

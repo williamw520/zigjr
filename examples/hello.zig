@@ -27,6 +27,7 @@ pub fn main() !void {
     try registry.add("hello-xtimes", helloXTimes);
     try registry.add("substr", substr);
     try registry.add("say", say);
+    try registry.add("opt-text", optionalText);
 
     var stdin_buffer: [1024]u8 = undefined;
     var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
@@ -70,6 +71,14 @@ fn substr(name: [] const u8, start: i64, len: i64) []const u8 {
 // A handler takes in a string and has no return value, for RPC notification.
 fn say(msg: [] const u8) void {
     std.debug.print("Message to say: {s}\n", .{msg});
+}
+
+fn optionalText(text: ?[] const u8) []const u8 {
+    if (text)|txt| {
+        return txt;
+    } else {
+        return "No text";
+    }
 }
 
 
