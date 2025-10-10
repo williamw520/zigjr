@@ -569,7 +569,7 @@ test "Construct a normal response message, simple integer result" {
         if (response_json)|res_json| {
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json, .{});
             defer parsed_res.deinit();
             const res = try parsed_res.response();
             
@@ -592,7 +592,7 @@ test "Construct a normal response message, array result" {
         if (response_json)|res_json| {
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json);
+            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json, .{});
             defer parsed_res.deinit();
             const res = try parsed_res.response();
 

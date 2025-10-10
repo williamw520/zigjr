@@ -111,7 +111,7 @@ pub const RequestPipeline = struct {
                                 request_json: []const u8) !RpcResponseResult {
         const response_json = try self.runRequestToJson(alloc, request_json);
         if (response_json) |json| {
-            return parseRpcResponseOwned(alloc, json);
+            return parseRpcResponseOwned(alloc, json, .{});
         } else {
             return .{};
         }        

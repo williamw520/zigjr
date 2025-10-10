@@ -24,30 +24,36 @@ const Owned = @import("../rpc/deiniter.zig").Owned;
 
 
 /// Parse response_json into a RpcResponseResult.
-/// Caller transfers ownership of response_json to RpcResponseResult.
-/// They will be freed in the RpcResponseResult.deinit().
-pub fn parseRpcResponseOwned(alloc: Allocator, response_json: []const u8) RpcResponseResult {
-    var rresult = parseRpcResponse(alloc, response_json);
-    rresult.jsonOwned(response_json, alloc);
-    return rresult;
-}
-
-/// Parse response_json into a RpcResponseResult.
 /// Caller manages the lifetime response_json.  Needs to ensure response_json is not
 /// freed before RpcResponseResult.deinit(). Parsed result references response_json.
 pub fn parseRpcResponse(alloc: Allocator, response_json: []const u8) RpcResponseResult {
+    return parseRpcResponseOpts(alloc, response_json, .{
+        .ignore_unknown_fields = true,
+    });
+}
+
+fn parseRpcResponseOpts(alloc: Allocator, response_json: []const u8, opts: ParseOptions) RpcResponseResult {
     const json = std.mem.trim(u8, response_json, " ");
     if (json.len == 0) {
         return .{ .response_msg = .{ .none = {} } };
     }
-    const parsed = std.json.parseFromSlice(RpcResponseMessage, alloc, json, .{}) catch |parse_err| {
-        // Create an empty response with the error so callers can have a uniform handling.
-        return .{ .response_msg = .{ .response = RpcResponse.ofParseErr(parse_err) } };
+    const parsed = std.json.parseFromSlice(RpcResponseMessage, alloc, json, opts) catch |err| {
+        // Return an empty response with the error so callers can have a uniform handling.
+        return .{ .response_msg = .{ .response = RpcResponse.ofParseErr(err) } };
     };
     return .{
         .response_msg = parsed.value,
         ._parsed = parsed,
     };
+}
+
+/// Parse response_json into a RpcResponseResult.
+/// Caller transfers ownership of response_json to RpcResponseResult.
+/// They will be freed in the RpcResponseResult.deinit().
+pub fn parseRpcResponseOwned(alloc: Allocator, response_json: []const u8, opts: ParseOptions) RpcResponseResult {
+    var rresult = parseRpcResponseOpts(alloc, response_json, opts);
+    rresult.jsonOwned(response_json, alloc);
+    return rresult;
 }
 
 pub const RpcResponseResult = struct {
