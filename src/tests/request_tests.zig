@@ -253,7 +253,7 @@ test "Parse valid request, with memory ownership transfered" {
         const request_json = try Allocator.dupe(alloc, u8,
             \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
         );
-        var result = zigjr.parseRpcRequestOwned(alloc, request_json);
+        var result = zigjr.parseRpcRequestOwned(alloc, request_json, .{});
         defer result.deinit();
         const req = try result.request();
         try testing.expect(!req.hasError());
@@ -454,7 +454,9 @@ test "Parse missing value request, expect error." {
             \\{"foo": }
         );
         defer result.deinit();
-        try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
+        // std.debug.print("Error {}, {s}\n", .{(try result.request()).err().code, (try result.request()).err().err_msg});
+        // std.debug.print("Error {any}\n", .{(try result.request()).err()});
+        try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
 
 }

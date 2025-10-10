@@ -25,23 +25,29 @@ const Owned = @import("../rpc/deiniter.zig").Owned;
 
 
 /// Parse request_json into a RpcRequestResult.
+/// Caller manages the lifetime request_json.  Needs to ensure request_json is not
+/// freed before RpcRequestResult.deinit(). Parsed result references request_json.
+pub fn parseRpcRequest(alloc: Allocator, request_json: []const u8) RpcRequestResult {
+    return parseRpcRequestOpts(alloc, request_json, .{
+        .ignore_unknown_fields = true,
+    });
+}
+
+/// Parse request_json into a RpcRequestResult.
 /// Caller transfers ownership of request_json to RpcRequestResult.
 /// They will be freed in the RpcRequestResult.deinit().
-pub fn parseRpcRequestOwned(alloc: Allocator, request_json: []const u8) RpcRequestResult {
-    var rresult = parseRpcRequest(alloc, request_json);
+/// This allows managing the lifetime of request_json and result together.
+pub fn parseRpcRequestOwned(alloc: Allocator, request_json: []const u8, opts: ParseOptions) RpcRequestResult {
+    var rresult = parseRpcRequestOpts(alloc, request_json, opts);
     rresult.jsonOwned(request_json, alloc);
     return rresult;
 }
 
-/// Parse request_json into a RpcRequestResult.
-/// Caller manages the lifetime request_json.  Needs to ensure request_json is not
-/// freed before RpcRequestResult.deinit(). Parsed result references request_json.
-pub fn parseRpcRequest(alloc: Allocator, request_json: []const u8) RpcRequestResult {
-    const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, request_json, .{}) catch |parse_err| {
-        // Create an empty request with the error so callers can have a uniform request handling.
+pub fn parseRpcRequestOpts(alloc: Allocator, request_json: []const u8, opts: ParseOptions) RpcRequestResult {
+    const parsed = std.json.parseFromSlice(RpcRequestMessage, alloc, request_json, opts) catch |err| {
+        // Return an empty request with the error so callers can have a uniform request handling.
         return .{
-            .request_msg = .{ .request = RpcRequest.ofParseErr(parse_err) },
-            ._parsed = null,
+            .request_msg = .{ .request = RpcRequest.ofParseErr(err) }
         };
     };
     return .{
