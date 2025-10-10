@@ -153,14 +153,31 @@ fn fn_cat(a: CatInfo) void {
     fn_cat_called = true;
 }
 
-var fn_opt1_int_a: ?usize = null;
+var fn_opt1_int_a: ?isize = null;
 
-fn fn_opt1_int(a: ?usize) void {
-    std.debug.print("fn_opt1_int called, a:{any}\n", .{a});
+fn fn_opt1_int(a: ?isize) void {
+    // std.debug.print("fn_opt1_int called, a:{any}\n", .{a});
     fn_opt1_int_a = a;
 }
 
+var fn_opt1_str_a: ?[]const u8 = null;
 
+fn fn_opt1_str(alloc: Allocator, a: ?[]const u8) ![]const u8 {
+    // std.debug.print("fn_opt1_str called, a:{any}\n", .{a});
+    fn_opt1_str_a = a;
+    if (a)|str| {
+        return str;
+    } else {
+        return try allocPrint(alloc, "a is null", .{});
+    }
+}
+
+var fn_opt1_cat_a: ?CatInfo = null;
+
+fn fn_opt1_cat(a: ?CatInfo) void {
+    // std.debug.print("fn_opt1_cat called, a:{any}\n", .{a});
+    fn_opt1_cat_a = a;
+}
 
 
 test "Test rpc call on fn0." {
@@ -465,6 +482,137 @@ test "Test rpc call on fn_cat." {
     }
 }
 
+test "Test rpc call on fn_opt1_int with optional argument." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn_opt1_int, alloc);
+        defer h.deinit();
 
+        _ = try h.invoke(.{ .null = {} });
+        try testing.expect(fn_opt1_int_a == null);
 
+        _ = try h.invoke(.{ .integer = 123 });
+        try testing.expect(fn_opt1_int_a == 123);
+
+        _ = try h.invokeJson("");
+        try testing.expect(fn_opt1_int_a == null);
+        h.reset();
+
+        _ = try h.invokeJson("123");
+        try testing.expect(fn_opt1_int_a == 123);
+        h.reset();
+
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        _ = try h.invoke(.{ .array = array0 });
+        try testing.expect(fn_opt1_int_a == null);
+
+        var array1 = std.json.Array.init(alloc);
+        try array1.append(.{ .integer = 456 });
+        defer array1.deinit();
+        _ = try h.invoke(.{ .array = array1 });
+        try testing.expect(fn_opt1_int_a == 456);
+
+        _ = try h.invokeJson("[]");
+        try testing.expect(fn_opt1_int_a == null);
+        h.reset();
+
+        _ = try h.invokeJson("[123]");
+        try testing.expect(fn_opt1_int_a == 123);
+        h.reset();
+    }
+}
+
+test "Test rpc call on fn_opt1_str with optional argument and alloc." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn_opt1_str, alloc);
+        defer h.deinit();
+        var res: DispatchResult = undefined;
+        
+        res = try h.invoke(.{ .null = {} });
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
+
+        res = try h.invoke(.{ .string = "abc" });
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
+
+        res = try h.invokeJson("");
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
+        h.reset();
+
+        res = try h.invokeJson("\"abc\"");
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
+        h.reset();
+
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        res = try h.invoke(.{ .array = array0 });
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
+        h.reset();
+
+        var array1 = std.json.Array.init(alloc);
+        try array1.append(.{ .string = "xyz" });
+        defer array1.deinit();
+        res = try h.invoke(.{ .array = array1 });
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "xyz");
+        try testing.expectEqualStrings(res.result, "\"xyz\"");
+        h.reset();
+
+        res = try h.invokeJson("[]");
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
+        h.reset();
+
+        res = try h.invokeJson("[\"abc\"]");
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
+        h.reset();
+    }
+}
+
+test "Test rpc call on fn_opt1_cat with optional object argument." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var ctx = {};
+    {
+        var h = try json_call.makeRpcHandler(&ctx, fn_opt1_cat, alloc);
+        defer h.deinit();
+
+        _ = try h.invokeJson(
+                \\{
+                \\ "cat_name": "cat1",
+                \\ "weight": 5.5,
+                \\ "eye_color": "brown"
+                \\}
+        );
+        try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
+        h.reset();
+        
+        _ = try h.invoke(.{ .null = {} });
+        try testing.expect(fn_opt1_cat_a == null);
+        h.reset();
+
+        _ = try h.invokeJson("");
+        try testing.expect(fn_opt1_cat_a == null);
+        h.reset();
+
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        _ = try h.invoke(.{ .array = array0 });
+        try testing.expect(fn_opt1_cat_a == null);
+        h.reset();
+    }
+}
 
