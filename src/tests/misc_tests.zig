@@ -11,8 +11,6 @@ const Array = std.json.Array;
 const Deiniter = @import("../rpc/deiniter.zig").Deiniter;
 const ConstDeiniter = @import("../rpc/deiniter.zig").ConstDeiniter;
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 fn foo(a: u8, b: i32) void { std.debug.print("foo: a={}, b={}\n", .{a, b}); }
 fn bar(a: f64) void { std.debug.print("bar: a={}\n", .{a}); }
@@ -87,7 +85,10 @@ fn jsonToTuple(comptime tuple_type: type, args: Array) tuple_type {
 }
 
 test "Misc" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var s1 = struct {
             a: u8 = 'A',
@@ -135,12 +136,15 @@ test "Misc" {
         std.debug.print("bb1={any}\n", .{bb1});
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
         
 }
 
 test "Deiniter var struct" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var obj1 = struct {
             alloc:  Allocator,
@@ -157,11 +161,14 @@ test "Deiniter var struct" {
         de1.deinit();
     
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Deiniter const struct" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var de1 = ConstDeiniter.implBy(&struct {
             alloc:  Allocator,
@@ -176,7 +183,7 @@ test "Deiniter const struct" {
         de1.deinit();
     
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 

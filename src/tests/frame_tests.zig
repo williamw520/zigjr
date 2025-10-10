@@ -9,11 +9,12 @@ const Value = std.json.Value;
 const Array = std.json.Array;
 const frame = @import("../streaming/frame.zig");
     
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 test "readHttpHeaders" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var frame_data = frame.FrameData.init(alloc);
         defer frame_data.deinit();
@@ -53,12 +54,15 @@ test "readHttpHeaders" {
         // try testing.expect(!has_more2);
         // std.debug.print("content: |{s}|\n", .{frame_data.getContent()});
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
         
 }
 
 test "writeContentLengthFrame" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var w = std.Io.Writer.Allocating.init(alloc);
         defer w.deinit();
@@ -66,12 +70,15 @@ test "writeContentLengthFrame" {
         try testing.expectEqualStrings(w.written(),
                                        "Content-Length: 3\r\n\r\nabc");
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
         
 }
 
 test "writeContentLengthFrames" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const data = [_][]const u8{
             \\abc
@@ -90,7 +97,7 @@ test "writeContentLengthFrames" {
                                        "Content-Length: 3\r\n\r\nijk"
                                        );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
         
 }
     

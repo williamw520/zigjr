@@ -17,11 +17,12 @@ const DispatchResult = zigjr.DispatchResult;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 test "Parsing valid request, single integer param, integer id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var msg_result = zigjr.parseRpcMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "params": [42], "id": 1}
@@ -54,11 +55,14 @@ test "Parsing valid request, single integer param, integer id" {
         try testing.expect(req.id.eql(1));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parsing valid request, single string param, string id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var msg_result = zigjr.parseRpcMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "fun1", "params": ["FUN1"], "id": "1"}
@@ -92,7 +96,7 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(req.id.eql([_]u8{'1'}));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
@@ -125,7 +129,10 @@ const HelloDispatcher = struct {
 
 
 test "Parse response to a request of hello method via " {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = HelloDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -146,11 +153,14 @@ test "Parse response to a request of hello method via " {
         try testing.expect(res.resultEql("hello back"));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse error from a request of unknown method, expect error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = HelloDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -170,12 +180,15 @@ test "Parse error from a request of unknown method, expect error" {
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "Dispatch on the request and response" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var req_dispatcher = HelloDispatcher{};
 
@@ -209,6 +222,6 @@ test "Dispatch on the request and response" {
         try testing.expect(run_res_result == .response_processed);
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 

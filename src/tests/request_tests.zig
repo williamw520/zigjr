@@ -12,10 +12,10 @@ const RpcRequest = zigjr.RpcRequest;
 const ErrorCode = zigjr.ErrorCode;
 const JrErrors = zigjr.JrErrors;
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 test "Parsing valid request, single integer param, integer id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
@@ -48,10 +48,12 @@ test "Parsing valid request, single integer param, integer id" {
         try testing.expect(req.id.eql(1));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parsing valid request, single string param, string id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
     {
         var result = zigjr.parseRpcRequest(alloc,
@@ -85,11 +87,14 @@ test "Parsing valid request, single string param, string id" {
         try testing.expect(req.id.eql([_]u8{'1'}));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parsing valid request, tw0 integer params, integer id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun1", "params": [42, 22], "id": 2}
@@ -123,11 +128,14 @@ test "Parsing valid request, tw0 integer params, integer id" {
         try testing.expect(req.id.eql(2));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parsing valid request, object params, integer id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun_obj", "params": { "name": "foobar", "weight": 150 }, "id": 3}
@@ -159,11 +167,14 @@ test "Parsing valid request, object params, integer id" {
         try testing.expect(req.id.eql(3));
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request, with 0 params, with no id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "params": [] }
@@ -194,11 +205,14 @@ test "Parse valid request, with 0 params, with no id" {
         try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request, with no params, with no id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0" }
@@ -227,11 +241,14 @@ test "Parse valid request, with no params, with no id" {
         try testing.expect(req.id == zigjr.RpcId.none);
         try testing.expect(req.hasError() == false);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request, with memory ownership transfered" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const request_json = try Allocator.dupe(alloc, u8,
             \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
@@ -244,11 +261,14 @@ test "Parse valid request, with memory ownership transfered" {
         try testing.expect(req.id.isNull());
         try testing.expect(req.id == .null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request, with no params, with null id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "id": null }
@@ -260,11 +280,14 @@ test "Parse valid request, with no params, with null id" {
         try testing.expect(req.id.isNull());
         try testing.expect(req.id == .null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request, with no params, with string id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
@@ -275,11 +298,14 @@ test "Parse valid request, with no params, with string id" {
         try testing.expect(req.id.isValid());
         try testing.expect(req.id.eql("5a"));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request batch, with no params, with string id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
@@ -297,11 +323,14 @@ test "Parse valid request batch, with no params, with string id" {
         try testing.expect(reqs[0].id.eql("5a"));
         try testing.expect(reqs[1].id.eql("5b"));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse a valid empty request batch" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\[ ]
@@ -312,14 +341,17 @@ test "Parse a valid empty request batch" {
         const reqs = try result.batch();
         try testing.expect(reqs.len == 0);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 // Testing parsing errors and invalid requests.
 
 test "Parse empty request, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\
@@ -330,11 +362,14 @@ test "Parse empty request, expect error." {
         try testing.expect(req.err().code == ErrorCode.InvalidRequest);
         try testing.expect(req.isError(ErrorCode.InvalidRequest));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse incomplete opening request {, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{
@@ -345,11 +380,14 @@ test "Parse incomplete opening request {, expect error." {
         try testing.expect(req.err().code == ErrorCode.InvalidRequest);
         try testing.expect(req.isError(ErrorCode.InvalidRequest));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse incomplete closing request }, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\}
@@ -358,11 +396,14 @@ test "Parse incomplete closing request }, expect error." {
         // std.debug.print("Error {}, {s}\n", .{(try result.request()).err().code, (try result.request()).err().err_msg});
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse empty object request {}, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{}
@@ -370,11 +411,14 @@ test "Parse empty object request {}, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse invalid syntax request, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\ foo abc 123
@@ -382,11 +426,14 @@ test "Parse invalid syntax request, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse incomplete missing value request, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"foo":
@@ -394,11 +441,14 @@ test "Parse incomplete missing value request, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse missing value request, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"foo": }
@@ -406,11 +456,14 @@ test "Parse missing value request, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse missing value for 'jsonrpc' property, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": }
@@ -418,11 +471,14 @@ test "Parse missing value for 'jsonrpc' property, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.ParseError);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse incomplete jsonrpc request 'jsonrpc' only, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0"}
@@ -430,11 +486,14 @@ test "Parse incomplete jsonrpc request 'jsonrpc' only, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse duplicate 'params' properties, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "methodx": "foobar", "params": [], "id": "4"}
@@ -442,11 +501,14 @@ test "Parse duplicate 'params' properties, expect error." {
         defer result.deinit();
         // try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse invalid jsonrpc version 0.0, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "0.0", "method": "foobar", "params": [], "id": "5"}
@@ -454,11 +516,14 @@ test "Parse invalid jsonrpc version 0.0, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse invalid jsonrpc version 1.0, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "1.0", "method": "foobar", "params": [], "id": "5"}
@@ -466,11 +531,14 @@ test "Parse invalid jsonrpc version 1.0, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse invalid jsonrpc version 3.0, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "3.0", "method": "foobar", "params": [], "id": "5"}
@@ -478,11 +546,14 @@ test "Parse invalid jsonrpc version 3.0, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse empty method, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": ""}
@@ -490,11 +561,14 @@ test "Parse empty method, expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse non-object nor non-array params '1234', expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "foobar", "params": 1234, "id": "5d"}
@@ -502,11 +576,14 @@ test "Parse non-object nor non-array params '1234', expect error." {
         defer result.deinit();
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse non-object nor non-array params 'abcd', expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "foobar", "params": "abcd", "id": "5d"}
@@ -515,11 +592,14 @@ test "Parse non-object nor non-array params 'abcd', expect error." {
         // std.debug.print("Request: {any}\n", .{try result.request()});
         try testing.expect((try result.request()).err().code == ErrorCode.InvalidParams);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request and get as a batch, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\{"jsonrpc": "2.0", "method": "fun0", "id": "5a" }
@@ -530,11 +610,14 @@ test "Parse valid request and get as a batch, expect error." {
         try testing.expect(result.batch() == JrErrors.NotBatchRpcRequest);
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Parse valid request batch and get as a request, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var result = zigjr.parseRpcRequest(alloc,
             \\[ {"jsonrpc": "2.0", "method": "fun0", "id": "5a" },
@@ -546,12 +629,15 @@ test "Parse valid request batch and get as a request, expect error." {
         defer result.deinit();
         try testing.expect(result.request() == JrErrors.NotSingleRpcRequest);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "Build request json with no params and none Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", null, zigjr.RpcId.none);
         defer alloc.free(req_json);
@@ -560,11 +646,14 @@ test "Build request json with no params and none Id." {
             \\{"jsonrpc": "2.0", "method": "foobar"}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with no params and null Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", null, zigjr.RpcId.null);
         defer alloc.free(req_json);
@@ -573,11 +662,14 @@ test "Build request json with no params and null Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "id": null}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with no params and integer Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", null, .{ .num = 1 });
         defer alloc.free(req_json);
@@ -586,11 +678,14 @@ test "Build request json with no params and integer Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "id": 1}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with no params and string Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", null, .{ .str = "1" });
         defer alloc.free(req_json);
@@ -599,11 +694,14 @@ test "Build request json with no params and string Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "id": "1"}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with array params and none Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .none = {} });
         defer alloc.free(req_json);
@@ -612,7 +710,7 @@ test "Build request json with array params and none Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2]}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 const  ParamsTest = struct {
@@ -621,7 +719,10 @@ const  ParamsTest = struct {
 };
 
 test "Build request json with object params and none Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", ParamsTest{}, .{ .none = {} });
         defer alloc.free(req_json);
@@ -630,11 +731,14 @@ test "Build request json with object params and none Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": {"a":1,"b":2}}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with array params and null Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .null = {} });
         defer alloc.free(req_json);
@@ -643,11 +747,14 @@ test "Build request json with array params and null Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": null}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with array params and num Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .num = 123 });
         defer alloc.free(req_json);
@@ -656,11 +763,14 @@ test "Build request json with array params and num Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": 123}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with array params and str Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_json = try zigjr.composer.makeRequestJson(alloc, "foobar", [_]i64{1, 2}, .{ .str = "10" });
         defer alloc.free(req_json);
@@ -669,20 +779,26 @@ test "Build request json with array params and str Id." {
             \\{"jsonrpc": "2.0", "method": "foobar", "params": [1,2], "id": "10"}
         );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Build request json with invalid params type and none Id, expect error." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         try testing.expectEqual(zigjr.composer.makeRequestJson(alloc, "foobar", 123, .{ .str = "10" }), JrErrors.InvalidParamsType);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "Build batch request json with array params and str Id." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const req_jsons = [_][]const u8{
             try zigjr.composer.makeRequestJson(alloc, "foo", [_]i64{1, 2}, .{ .none = {} }),
@@ -705,6 +821,6 @@ test "Build batch request json with array params and str Id." {
         try testing.expect((try result.batch())[1].id.eql(2));
         try testing.expectEqualSlices(u8, (try result.batch())[1].method, "bar");
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 

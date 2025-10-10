@@ -11,7 +11,6 @@ const ErrorCode = zigjr.ErrorCode;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 
-var gpa = std.heap.DebugAllocator(.{}){};
 
 const EchoDispatcher = struct {
     pub fn dispatch(_: *@This(), alloc: Allocator, req: zigjr.RpcRequest) !DispatchResult {
@@ -61,7 +60,10 @@ const CounterDispatcher = struct {
 
 
 test "DelimiterStream.streamRequests on JSON requests, single param, id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = EchoDispatcher{};
 
@@ -89,11 +91,14 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
                                       );
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = CounterDispatcher{};
         const req_json_list = [_][]const u8{
@@ -131,12 +136,15 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
                                       \\{"jsonrpc": "2.0", "result": 0, "id": 4}
                                       );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "DelimiterStream.streamRequests on JSON requests, recover from error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = EchoDispatcher{};
 
@@ -167,11 +175,14 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
                                       \\
                                       );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, recover from error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = EchoDispatcher{};
 
@@ -202,11 +213,14 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
                                       \\
                                       );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "ContentLengthStream.streamRequests on JSON requests, recover from missing headers" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons1 = [_][]const u8{
@@ -256,12 +270,15 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
                                       \\{"jsonrpc": "2.0", "result": 0, "id": 4}
                                       );
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "DelimiterStream.streamResponses on JSON responses, single param, id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = EchoDispatcher{};
 
@@ -305,11 +322,14 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
                                               zigjr.ResponseDispatcher.implBy(&my_response_dispatcher), .{});
         try testing.expect(my_response_dispatcher.called);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "responsesByLength on JSON responses, single param, id" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var dispatcher = CounterDispatcher{};
         const req_jsons = [_][]const u8{
@@ -365,7 +385,7 @@ test "responsesByLength on JSON responses, single param, id" {
                                               zigjr.ResponseDispatcher.implBy(&my_response_dispatcher), .{});
         try testing.expect(my_response_dispatcher.called);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 

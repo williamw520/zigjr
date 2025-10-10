@@ -18,8 +18,6 @@ const JrErrors = zigjr.JrErrors;
 const DispatchErrors = zigjr.DispatchErrors;
 
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 const HelloDispatcher = struct {
     pub fn dispatch(_: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
@@ -179,7 +177,10 @@ fn fallbackHandler(ctx: anytype, alloc: Allocator, request: RpcRequest) !void {
 
 
 test "Response to a request of hello method" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = HelloDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -201,11 +202,14 @@ test "Response to a request of hello method" {
         try testing.expect(res.resultEql("hello back"));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Handle a request of hello method" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = HelloDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -225,11 +229,14 @@ test "Handle a request of hello method" {
         try testing.expect(res.resultEql("hello back"));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Handle a request of unknown method, expect error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = HelloDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -245,11 +252,14 @@ test "Handle a request of unknown method, expect error" {
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer add" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -268,11 +278,14 @@ test "Response to a request of integer add" {
         try testing.expect(res.resultEql(3));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "runRequestToJson on a request of integer add" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -288,11 +301,14 @@ test "runRequestToJson on a request of integer add" {
         try testing.expect(res.resultEql(3));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer sub" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -308,11 +324,14 @@ test "Response to a request of integer sub" {
         try testing.expect(res.resultEql(-1));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer multiply" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -328,11 +347,14 @@ test "Response to a request of integer multiply" {
         try testing.expect(res.resultEql(20));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer divide" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -349,11 +371,14 @@ test "Response to a request of integer divide" {
         try testing.expect(res.resultEql(3.0));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer add with missing parameter, expect error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -369,11 +394,14 @@ test "Response to a request of integer add with missing parameter, expect error"
         try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of float add" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -389,11 +417,14 @@ test "Response to a request of float add" {
         try testing.expect(res.resultEql(3));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of float sub" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -409,11 +440,14 @@ test "Response to a request of float sub" {
         try testing.expect(res.resultEql(-1));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of float multiply" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -429,11 +463,14 @@ test "Response to a request of float multiply" {
         try testing.expect(res.resultEql(20));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of float divide" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -449,11 +486,14 @@ test "Response to a request of float divide" {
         try testing.expect(res.resultEql(10.0/3.0));
         try testing.expect(res.id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response using an object based dispatcher." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -495,11 +535,14 @@ test "Response using an object based dispatcher." {
             try testing.expect((try parsed_res.response()).resultEql(1));
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Response to a request of integer add with invalid parameter type, expect error" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -513,11 +556,14 @@ test "Response to a request of integer add with invalid parameter type, expect e
         try testing.expectEqual((try parsed_res.response()).err().code, @intFromEnum(ErrorCode.InvalidParams));
         try testing.expect((try parsed_res.response()).id.eql(1));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Construct a normal response message, simple integer result" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, .{ .num = 1 }, "10");
         if (response_json)|res_json| {
@@ -533,11 +579,14 @@ test "Construct a normal response message, simple integer result" {
             try testing.expect(res.id.eql(1));
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Construct a normal response message, array result" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, zigjr.RpcId{ .str = "2" }, "[1, 2, 3]");
         if (response_json)|res_json| {
@@ -552,11 +601,14 @@ test "Construct a normal response message, array result" {
             try testing.expectEqualSlices(u8, res.id.str, "2");
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Construct an error response message" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const res_json = try zigjr.composer.makeErrorResponseJson(alloc, .{ .none = {} },
                                                                   ErrorCode.InternalError, "Internal Error");
@@ -572,11 +624,14 @@ test "Construct an error response message" {
         try testing.expectEqualSlices(u8, res.err().message, "Internal Error");
         try testing.expect(res.id == .null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Construct an error response message with data" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         const res_json = try zigjr.composer.makeErrorDataResponseJson(alloc, .{ .none = {} },
                                                                       ErrorCode.InternalError, "Internal Error", "123");
@@ -594,12 +649,15 @@ test "Construct an error response message with data" {
         try testing.expectEqual(res.err().data.?.integer, 123);
         try testing.expect(res.id == .null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "Handle batch requests with the CounterDispatcher" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = CounterDispatcher{};
         var logger = zigjr.DbgLogger{};
@@ -665,11 +723,14 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect(batch_res[2].result.integer == 0);
         try testing.expect(batch_res[2].resultEql(0));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -723,12 +784,15 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
         try testing.expect(batch_res[2].result.integer == 0);
         try testing.expect(batch_res[2].resultEql(0));
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "Handle empty batch response" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -757,11 +821,14 @@ test "Handle empty batch response" {
 
         try testing.expect(batch_res.len == 0);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Dispatch on the response to a request of float add" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -789,11 +856,14 @@ test "Dispatch on the response to a request of float add" {
 
         try res_pipeline.runResponse(res_json, null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "Dispatch batch responses on batch JSON requests with the CounterDispatcher" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
@@ -839,7 +909,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
 
         try res_pipeline.runResponse(batch_res_json, null);
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 

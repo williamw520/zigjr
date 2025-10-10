@@ -15,8 +15,6 @@ const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
-var gpa = std.heap.DebugAllocator(.{}){};
-
 
 // Test handler registration.
 
@@ -308,7 +306,10 @@ fn fun_wrong_param_type2(alloc: Allocator, _: Value, _: u8) anyerror![]const u8 
 
 
 test "rpc_registry fn0" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -326,11 +327,14 @@ test "rpc_registry fn0" {
             try testing.expect(fn0_called);
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 test "rpc_registry fn0 variants" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -395,12 +399,15 @@ test "rpc_registry fn0 variants" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry fn1" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -461,12 +468,15 @@ test "rpc_registry fn1" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry fn2" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -526,12 +536,15 @@ test "rpc_registry fn2" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry with struct scope functions" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -556,12 +569,15 @@ test "rpc_registry with struct scope functions" {
             try testing.expect(Group.group_fn1_called);
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry with context" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -627,12 +643,15 @@ test "rpc_registry with context" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry fn with array params returning struct value" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -661,12 +680,15 @@ test "rpc_registry fn with array params returning struct value" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry fn with built array params returning struct value" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -697,12 +719,15 @@ test "rpc_registry fn with built array params returning struct value" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in an Value as a parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -733,12 +758,15 @@ test "rpc_registry passing in an Value as a parameter" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in an Value as a parameter, with an Allocator as the first parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -768,12 +796,15 @@ test "rpc_registry passing in an Value as a parameter, with an Allocator as the 
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a Value(.object) as a parameter, with a context, parsing the Value to a struct" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -806,12 +837,15 @@ test "rpc_registry passing in a Value(.object) as a parameter, with a context, p
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a single JSON Value as parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -849,12 +883,15 @@ test "rpc_registry passing in a single JSON Value as parameter" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in two JSON Values as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -877,12 +914,15 @@ test "rpc_registry passing in two JSON Values as parameters" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in one JSON Value and one primitive as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -905,12 +945,15 @@ test "rpc_registry passing in one JSON Value and one primitive as parameters" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in one JSON Value, one primitive, and one Value as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -933,12 +976,15 @@ test "rpc_registry passing in one JSON Value, one primitive, and one Value as pa
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a struct object as a parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -969,12 +1015,15 @@ test "rpc_registry passing in a struct object as a parameter" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a struct object as a parameter, with Allocator parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -1005,12 +1054,15 @@ test "rpc_registry passing in a struct object as a parameter, with Allocator par
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a struct object as a parameter, on a ctx" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -1043,12 +1095,15 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx" {
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry passing in a struct object as a parameter, on a ctx, with Allocator parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -1081,12 +1136,15 @@ test "rpc_registry passing in a struct object as a parameter, on a ctx, with All
         }
 
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
 test "rpc_registry register standalone functions on standalone object." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
+
     {
         var registry = zigjr.RpcRegistry.init(alloc);
         defer registry.deinit();
@@ -1155,7 +1213,7 @@ test "rpc_registry register standalone functions on standalone object." {
             try testing.expect((try res_result.response()).resultEql("flag value is: false"));
         }
     }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+
 }
 
 
