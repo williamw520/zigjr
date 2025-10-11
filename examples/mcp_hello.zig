@@ -224,10 +224,8 @@ const ListToolsResult = struct {
         const jws = jsonWriteStream;
         try jws.beginObject();
         {
-            try jws.objectField("_meta");
-            try jws.write(self._meta);
-            try jws.objectField("nextCursor");
-            try jws.write(self.nextCursor);
+            if (self._meta) |val| try writeField(jws, "_meta", val);
+            if (self.nextCursor) |val| try writeField(jws, "nextCursor", val);
             try jws.objectField("tools");
             try jws.write(self.tools.items);
         }
@@ -375,8 +373,7 @@ const CallToolResult = struct {
         const jws = jsonWriteStream;
         try jws.beginObject();
         {
-            try jws.objectField("_meta");
-            try jws.write(self._meta);
+            if (self._meta) |val| try writeField(jws, "_meta", val);
 
             try jws.objectField("content");
             try jws.write(self.content.items);
@@ -469,4 +466,8 @@ fn typeObject(alloc: Allocator, type_name: []const u8, type_desc: []const u8) !V
     return value;
 }
 
+fn writeField(jws: anytype, name: []const u8, value: anytype) !void {
+    try jws.objectField(name);
+    try jws.write(value);
+}
 

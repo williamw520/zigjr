@@ -8,9 +8,6 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const allocPrint = std.fmt.allocPrint;
-const ArrayList = std.ArrayList;
-const assert = std.debug.assert;
 
 const RpcId = @import("request.zig").RpcId;
 const errors = @import("errors.zig");
@@ -66,7 +63,10 @@ pub fn writeRequest(alloc: Allocator, method: []const u8, params: anytype, id: R
 
     if (pinfo != .null) {
         // TODO: direct write to writer, without output to string.
-        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
+        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{
+            .emit_null_optional_fields = false,
+            .emit_nonportable_numbers_as_strings = true,
+        });
         defer alloc.free(params_json);
         try writeRequestJson(method, params_json, id, writer);
     } else {
@@ -85,7 +85,10 @@ pub fn makeRequestJson(alloc: Allocator, method: []const u8, params: anytype,
 
     var output_buf = std.Io.Writer.Allocating.init(alloc);
     if (pinfo != .null) {
-        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{});
+        const params_json = try std.json.Stringify.valueAlloc(alloc, params, .{
+            .emit_null_optional_fields = false,
+            .emit_nonportable_numbers_as_strings = true,
+        });
         defer alloc.free(params_json);
         try writeRequestJson(method, params_json, id, &output_buf.writer);
     } else {

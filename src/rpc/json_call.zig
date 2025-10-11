@@ -338,7 +338,9 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
 
     // Map the incoming Value (.object) into a struct object.
     // Alloc is an arena allocator; don't need to free the parsed result here.
-    const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, params_value, .{});
+    const parsed = try std.json.parseFromValue(hinfo.obj1_type, alloc, params_value, .{
+        .ignore_unknown_fields = true,
+    });
     const obj1: hinfo.obj1_type = parsed.value;
 
     // Pack JSON array params into a tuple for F's params.
@@ -394,7 +396,10 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
         return result;
     } else {
         // wrap the result in a JSON.
-        const json = try std.json.Stringify.valueAlloc(alloc, result, .{});
+        const json = try std.json.Stringify.valueAlloc(alloc, result, .{
+            .emit_null_optional_fields = false,
+            .emit_nonportable_numbers_as_strings = true,
+        });
         return DispatchResult.withResult(json);
     }
 }
@@ -451,7 +456,9 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, alloc: Allocator,
         if (isValue(t_field.type)) {
             @field(tuple, t_field.name) = j_value;
         } else if (isStruct(t_field.type)) {
-            const parsed = try std.json.parseFromValue(t_field.type, alloc, j_value, .{});
+            const parsed = try std.json.parseFromValue(t_field.type, alloc, j_value, .{
+                .ignore_unknown_fields = true,
+            });
             @field(tuple, t_field.name) = parsed.value;
         // } else if (isArray(t_field.type)) {
         //     // TODO: handle Array function paramenter.
@@ -569,60 +576,56 @@ fn isEmptyArray(params_value: Value) bool {
 
 test "Test simple JSON value conversion." {
     var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
-    {
-        _=alloc;
-        try testing.expectEqual(ValueAs(i64).from(.{ .integer = 10 }), 10);
-        try testing.expectEqual(ValueAs(i128).from(.{ .integer = 10 }), 10);
+    _=alloc;
 
-        try testing.expectEqual(ValueAs(bool).from(.{ .bool = true }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .bool = false }), false);
-        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 0 }), false);
-        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 1 }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .integer = 2 }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .integer = -2 }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .float = 0 }), false);
-        try testing.expectEqual(ValueAs(bool).from(.{ .float = 1 }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .float = -1 }), true);
-        try testing.expectEqual(ValueAs(bool).from(.{ .float = -1.2 }), true);
+    try testing.expectEqual(ValueAs(i64).from(.{ .integer = 10 }), 10);
+    try testing.expectEqual(ValueAs(i128).from(.{ .integer = 10 }), 10);
 
-        try testing.expectEqual(ValueAs(f64).from(.{ .float = 1.2 }), 1.2);
-        try testing.expectEqual(ValueAs(f64).from(.{ .float = -1.2 }), -1.2);
-        try testing.expectEqual(ValueAs(f128).from(.{ .float = 10 }), 10);
-        try testing.expectEqual(ValueAs(f64).from(.{ .integer = 12 }), 12);
+    try testing.expectEqual(ValueAs(bool).from(.{ .bool = true }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .bool = false }), false);
+    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 0 }), false);
+    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 1 }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 2 }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .integer = -2 }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .float = 0 }), false);
+    try testing.expectEqual(ValueAs(bool).from(.{ .float = 1 }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .float = -1 }), true);
+    try testing.expectEqual(ValueAs(bool).from(.{ .float = -1.2 }), true);
 
-        try testing.expectEqualSlices(u8, try ValueAs([]const u8).from(.{ .string = "hello" }), "hello");
-    }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+    try testing.expectEqual(ValueAs(f64).from(.{ .float = 1.2 }), 1.2);
+    try testing.expectEqual(ValueAs(f64).from(.{ .float = -1.2 }), -1.2);
+    try testing.expectEqual(ValueAs(f128).from(.{ .float = 10 }), 10);
+    try testing.expectEqual(ValueAs(f64).from(.{ .integer = 12 }), 12);
+
+    try testing.expectEqualSlices(u8, try ValueAs([]const u8).from(.{ .string = "hello" }), "hello");
 }
 
 test "Test simple JSON value conversion on invalid JSON values." {
     var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
-    {
-        _=alloc;
-        try testing.expectEqual(ValueAs(i64).from(.{ .float = 0 }), JrErrors.InvalidJsonValueType);
-        try testing.expectEqual(ValueAs(i128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
-        try testing.expectEqual(ValueAs(i64).from(.{ .string = "abc" }), error.InvalidCharacter);
 
-        try testing.expectEqual(ValueAs(f128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
-        try testing.expectEqual(ValueAs(f64).from(.{ .string = "abc" }), error.InvalidCharacter);
-    }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+    _=alloc;
+    try testing.expectEqual(ValueAs(i64).from(.{ .float = 0 }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(ValueAs(i128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(ValueAs(i64).from(.{ .string = "abc" }), error.InvalidCharacter);
+
+    try testing.expectEqual(ValueAs(f128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(ValueAs(f64).from(.{ .string = "abc" }), error.InvalidCharacter);
 }
 
 test "Test JSON value conversion with alloc." {
     var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
     const alloc = gpa.allocator();
-    {
-        const x = try ValueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });
-        try testing.expectEqualSlices(u8, x, "hello");
+    const x = try ValueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });
+    try testing.expectEqualSlices(u8, x, "hello");
 
-        try testing.expectEqual(ValueAs(i64).fromAlloc(.{ .integer = 10 }, .{ .alloc = alloc }), 10);
-        
-        alloc.free(x);
-    }
-    if (gpa.detectLeaks()) std.debug.print("Memory leak detected!\n", .{});
+    try testing.expectEqual(ValueAs(i64).fromAlloc(.{ .integer = 10 }, .{ .alloc = alloc }), 10);
+    
+    alloc.free(x);
 }
 
 
