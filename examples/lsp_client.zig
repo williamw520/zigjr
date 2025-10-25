@@ -23,7 +23,7 @@ const RpcId = zigjr.RpcId;
 const writeContentLengthRequest = zigjr.frame.writeContentLengthRequest;
 const responsesByContentLength = zigjr.stream.responsesByContentLength;
 const messagesByContentLength = zigjr.stream.messagesByContentLength;
-const RpcRegistry = zigjr.RpcRegistry;
+const RpcDispatcher = zigjr.RpcDispatcher;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const ResponseDispatcher = zigjr.ResponseDispatcher;
 const RpcRequest = zigjr.RpcRequest;
@@ -237,7 +237,7 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     } else {
         // LSP server can send 'server_to_client' notifications/events as JSON-RPC requests.
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
-        var req_registry = zigjr.RpcRegistry.init(alloc);
+        var req_registry = zigjr.RpcDispatcher.init(alloc);
         defer req_registry.deinit();
         var ext_handlers = ReqExtHandlers {
             .log_json = (args.json or args.pp_json),
@@ -303,11 +303,16 @@ const ResDispatcher = struct {
     pub fn dispatch(self: *@This(), alloc: Allocator, res: RpcResponse) anyerror!void {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
-        std.debug.print("\n[---- response_worker ---] Server sent response, id: {any}\n", .{res.id.num});
-        if (self.log_json) {
-            const result_json = try std.json.Stringify.valueAlloc(alloc, res.result, self.json_opt);
-            defer alloc.free(result_json);
-            std.debug.print("{s}\n", .{result_json});
+        if (res.hasErr()) {
+            std.debug.print("\n[---- response_worker ---] Server sent error response, error code: {}, msg, {s}\n",
+                            .{res.err().code, res.err().message});
+        } else {
+            std.debug.print("\n[---- response_worker ---] Server sent response, id: {any}\n", .{res.id.num});
+            if (self.log_json) {
+                const result_json = try std.json.Stringify.valueAlloc(alloc, res.result, self.json_opt);
+                defer alloc.free(result_json);
+                std.debug.print("{s}\n", .{result_json});
+            }
         }
     }
 };

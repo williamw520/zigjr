@@ -18,17 +18,17 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Create a registry for the JSON-RPC registry.
-    var registry = zigjr.RpcRegistry.init(alloc);
-    defer registry.deinit();
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
 
     // Register each RPC method with a handling function.
-    try registry.add("hello", hello);
-    try registry.add("hello-name", helloName);
-    try registry.add("hello-xtimes", helloXTimes);
-    try registry.add("say", say);
+    try rpc_dispatcher.add("hello", hello);
+    try rpc_dispatcher.add("hello-name", helloName);
+    try rpc_dispatcher.add("hello-xtimes", helloXTimes);
+    try rpc_dispatcher.add("say", say);
 
     // RequestDispatcher interface implemented by the 'registry' registry.
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 

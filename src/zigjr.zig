@@ -13,7 +13,7 @@ pub const errors = @import("jsonrpc/errors.zig");
 pub const composer = @import("jsonrpc/composer.zig");
 pub const pipeline = @import("rpc/rpc_pipeline.zig");
 const dispatcher = @import("rpc/dispatcher.zig");
-const rpc_registry = @import("rpc/rpc_registry.zig");
+const rpc_dispatcher = @import("rpc/rpc_dispatcher.zig");
 pub const stream = @import("streaming/stream.zig");
 pub const frame = @import("streaming/frame.zig");
 const logger = @import("rpc/logger.zig");
@@ -50,8 +50,8 @@ pub const NopLogger = logger.NopLogger;
 pub const DbgLogger = logger.DbgLogger;
 pub const FileLogger = logger.FileLogger;
 
-pub const RpcRegistry = rpc_registry.RpcRegistry;
-pub const RegistrationErrors = rpc_registry.RegistrationErrors;
+pub const RpcDispatcher = rpc_dispatcher.RpcDispatcher;
+pub const RegistrationErrors = rpc_dispatcher.RegistrationErrors;
 pub const JsonStr = @import("rpc/json_call.zig").JsonStr;
 
 pub const ErrorCode = errors.ErrorCode;

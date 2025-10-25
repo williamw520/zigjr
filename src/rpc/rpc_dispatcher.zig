@@ -25,8 +25,9 @@ const DispatchErrors = zigjr.DispatchErrors;
 const json_call = @import("json_call.zig");
 
 
+/// Maintain a list of handlers to handle the RPC requests.
 /// Implements the RequestDispatcher interface.
-pub const RpcRegistry = struct {
+pub const RpcDispatcher = struct {
     const Self = @This();
 
     alloc:          Allocator,
@@ -108,7 +109,7 @@ pub const RpcRegistry = struct {
         _=alloc;
         _=dresult;
         if (self.handlers.getPtr(req.method))|h| {
-            h.reset();
+            h.reset();      // Reset after each request dispatching.
         }
     }
 

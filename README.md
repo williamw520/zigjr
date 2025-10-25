@@ -47,7 +47,7 @@ which are mapped to the JSON data types automatically.
 
 ```zig
 {
-    var registry = zigjr.RpcRegistry.init(alloc);
+    var registry = zigjr.RpcDispatcher.init(alloc);
 
     try registry.add"say", say);
     try registry.add("hello", hello);
@@ -156,7 +156,7 @@ The following example handles a stream of messages prefixed with a `Content-Leng
 reading requests from `stdin` and writing responses to `stdout`.
 ```zig
 {
-    var registry = zigjr.RpcRegistry.init(alloc);
+    var registry = zigjr.RpcDispatcher.init(alloc);
     defer registry.deinit();
     try registry.add("add", addTwoNums);
 
@@ -173,7 +173,7 @@ This example streams messages from one in-memory buffer to another,
 using a newline character (`\n`) as a delimiter.
 ```zig
 {
-    var registry = zigjr.RpcRegistry.init(alloc);
+    var registry = zigjr.RpcDispatcher.init(alloc);
     defer registry.deinit();
     try registry.add("add", addTwoNums);
 
@@ -201,7 +201,7 @@ dispatching, and response composition.
 ```zig
 {
     // Set up the registry as the dispatcher.
-    var registry = zigjr.RpcRegistry.init(alloc);
+    var registry = zigjr.RpcDispatcher.init(alloc);
     defer registry.deinit();
     try registry.add("add", addTwoNums);
     const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
@@ -277,7 +277,7 @@ calls the function, and captures the result or error to formulate a response.
 
 ```zig
 {
-    var registry = zigjr.RpcRegistry.init(alloc);
+    var registry = zigjr.RpcDispatcher.init(alloc);
     defer registry.deinit();
 
     try registry.add("add", addTwoNums);
@@ -467,7 +467,7 @@ The extended handlers are set up via `setExtHandlers()` on `RpcRegistry`. For ex
 
 ```zig
 {
-        var registry = zigjr.RpcRegistry.init(alloc);
+        var registry = zigjr.RpcDispatcher.init(alloc);
         defer registry.deinit();
         var ext_handlers = MyExtHandlers {};
         registry.setExtHandlers(&ext_handlers);

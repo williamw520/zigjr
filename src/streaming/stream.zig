@@ -13,6 +13,7 @@ const ArrayList = std.ArrayList;
 // const bufferedWriter = std.io.bufferedWriter;
 
 const zigjr = @import("../zigjr.zig");
+const RpcDispatcher = zigjr.RpcDispatcher;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const ResponseDispatcher = zigjr.ResponseDispatcher;
 const JrErrors = zigjr.JrErrors;
@@ -22,10 +23,16 @@ const frame = @import("frame.zig");
 const TRIM_SET = " \t\r\n";
 
 
-/// Runs a loop to read a stream of JSON request messages (frames) from the reader,
-/// handle each one with the dispatcher, and write the JSON responses to the writer.
-/// The writer is buffered internally.  The reader is not buffered.
-/// Caller might want to wrap a buffered reader around it.
+/// Runs a loop to read a stream of delimitered JSON request messages (frames) from the reader,
+/// handle each one with the RpcDispatcher, and write the JSON responses to the writer.
+pub fn runByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
+                      rpc_dispatcher: *RpcDispatcher, options: DelimiterOptions) !void {
+    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher);
+    try requestsByDelimiter(alloc, reader, writer, dispatcher, options);
+}
+
+/// Runs a loop to read a stream of delimitered JSON request messages (frames) from the reader,
+/// handle each one with the dispatcher interface, and write the JSON responses to the writer.
 pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
                            dispatcher: RequestDispatcher, options: DelimiterOptions) !void {
     var frame_buf = std.Io.Writer.Allocating.init(alloc);
@@ -100,8 +107,16 @@ pub const DelimiterOptions = struct {
 };
 
 
-/// Runs a loop to read a stream of JSON request messages (frames) from the reader,
-/// handle each one with the dispatcher, and write the JSON responses to the buffered_writer.
+/// Runs a loop to read a stream of Content-length based JSON request messages (frames) from the reader,
+/// handle each one with the RpcDispatcher, and write the JSON responses to the buffered_writer.
+pub fn runByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
+                          rpc_dispatcher: *RpcDispatcher, options: ContentLengthOptions) !void {
+    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher);
+    try requestsByContentLength(alloc, reader, writer, dispatcher, options);
+}
+
+/// Runs a loop to read a stream of Content-length based JSON request messages (frames) from the reader,
+/// handle each one with the dispatcher interface, and write the JSON responses to the buffered_writer.
 pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
                                dispatcher: RequestDispatcher, options: ContentLengthOptions) !void {
     options.logger.start("[stream.requestsByContentLength] Logging starts");
@@ -112,7 +127,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
     var response_buf = std.Io.Writer.Allocating.init(alloc);
     defer response_buf.deinit();
     const output_writer = writer;
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
     while (true) {

@@ -28,10 +28,39 @@ pub fn main() !void {
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    // RequestDispatcher interface implemented by the custom dispatcher.
-    var dispatcher_impl = HelloDispatcher{};
-    const dispatcher = zigjr.RequestDispatcher.implBy(&dispatcher_impl);
-    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
+    // RequestDispatcher interface implemented by the custom dispatcher HelloDispatcher.
+    var hello_dispatcher = HelloDispatcher{};
+    const dispatcher = zigjr.RequestDispatcher.implBy(&hello_dispatcher);
+
+    // Construct a pipeline with the custom dispatcher.
+    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    defer pipeline.deinit();
+
+    // Read request from stdin.
+    var read_buf = std.Io.Writer.Allocating.init(alloc);
+    defer read_buf.deinit();
+    const read_len = stdin.streamDelimiter(&read_buf.writer, '\n') catch |err| blk: {
+        switch (err) {
+            std.Io.Reader.StreamError.EndOfStream => break :blk read_buf.written().len,
+            else => return err,
+        }
+    };
+    
+    if (read_len > 0) {
+        try stdout.print("Request:  {s}\n", .{read_buf.written()});
+
+        // Run request through the pipeline.
+        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
+            defer alloc.free(response);
+            try stdout.print("Response: {s}\n", .{response});
+        } else {
+            try stdout.print("No response\n", .{});
+        }
+        try stdout.flush();
+    } else {
+        usage();
+    }
+    
 }
 
 

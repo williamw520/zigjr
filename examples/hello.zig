@@ -17,17 +17,17 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    // Create a registry for the JSON-RPC handlers.
-    var registry = zigjr.RpcRegistry.init(alloc);
-    defer registry.deinit();
+    // Create a RpcDispatcher for the JSON-RPC handlers.
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
 
-    // // Register each RPC method with a handling function.
-    try registry.add("hello", hello);
-    try registry.add("hello-name", helloName);
-    try registry.add("hello-xtimes", helloXTimes);
-    try registry.add("substr", substr);
-    try registry.add("say", say);
-    try registry.add("opt-text", optionalText);
+    // Register each RPC method with a handling function.
+    try rpc_dispatcher.add("hello", hello);
+    try rpc_dispatcher.add("hello-name", helloName);
+    try rpc_dispatcher.add("hello-xtimes", helloXTimes);
+    try rpc_dispatcher.add("substr", substr);
+    try rpc_dispatcher.add("say", say);
+    try rpc_dispatcher.add("opt-text", optionalText);
 
     var stdin_buffer: [1024]u8 = undefined;
     var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
@@ -38,8 +38,7 @@ pub fn main() !void {
     const stdout = &stdout_writer.interface;
 
     // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
-                                         zigjr.RequestDispatcher.implBy(&registry), .{});
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{});
     try stdout.flush();
 }
 

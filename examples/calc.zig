@@ -21,26 +21,26 @@ pub fn main() !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
-    var registry = zigjr.RpcRegistry.init(alloc);
-    defer registry.deinit();
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
 
-    try registry.add("add", Basic.add);                 // register functions in a struct scope.
-    try registry.add("subtract", Basic.subtract);
-    try registry.add("multiply", Basic.multiply);
-    try registry.add("divide", Basic.divide);
-    try registry.add("pow", raiseToPower);              // register function from any scope.
-    try registry.add("logNum", logNum);                 // function with no result.
-    try registry.addWithCtx("inc", &g_sum, increase);   // attach a context to the function.
-    try registry.addWithCtx("dec", &g_sum, decrease);   // attach the same context to another function.
-    try registry.addWithCtx("load", &stash,Stash.load); // handler on a struct object context.
-    try registry.addWithCtx("save", &stash,Stash.save); // handler on a struct object context.
-    try registry.add("weigh-cat", weighCat);            // function with a struct parameter.
-    try registry.add("make-cat", makeCat);              // function returns a struct parameter.
-    try registry.add("clone-cat", cloneCat);            // function returns an array.
-    try registry.add("desc-cat", descCat);              // function returns a tuple.
-    try registry.add("add-weight", addWeight);
+    try rpc_dispatcher.add("add", Basic.add);                   // register functions in a struct scope.
+    try rpc_dispatcher.add("subtract", Basic.subtract);
+    try rpc_dispatcher.add("multiply", Basic.multiply);
+    try rpc_dispatcher.add("divide", Basic.divide);
+    try rpc_dispatcher.add("pow", raiseToPower);                // register function from any scope.
+    try rpc_dispatcher.add("logNum", logNum);                   // function with no result.
+    try rpc_dispatcher.addWithCtx("inc", &g_sum, increase);     // attach a context to the function.
+    try rpc_dispatcher.addWithCtx("dec", &g_sum, decrease);     // attach the same context to another function.
+    try rpc_dispatcher.addWithCtx("load", &stash, Stash.load);  // handler on a struct object context.
+    try rpc_dispatcher.addWithCtx("save", &stash, Stash.save);  // handler on a struct object context.
+    try rpc_dispatcher.add("weigh-cat", weighCat);              // function with a struct parameter.
+    try rpc_dispatcher.add("make-cat", makeCat);                // function returns a struct parameter.
+    try rpc_dispatcher.add("clone-cat", cloneCat);              // function returns an array.
+    try rpc_dispatcher.add("desc-cat", descCat);                // function returns a tuple.
+    try rpc_dispatcher.add("add-weight", addWeight);
 
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
