@@ -23,7 +23,7 @@ This small library is packed with the following features:
 * [Installation](#installation)
 * [Usage](#usage)
 * [Dispatcher](#dispatcher)
-* [RpcRegistry](#rpcregistry)
+* [RpcDispatcher](#rpcdispatcher)
 * [Custom Dispatcher](#custom-dispatcher)
 * [Invocation and Cleanup](#invocation-and-cleanup)
 * [Handler Function](#handler-function)
@@ -47,16 +47,15 @@ which are mapped to the JSON data types automatically.
 
 ```zig
 {
-    var registry = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
 
-    try registry.add"say", say);
-    try registry.add("hello", hello);
-    try registry.add("hello-name", helloName);
-    try registry.add("substr", substr);
-    try registry.add("weigh-cat", weigh);
+    try rpc_dispatcher.add"say", say);
+    try rpc_dispatcher.add("hello", hello);
+    try rpc_dispatcher.add("hello-name", helloName);
+    try rpc_dispatcher.add("substr", substr);
+    try rpc_dispatcher.add("weigh-cat", weigh);
 
-    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout,
-        RequestDispatcher.implBy(&registry), .{});
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{});
 }
 
 fn say(msg: []const u8) void {
@@ -156,12 +155,11 @@ The following example handles a stream of messages prefixed with a `Content-Leng
 reading requests from `stdin` and writing responses to `stdout`.
 ```zig
 {
-    var registry = zigjr.RpcDispatcher.init(alloc);
-    defer registry.deinit();
-    try registry.add("add", addTwoNums);
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
+    try rpc_dispatcher.add("add", addTwoNums);
 
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-    try zigjr.stream.requestsByContentLength(alloc, stdin, stdout, dispatcher, .{});
+    try zigjr.stream.runByContentLength(alloc, stdin, stdout, &rpc_dispatcher, .{});
 }
 
 fn addTwoNums(a: i64, b: i64) i64 { return a + b; }
@@ -173,9 +171,9 @@ This example streams messages from one in-memory buffer to another,
 using a newline character (`\n`) as a delimiter.
 ```zig
 {
-    var registry = zigjr.RpcDispatcher.init(alloc);
-    defer registry.deinit();
-    try registry.add("add", addTwoNums);
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
+    try rpc_dispatcher.add("add", addTwoNums);
 
     const req_jsons =
         \\{"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1}
@@ -187,8 +185,7 @@ using a newline character (`\n`) as a delimiter.
     var out_buf = std.Io.Writer.Allocating.init(alloc);
     defer out_buf.deinit();
 
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-    try zigjr.stream.requestsByDelimiter(alloc, &reader, &out_buf.writer, dispatcher, .{});
+    try zigjr.stream.runByDelimiter(alloc, &reader, &out_buf.writer, &rpc_dispatcher, .{});
 
     std.debug.print("output_jsons: {s}\n", .{out_buf.written()});
 }
@@ -200,11 +197,11 @@ dispatching, and response composition.
 
 ```zig
 {
-    // Set up the registry as the dispatcher.
-    var registry = zigjr.RpcDispatcher.init(alloc);
-    defer registry.deinit();
-    try registry.add("add", addTwoNums);
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    // Set up the rpc_dispatcher as the dispatcher.
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
+    try rpc_dispatcher.add("add", addTwoNums);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
 
     // Set up the request pipeline with the dispatcher.
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
@@ -268,22 +265,22 @@ After a message is parsed, the RPC pipeline feeds it to the dispatcher,
 which routes it to a handler function based on the message's `method`. 
 The `RequestDispatcher` and `ResponseDispatcher` interfaces define the required dispatching functions.
 
-## RpcRegistry
-The built-in `RpcRegistry` implements the `RequestDispatcher` interface and 
-serves as a powerful, ready-to-use dispatcher. Use `RpcRegistry.add(method_name, function)` 
+## RpcDispatcher
+The built-in `RpcDispatcher` is a registry of RPC handlers that also implements the `RequestDispatcher` interface and 
+serves as a powerful, ready-to-use dispatcher. Use `RpcDispatcher.add(method_name, function)` 
 to register a handler function for a specific JSON-RPC method. When a request comes in, 
-the registry looks up the handler, maps the request's parameters to the function's arguments, 
+the it looks up the handler from its registry, maps the request's parameters to the function's arguments, 
 calls the function, and captures the result or error to formulate a response.
 
 ```zig
 {
-    var registry = zigjr.RpcDispatcher.init(alloc);
-    defer registry.deinit();
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
 
-    try registry.add("add", addTwoNums);
-    try registry.add("sub", subTwoNums);
+    try rpc_dispatcher.add("add", addTwoNums);
+    try rpc_dispatcher.add("sub", subTwoNums);
     ...
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
     ...
 }
 ```
@@ -308,12 +305,12 @@ to the handler function when it is invoked.
 
 ```zig
 {
-    try registry.add("global-fn", global_fn);
-    try registry.add("group-fn", Group.group_fn);
+    try rpc_dispatcher.add("global-fn", global_fn);
+    try rpc_dispatcher.add("group-fn", Group.group_fn);
     ...
     var counter = Counter{};
-    try registry.addWithCtx("counter-inc", &counter, Counter.inc);
-    try registry.addWithCtx("counter-get", &counter, Counter.get);
+    try rpc_dispatcher.addWithCtx("counter-inc", &counter, Counter.inc);
+    try rpc_dispatcher.addWithCtx("counter-get", &counter, Counter.get);
     ...
 }
 
@@ -354,7 +351,7 @@ documentation for details.
 
 #### Context
 
-If a context pointer is supplied to `RpcRegistry.addWithCtx()`, it is passed as 
+If a context pointer is supplied to `RpcDispatcher.addWithCtx()`, it is passed as 
 the first parameter to the handler function, effectively serving as a `self` pointer.
 
 The first parameter's type and the context type need to be the same.
@@ -398,7 +395,7 @@ A handler function can have an error union with the return type. Any error retur
 packaged into a JSON-RPC error response with the `InternalError` code.
 
 ### Memory Management
-When using `RpcRegistry`, memory management is straightforward. Any memory 
+When using `RpcDispatcher`, memory management is straightforward. Any memory 
 obtained from the allocator passed to a handler is automatically freed 
 after the request completes. Handlers do not need to perform manual cleanup.
 Memory is freed in the `dispatcher.dispatchEnd()` phase.
@@ -429,8 +426,7 @@ Note: `log_buf` is required for the new std.Io.Writer API.
     var log_buf: [1024]u8 = undefined;
     var logger = try zigjr.FileLogger.init("log.txt",  &log_buf);
     defer logger.deinit();
-    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, 
-        dispatcher, .{ .logger = Logger.implBy(&logger) });
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = Logger.implBy(&logger) });
 ```
 #### Custom Logger
 This example uses a custom logger in a request pipeline.
@@ -438,7 +434,7 @@ This example uses a custom logger in a request pipeline.
 {
     var logger = MyLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.implBy(&registry), zigjr.Logger.implBy(&logger));
+        RequestDispatcher.implBy(&rpc_dispatcher), zigjr.Logger.implBy(&logger));
 }
 
 const MyLogger = struct {
@@ -455,7 +451,7 @@ const MyLogger = struct {
 
 ## Extended Handlers
 
-`RpcRegistry` supports setting up of pre-handler, post-handler, and fallback handler
+`RpcDispatcher` supports setting up of pre-handler, post-handler, and fallback handler
 for each request. Before dispatching a request to its method's handler, the
 `onBefore()` handler is called, giving a chance to do pre-handling on every request.
 After the handler for a request has returned, the `onAfter()` handler is called,
@@ -463,7 +459,7 @@ giving a chance to do post-handling on every request.
 
 If a request's method has no registered handler, the `fallback()` handler is called.
 
-The extended handlers are set up via `setExtHandlers()` on `RpcRegistry`. For example,
+The extended handlers are set up via `setExtHandlers()` on `RpcDispatcher`. For example,
 
 ```zig
 {
@@ -643,7 +639,7 @@ and another thread for `response_worker()` to read LSP responses and requests fr
 Since a LSP server can send both responses to client's requests and its own server-to-client requests,
 lsp_client uses `stream.messagesByContentLength()` to handle both incoming JSON RPC responses and requests.
 
-It uses `RpcRegistry`, `ExtHandlers` and `ResponseDispatcher` to handle the requests and responses in
+It uses `RpcDispatcher`, `ExtHandlers` and `ResponseDispatcher` to handle the requests and responses in
 a central place.
 
 The `request_worker()` sends a number of LSP requests to the server to illustrate how the LSP protocol works.
