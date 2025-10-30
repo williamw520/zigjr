@@ -25,19 +25,44 @@ const DispatchErrors = zigjr.DispatchErrors;
 const json_call = @import("json_call.zig");
 
 
+/// Extended handler: pre-dispatch handler, called before the request is dispatched.
+pub const OnBeforeFn    = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest) void;
+/// Extended handler: post-dispatch handler, called after the request has been dispatched.
+pub const OnAfterFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, result: DispatchResult) void;
+/// Extended handler: on-error handler, called when the request causes an error.
+pub const OnErrorFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, err: anyerror) void;
+/// Extended handler: fallback handler, called when no handler is found for the request's method.
+pub const OnFallbackFn  = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest) anyerror!DispatchResult;
+
+
 /// Maintain a list of handlers to handle the RPC requests.
 /// Implements the RequestDispatcher interface.
 pub const RpcDispatcher = struct {
     const Self = @This();
 
-    alloc:          Allocator,
-    handlers:       StringHashMap(json_call.RpcHandler),
-    ext_handlers:   ?ExtHandlers = null,
+    alloc:              Allocator,
+    handlers:           StringHashMap(json_call.RpcHandler),
+    on_before_fn:       *const OnBeforeFn,
+    on_after_fn:        *const OnAfterFn,
+    on_error_fn:        *const OnErrorFn,
+    on_fallback_fn:     ?*const OnFallbackFn = null,
+    on_before_ctx:      *anyopaque,
+    on_after_ctx:       *anyopaque,
+    on_error_ctx:       *anyopaque,
+    on_fallback_ctx:    *anyopaque,
 
     pub fn init(alloc: Allocator) Self {
         return .{
             .alloc = alloc,
             .handlers = StringHashMap(json_call.RpcHandler).init(alloc),
+            .on_before_fn   = onBeforeNop,
+            .on_after_fn    = onAfterNop,
+            .on_error_fn    = onErrorNop,
+            .on_fallback_fn = null,
+            .on_before_ctx  = &NopCtx,
+            .on_after_ctx   = &NopCtx,
+            .on_error_ctx   = &NopCtx,
+            .on_fallback_ctx= &NopCtx,
         };
     }
 
@@ -51,10 +76,30 @@ pub const RpcDispatcher = struct {
         self.handlers.deinit();
     }
 
-    /// Install the extended handlers: pre-dispatch, post-dispatch, and fallback handler.
-    /// 'ext_handlers_obj' must adhere to the 'ExtHandlers' interface.
-    pub fn setExtHandlers(self: *Self, ext_handlers_obj: anytype) void {
-        self.ext_handlers = ExtHandlers.implBy(ext_handlers_obj);
+    /// Install the pre-dispatch extended handler, called before the request is dispatched.
+    pub fn setOnBefore(self: *Self, ctx: ?*anyopaque, on_before_fn: *const OnBeforeFn) void {
+        self.on_before_ctx = ctx orelse &NopCtx;
+        self.on_before_fn = on_before_fn;
+    }
+
+    /// Install the post-dispatch extended handler, called after the request has been handled successfully
+    /// by a registered handler or the fallback handler.
+    /// This won't be called with request resulted in error.  See setOnError().
+    pub fn setOnAfter(self: *Self, ctx: ?*anyopaque, on_after_fn: *const OnAfterFn) void {
+        self.on_after_ctx = ctx orelse &NopCtx;
+        self.on_after_fn = on_after_fn;
+    }
+
+    /// Install the on-error extended handler, called when the request causes an error.
+    pub fn setOnError(self: *Self, ctx: ?*anyopaque, on_error_fn: *const OnErrorFn) void {
+        self.on_error_ctx = ctx orelse &NopCtx;
+        self.on_error_fn = on_error_fn;
+    }
+
+    /// Install the extended handler: fallback handler, called when no handler is found for the request's method.
+    pub fn setOnFallback(self: *Self, ctx: ?*anyopaque, on_fallback_fn: *const OnFallbackFn) void {
+        self.on_fallback_ctx = ctx orelse &NopCtx;
+        self.on_fallback_fn = on_fallback_fn;
     }
 
     pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) RegistrationErrors!void {
@@ -84,24 +129,27 @@ pub const RpcDispatcher = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
+    // TODO: investigate whether the alloc can be removed.
     pub fn dispatch(self: *const Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        if (self.ext_handlers) |eh| {
-            eh.onBefore(self.alloc, req);
-        }
+        self.on_before_fn(self.on_before_ctx, self.alloc, req);
+        return self.dispatchInner(self.alloc, req) catch |err| {
+            self.on_error_fn(self.on_error_ctx, self.alloc, req, err);
+            return err;
+        };
+    }
 
-        var result: DispatchResult = undefined;
+    fn dispatchInner(self: *const Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
         if (self.handlers.getPtr(req.method)) |h| {
-            result = try h.invoke(req.params);
-        } else if (self.ext_handlers) |eh| {
-            result = try eh.fallback(self.alloc, req);
+            const result = try h.invoke(req.params);
+            self.on_after_fn(self.on_after_ctx, self.alloc, req, result);
+            return result;
+        } else if (self.on_fallback_fn) |fallback_fn| {
+            const result = try fallback_fn(self.on_fallback_ctx, self.alloc, req);
+            self.on_after_fn(self.on_after_ctx, self.alloc, req, result);
+            return result;
         } else {
             return DispatchErrors.MethodNotFound;
         }
-
-        if (self.ext_handlers) |eh| {
-            eh.onAfter(self.alloc, req, result);
-        }
-        return result;
     }
 
     pub fn dispatchEnd(self: *const Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
@@ -122,53 +170,13 @@ fn validateMethod(method: []const u8) RegistrationErrors!void {
 }
 
 
-/// Interface for extended handlers: pre-dispatch, post-dispatch, and fallback handler.
-pub const ExtHandlers = struct {
-    impl_ptr:       *anyopaque,
-    // Call on every request before dispatching and after dispatching.
-    onBefore_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) void,
-    onAfter_fn:     *const fn(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest,
-                              result: DispatchResult) void,
-    // Fallback handler for handling unregistered request methods.
-    fallback_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) anyerror!DispatchResult,
-
-    pub fn implBy(impl_obj: anytype) ExtHandlers {
-        const Delegate = struct {
-            fn onBefore(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) void {
-                const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
-                impl.onBefore(alloc, request);
-            }
-            fn onAfter(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest, result: DispatchResult) void {
-                const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
-                impl.onAfter(alloc, request, result);
-            }
-            fn fallback(impl_ptr: *anyopaque, alloc: Allocator, request: RpcRequest) anyerror!DispatchResult {
-                const impl: @TypeOf(impl_obj) = @ptrCast(@alignCast(impl_ptr));
-                return try impl.fallback(alloc, request);
-            }
-        };
-
-        return .{
-            .impl_ptr = impl_obj,
-            .onBefore_fn = Delegate.onBefore,
-            .onAfter_fn = Delegate.onAfter,
-            .fallback_fn = Delegate.fallback,
-        };
-    }
-
-    // The implementation must have these methods.
-    pub fn onBefore(self: @This(), alloc: Allocator, request: RpcRequest) void {
-        self.onBefore_fn(self.impl_ptr, alloc, request);
-    }
-
-    pub fn onAfter(self: @This(), alloc: Allocator, request: RpcRequest, result: DispatchResult) void {
-        self.onAfter_fn(self.impl_ptr, alloc, request, result);
-    }
-
-    pub fn fallback(self: @This(), alloc: Allocator, request: RpcRequest) anyerror!DispatchResult {
-        return try self.fallback_fn(self.impl_ptr, alloc, request);
-    }
-};
+fn onBeforeNop(_: *anyopaque, _: Allocator, _: RpcRequest) void {}
+fn onAfterNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: DispatchResult) void {}
+fn onErrorNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: anyerror) void {}
+fn onFallbackNop(_: *anyopaque, _: Allocator, _: RpcRequest) anyerror!DispatchResult {
+    return DispatchResult.asNone();
+}
+var NopCtx = {};
 
 
 pub const RegistrationErrors = error {

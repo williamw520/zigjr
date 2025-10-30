@@ -237,16 +237,23 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     } else {
         // LSP server can send 'server_to_client' notifications/events as JSON-RPC requests.
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
-        var req_registry = zigjr.RpcDispatcher.init(alloc);
-        defer req_registry.deinit();
-        var ext_handlers = ReqExtHandlers {
+        var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+        defer rpc_dispatcher.deinit();
+        // var ext_handlers = ReqExtHandlers {
+        //     .log_json = (args.json or args.pp_json),
+        //     .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
+        // };
+        // rpc_dispatcher.setExtHandlers(&ext_handlers);
+
+        rpc_dispatcher.setOnBefore(null, onBefore);
+        var fallbackCtx: FallbackCtx = .{
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
-        req_registry.setExtHandlers(&ext_handlers);
+        rpc_dispatcher.setOnFallback(&fallbackCtx, onFallback);
 
         // Comment out this to see the fallback_handler being called.
-        try req_registry.add("window/logMessage", window_logMessage);
+        try rpc_dispatcher.add("window/logMessage", window_logMessage);
 
         // Use ZigJR's ResponseDispatcher to process the response messages.
         var res_dispatcher = ResDispatcher {
@@ -260,36 +267,58 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
 
         // Use the generic 'messagesByContentLength' to handle both requests and responses.
         try messagesByContentLength(alloc, out_reader, stderr,
-                                    RequestDispatcher.implBy(&req_registry),
+                                    RequestDispatcher.implBy(&rpc_dispatcher),
                                     ResponseDispatcher.implBy(&res_dispatcher), .{});
     }
 
     std.debug.print("[---- response_worker ---] exits\n", .{});
 }
 
-const ReqExtHandlers = struct {
+fn onBefore(_: *anyopaque, _: Allocator, req: RpcRequest) void {
+    // req.result has the result JSON object from server.
+    // req.id is the request id; dispatch based on the id recorded in request_worker().
+    std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
+                    .{req.method, req.id});
+}
+
+const FallbackCtx = struct {
     log_json:   bool,
     json_opt:   StringifyOptions,
-
-    pub fn onBefore(_: *@This(), _: Allocator, req: RpcRequest) void {
-        // req.result has the result JSON object from server.
-        // req.id is the request id; dispatch based on the id recorded in request_worker().
-        std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
-                        .{req.method, req.id});
-    }
-
-    pub fn onAfter(_: *@This(), _: Allocator, _: RpcRequest, _: DispatchResult) void {
-    }
-
-    pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        if (self.log_json) {
-            const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, self.json_opt);
-            defer alloc.free(params_json);
-            std.debug.print("{s}\n", .{params_json});
-        }
-        return DispatchResult.asNone();
-    }
 };
+
+fn onFallback(ctx_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    const ctx =  @as(*FallbackCtx, @ptrCast(@alignCast(ctx_ptr)));
+    if (ctx.log_json) {
+        const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, ctx.json_opt);
+        defer alloc.free(params_json);
+        std.debug.print("{s}\n", .{params_json});
+    }
+    return DispatchResult.asNone();
+}
+
+// const ReqExtHandlers = struct {
+//     log_json:   bool,
+//     json_opt:   StringifyOptions,
+
+//     pub fn onBefore(_: *@This(), _: Allocator, req: RpcRequest) void {
+//         // req.result has the result JSON object from server.
+//         // req.id is the request id; dispatch based on the id recorded in request_worker().
+//         std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
+//                         .{req.method, req.id});
+//     }
+
+//     pub fn onAfter(_: *@This(), _: Allocator, _: RpcRequest, _: DispatchResult) void {
+//     }
+
+//     pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+//         if (self.log_json) {
+//             const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, self.json_opt);
+//             defer alloc.free(params_json);
+//             std.debug.print("{s}\n", .{params_json});
+//         }
+//         return DispatchResult.asNone();
+//     }
+// };
 
 // Handler for the 'window/logMessage' request from server.
 fn window_logMessage(params: LogMessageParams) void {
