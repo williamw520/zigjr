@@ -53,6 +53,11 @@
 ** rpc_pipeline.runMessage() needs to pass in an allocator for response_buf.
 
 * Releases
+- Releases 1.5.0
+  * Breaking change. Simplify RpcPipeline.runRequest() API by removing of the passed in Allocator.
+  * Breaking change. Simplify dispatcher API. Remove the need to pass in an Allocator to dispatch() and dispatchEnd(). The Dispatcher object is expected to manage its own allocator as needed.
+  * Redo and formalize extended handlers on RpcDispatcher. Add OnErrorHandler. Add tests.
+
 - Releases 1.4.0
   * Breaking change!
     Rename RpcRegistry to RpcDispatcher. Rename rpc_registry.zig to rpc_dispatcher.zig. Add stream.runByDelimiter() and stream.runByContentLength() to take on RpcDispatcher as parameter.
