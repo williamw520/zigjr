@@ -57,7 +57,7 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
         const request_json = std.mem.trim(u8, frame_buf.written(), TRIM_SET);
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        if (try pipeline.runRequest(alloc, request_json, writer, .{})) {
+        if (try pipeline.runRequest(request_json, writer, .{})) {
             try writer.writeByte(options.response_delimiter);
             try writer.flush();
         }
@@ -146,7 +146,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
 
         response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
         options.logger.log("stream.requestsByContentLength", "request ", request_json);
-        if (try pipeline.runRequest(alloc, request_json, &response_buf.writer, .{})) {
+        if (try pipeline.runRequest(request_json, &response_buf.writer, .{})) {
             try frame.writeContentLengthFrame(output_writer, response_buf.written());
             options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
         } else {

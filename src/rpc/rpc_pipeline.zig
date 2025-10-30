@@ -48,6 +48,7 @@ pub const RequestOpts = struct {
 };
 
 pub const RequestPipeline = struct {
+    alloc:          Allocator,
     req_dispatcher: RequestDispatcher,
     logger:         zigjr.Logger,
     buf_writer:     std.Io.Writer.Allocating,
@@ -56,6 +57,7 @@ pub const RequestPipeline = struct {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline.init] Logging starts");
         return .{
+            .alloc = alloc,
             .req_dispatcher = req_dispatcher,
             .logger = l,
             .buf_writer = std.Io.Writer.Allocating.init(alloc),
@@ -73,13 +75,12 @@ pub const RequestPipeline = struct {
     /// Error is turned into a JSON-RPC error response message.
     /// The function returns a boolean flag indicating whether any response has been written,
     /// as notification requests have no response.
-    pub fn runRequest(self: *RequestPipeline, alloc: Allocator,
-                      request_json: []const u8, writer: *std.Io.Writer,
+    pub fn runRequest(self: *RequestPipeline, request_json: []const u8, writer: *std.Io.Writer,
                       req_opts: RequestOpts) std.Io.Writer.Error!bool {
         _=req_opts;
 
         self.logger.log("RequestPipeline.runRequest", "request ", request_json);
-        var parsed_request = parseRpcRequest(alloc, request_json);
+        var parsed_request = parseRpcRequest(self.alloc, request_json);
         defer parsed_request.deinit();
         self.buf_writer.clearRetainingCapacity();
         const response_written = switch (parsed_request.request_msg) {
@@ -94,11 +95,12 @@ pub const RequestPipeline = struct {
     }
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
+    /// The returned response JSON should be freed with the passed in allocator.
     pub fn runRequestToJson(self: *RequestPipeline, alloc: Allocator,
                             request_json: []const u8) WriteAllocError!?[]const u8 {
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        if (try self.runRequest(alloc, request_json, &response_buf.writer, .{})) {
+        if (try self.runRequest(request_json, &response_buf.writer, .{})) {
             return try response_buf.toOwnedSlice();
         } else {
             return null;
@@ -106,6 +108,7 @@ pub const RequestPipeline = struct {
     }
 
     /// Run the request and return the response(s) in a RpcResponseResult. Same as runRequest().
+    /// The returned RpcResponseResult should be freed with the passed in allocator.
     /// This is mainly for testing.
     pub fn runRequestToResponse(self: *RequestPipeline, alloc: Allocator,
                                 request_json: []const u8) !RpcResponseResult {

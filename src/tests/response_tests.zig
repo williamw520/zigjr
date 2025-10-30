@@ -194,7 +194,7 @@ test "Response to a request of hello method" {
 
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        _ = try pipeline.runRequest(alloc, 
+        _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
             , &response_buf.writer, .{});
         // std.debug.print("response: {s}\n", .{response_buf.items});
@@ -696,7 +696,7 @@ test "Handle batch requests with the CounterDispatcher" {
 
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        _ = try pipeline.runRequest(alloc, batch_req_json, &response_buf.writer, .{});
+        _ = try pipeline.runRequest(batch_req_json, &response_buf.writer, .{});
         const batch_res_json = response_buf.written();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
@@ -816,7 +816,7 @@ test "Handle empty batch response" {
 
         var batch_res_buf = std.Io.Writer.Allocating.init(alloc);
         defer batch_res_buf.deinit();
-        _ = try pipeline.runRequest(alloc, batch_req_json, &batch_res_buf.writer, .{});
+        _ = try pipeline.runRequest(batch_req_json, &batch_res_buf.writer, .{});
         const batch_res_json = batch_res_buf.written();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
@@ -842,7 +842,7 @@ test "Dispatch on the response to a request of float add" {
 
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        _ = try pipeline.runRequest(alloc, 
+        _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
             , &response_buf.writer, .{});
         const res_json = response_buf.written();
