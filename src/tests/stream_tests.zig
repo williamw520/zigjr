@@ -13,30 +13,35 @@ const DispatchResult = zigjr.DispatchResult;
 
 
 const EchoDispatcher = struct {
-    pub fn dispatch(_: *@This(), alloc: Allocator, req: zigjr.RpcRequest) !DispatchResult {
+    alloc:  Allocator,
+
+    pub fn dispatch(self: *@This(), req: zigjr.RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 1 or params.items[0] != .string) {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         }
         return .{
-            .result = try std.json.Stringify.valueAlloc(alloc, params.items[0].string, .{}),
+            // Result is allocated with self.alloc
+            .result = try std.json.Stringify.valueAlloc(self.alloc, params.items[0].string, .{}),
         };
     }
 
-    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: zigjr.RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: zigjr.RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
-            .result => |json| alloc.free(json),
+            // Result is freed with self.alloc
+            .result => |json| self.alloc.free(json),
             .err => {},
         }
     }
 };
 
 const CounterDispatcher = struct {
+    alloc:  Allocator,
     count:  isize = 0,
 
-    pub fn dispatch(self: *@This(), alloc: Allocator, req: zigjr.RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), req: zigjr.RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -44,15 +49,15 @@ const CounterDispatcher = struct {
             self.count -= 1;
             return .{ .none = {} };     // treat request as notification
         } else if (std.mem.eql(u8, req.method, "get")) {
-            return .{ .result = try std.json.Stringify.valueAlloc(alloc, self.count, .{}) };
+            return .{ .result = try std.json.Stringify.valueAlloc(self.alloc, self.count, .{}) };
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: zigjr.RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: zigjr.RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
-            .result => alloc.free(dresult.result),
+            .result => self.alloc.free(dresult.result),
             else => {},
         }
     }
@@ -65,7 +70,7 @@ test "DelimiterStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = EchoDispatcher{};
+        var dispatcher = EchoDispatcher{ .alloc = alloc };
 
         const req_jsons =
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
@@ -100,7 +105,7 @@ test "ContentLengthStream.streamRequests on JSON requests, single param, id" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = CounterDispatcher{};
+        var dispatcher = CounterDispatcher{ .alloc = alloc };
         const req_json_list = [_][]const u8{
             \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
                 ,
@@ -146,7 +151,7 @@ test "DelimiterStream.streamRequests on JSON requests, recover from error" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = EchoDispatcher{};
+        var dispatcher = EchoDispatcher{ .alloc = alloc };
 
         const req_jsons =
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
@@ -184,7 +189,7 @@ test "DelimiterStream.streamRequests on JSON requests, no skipping blank lines, 
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = EchoDispatcher{};
+        var dispatcher = EchoDispatcher{ .alloc = alloc };
 
         const req_jsons =
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a"}
@@ -222,7 +227,7 @@ test "ContentLengthStream.streamRequests on JSON requests, recover from missing 
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = CounterDispatcher{};
+        var dispatcher = CounterDispatcher{ .alloc = alloc };
         const req_jsons1 = [_][]const u8{
             \\{"jsonrpc": "2.0", "method": "inc", "id": 1}
                 ,
@@ -280,7 +285,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = EchoDispatcher{};
+        var dispatcher = EchoDispatcher{ .alloc = alloc };
 
         const req_jsons =
             \\{"jsonrpc": "2.0", "method": "fun0", "params": ["abc"], "id": "5a" }
@@ -331,7 +336,7 @@ test "responsesByLength on JSON responses, single param, id" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = CounterDispatcher{};
+        var dispatcher = CounterDispatcher{ .alloc = alloc };
         const req_jsons = [_][]const u8{
             \\{"jsonrpc": "2.0", "method": "inc", "id": 1 }
             ,

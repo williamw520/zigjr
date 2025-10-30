@@ -29,7 +29,7 @@ pub fn main() !void {
     const stdout = &stdout_writer.interface;
 
     // RequestDispatcher interface implemented by the custom dispatcher.
-    var counter_dispatcher = CounterDispatcher{};
+    var counter_dispatcher = CounterDispatcher{ .alloc = alloc };
     const dispatcher = zigjr.RequestDispatcher.implBy(&counter_dispatcher);
     // try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
 
@@ -67,9 +67,10 @@ pub fn main() !void {
 
 
 const CounterDispatcher = struct {
+    alloc:  Allocator,
     count:  isize = 1,                      // start with 1.
     
-    pub fn dispatch(self: *@This(), alloc: Allocator, req: RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return DispatchResult.asNone(); // treat request as notification
@@ -77,15 +78,15 @@ const CounterDispatcher = struct {
             self.count -= 1;
             return DispatchResult.asNone(); // treat request as notification
         } else if (std.mem.eql(u8, req.method, "get")) {
-            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(alloc, self.count, .{}));
+            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(self.alloc, self.count, .{}));
         } else {
             return DispatchResult.withErr(ErrorCode.MethodNotFound, "");
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), alloc: Allocator, _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
-            .result => alloc.free(dresult.result),
+            .result => self.alloc.free(dresult.result),
             else => {},
         }
     }

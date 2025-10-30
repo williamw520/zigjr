@@ -21,22 +21,22 @@ const ErrorCode = zigjr.errors.ErrorCode;
 /// This is for the request handlers in a RPC server handling the incoming requests.
 pub const RequestDispatcher = struct {
     impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult,
-    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, req: RpcRequest) anyerror!DispatchResult,
+    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, req: RpcRequest, dresult: DispatchResult) void,
 
     // Interface is implemented by the 'impl' object.
     pub fn implBy(impl_obj: anytype) RequestDispatcher {
         const ImplType = @TypeOf(impl_obj);
 
         const Delegate = struct {
-            fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
+            fn dispatch(impl_ptr: *anyopaque, req: RpcRequest) anyerror!DispatchResult {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return impl.dispatch(alloc, req);
+                return impl.dispatch(req);
             }
 
-            fn dispatchEnd(impl_ptr: *anyopaque, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+            fn dispatchEnd(impl_ptr: *anyopaque, req: RpcRequest, dresult: DispatchResult) void {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return impl.dispatchEnd(alloc, req, dresult);
+                return impl.dispatchEnd(req, dresult);
             }
         };
 
@@ -49,12 +49,12 @@ pub const RequestDispatcher = struct {
 
     // The implementation must have these methods.
 
-    pub fn dispatch(self: @This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        return self.dispatch_fn(self.impl_ptr, alloc, req);
+    pub fn dispatch(self: @This(), req: RpcRequest) anyerror!DispatchResult {
+        return self.dispatch_fn(self.impl_ptr, req);
     }
 
-    pub fn dispatchEnd(self: @This(), alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-        return self.dispatchEnd_fn(self.impl_ptr, alloc, req, dresult);
+    pub fn dispatchEnd(self: @This(), req: RpcRequest, dresult: DispatchResult) void {
+        return self.dispatchEnd_fn(self.impl_ptr, req, dresult);
     }
 };
 

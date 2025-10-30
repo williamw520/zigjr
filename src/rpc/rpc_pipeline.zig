@@ -83,8 +83,8 @@ pub const RequestPipeline = struct {
         defer parsed_request.deinit();
         self.buf_writer.clearRetainingCapacity();
         const response_written = switch (parsed_request.request_msg) {
-            .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, &self.buf_writer.writer),
-            .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", &self.buf_writer.writer),
+            .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
+            .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
         };
         if (response_written) {
             try writer.writeAll(self.buf_writer.written());
@@ -118,13 +118,13 @@ pub const RequestPipeline = struct {
     }
 };
 
-fn processRpcBatch(alloc: Allocator, reqs: []RpcRequest, dispatcher: RequestDispatcher,
+fn processRpcBatch(reqs: []RpcRequest, dispatcher: RequestDispatcher,
                    writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     var has_output: bool = false;
     try writer.writeAll("[");
     for (reqs) |req| {
         const delimiter = if (has_output) ", " else "";
-        if (try processRpcRequest(alloc, req, dispatcher, delimiter, writer)) {
+        if (try processRpcRequest(req, dispatcher, delimiter, writer)) {
             has_output = true;
         }
     }
@@ -134,13 +134,13 @@ fn processRpcBatch(alloc: Allocator, reqs: []RpcRequest, dispatcher: RequestDisp
 
 /// Handle request's error, dispatch the request, and write the response.
 /// Returns true if a response message is written, false for not as notification has no response.
-fn processRpcRequest(alloc: Allocator, req: RpcRequest, req_dispatcher: RequestDispatcher,
+fn processRpcRequest(req: RpcRequest, req_dispatcher: RequestDispatcher,
                      delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
     if (try handleRequestError(req, writer)) return true;
-    errdefer req_dispatcher.dispatchEnd(alloc, req, DispatchResult.asNone());   // for std.Io.Writer.Error
-    const dresult = try dispatchRequest(alloc, req, req_dispatcher);
+    errdefer req_dispatcher.dispatchEnd(req, DispatchResult.asNone());   // for std.Io.Writer.Error
+    const dresult = try dispatchRequest(req, req_dispatcher);
     const written = try writeResponse(dresult, req, delimiter, writer);
-    req_dispatcher.dispatchEnd(alloc, req, dresult);
+    req_dispatcher.dispatchEnd(req, dresult);
     return written;
 }
 
@@ -152,9 +152,8 @@ fn handleRequestError(req: RpcRequest, writer: *std.Io.Writer) std.Io.Writer.Err
     return false;
 }
 
-fn dispatchRequest(alloc: Allocator, req: RpcRequest,
-                  req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
-    return req_dispatcher.dispatch(alloc, req) catch |err| {
+fn dispatchRequest(req: RpcRequest, req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
+    return req_dispatcher.dispatch(req) catch |err| {
         // Turn dispatching error into DispatchResult.err.
         // Handle errors here so dispatchers don't have to worry about error handling.
         return DispatchResult.withAnyErr(err);
@@ -265,8 +264,8 @@ pub const MessagePipeline = struct {
         switch (msg_result) {
             .request_result  => |request_result| {
                 const response_written = switch (request_result.request_msg) {
-                    .batch   => |reqs| try processRpcBatch(alloc,  reqs, self.req_dispatcher, &self.buf_writer.writer),
-                    .request => |req|  try processRpcRequest(alloc, req, self.req_dispatcher, "", &self.buf_writer.writer),
+                    .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
+                    .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
                 };
                 if (response_written) {
                     self.logger.log("runMessage", "req_response_json", self.buf_writer.written());

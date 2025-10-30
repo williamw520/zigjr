@@ -129,16 +129,15 @@ pub const RpcDispatcher = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    // TODO: investigate whether the alloc can be removed.
-    pub fn dispatch(self: *const Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    pub fn dispatch(self: *const Self, req: RpcRequest) anyerror!DispatchResult {
         self.on_before_fn(self.on_before_ctx, self.alloc, req);
-        return self.dispatchInner(self.alloc, req) catch |err| {
+        return self.dispatchInner(req) catch |err| {
             self.on_error_fn(self.on_error_ctx, self.alloc, req, err);
             return err;
         };
     }
 
-    fn dispatchInner(self: *const Self, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    fn dispatchInner(self: *const Self, req: RpcRequest) anyerror!DispatchResult {
         if (self.handlers.getPtr(req.method)) |h| {
             const result = try h.invoke(req.params);
             self.on_after_fn(self.on_after_ctx, self.alloc, req, result);
@@ -152,9 +151,8 @@ pub const RpcDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(self: *const Self, alloc: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *const Self, req: RpcRequest, dresult: DispatchResult) void {
         // RpcHandler uses ArenaAllocator so no need to explicitly free the dresult.
-        _=alloc;
         _=dresult;
         if (self.handlers.getPtr(req.method))|h| {
             h.reset();      // Reset after each request dispatching.
