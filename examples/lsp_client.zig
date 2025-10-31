@@ -239,13 +239,9 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
         var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
         defer rpc_dispatcher.deinit();
-        // var ext_handlers = ReqExtHandlers {
-        //     .log_json = (args.json or args.pp_json),
-        //     .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
-        // };
-        // rpc_dispatcher.setExtHandlers(&ext_handlers);
 
         rpc_dispatcher.setOnBefore(null, onBefore);
+
         var fallbackCtx: FallbackCtx = .{
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
@@ -295,30 +291,6 @@ fn onFallback(ctx_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!D
     }
     return DispatchResult.asNone();
 }
-
-// const ReqExtHandlers = struct {
-//     log_json:   bool,
-//     json_opt:   StringifyOptions,
-
-//     pub fn onBefore(_: *@This(), _: Allocator, req: RpcRequest) void {
-//         // req.result has the result JSON object from server.
-//         // req.id is the request id; dispatch based on the id recorded in request_worker().
-//         std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
-//                         .{req.method, req.id});
-//     }
-
-//     pub fn onAfter(_: *@This(), _: Allocator, _: RpcRequest, _: DispatchResult) void {
-//     }
-
-//     pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-//         if (self.log_json) {
-//             const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, self.json_opt);
-//             defer alloc.free(params_json);
-//             std.debug.print("{s}\n", .{params_json});
-//         }
-//         return DispatchResult.asNone();
-//     }
-// };
 
 // Handler for the 'window/logMessage' request from server.
 fn window_logMessage(params: LogMessageParams) void {

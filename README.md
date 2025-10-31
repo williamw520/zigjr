@@ -38,16 +38,17 @@ This small library is packed with the following features:
 
 ## Quick Usage
 
-The following example shows a JSON-RPC server that registers native Zig functions 
-as RPC handlers in a registry, creates a dispatcher from the registry,
-and uses it to stream JSON-RPC messages from `stdin` to `stdout`.
+The following example shows a JSON-RPC server registering native Zig functions 
+as RPC handlers in a dispatcher's registry and using it to handle 
+JSON-RPC messages in a stream from `stdin` to `stdout`.
 
-The functions take in native Zig data types and return native result values or errors,
-which are mapped to the JSON data types automatically.
+The handler functions take in native Zig data types and return native result values 
+or errors, which are automatically mapped to the JSON data types.
 
 ```zig
 {
     var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
 
     try rpc_dispatcher.add"say", say);
     try rpc_dispatcher.add("hello", hello);
@@ -78,10 +79,10 @@ fn weigh(cat: CatInfo) f64 {
     return cat.weight;
 }
 ```
-Check [hello.zig](examples/hello.zig) for a complete example. 
+Check out [hello.zig](examples/hello.zig) for a complete example. 
 See the example on how to obtain the `std.Io.Reader` based `stdin` and `std.Io.Writer` based `stdout`.
 
-Sample request and response messages.
+Here are some sample request and response JSON messages for testing.
 ```
 Request:  {"jsonrpc": "2.0", "method": "hello", "id": 1}
 Response: {"jsonrpc": "2.0", "result": "Hello world", "id": 1}
@@ -143,7 +144,7 @@ const zigjr = @import("zigjr");
 
 ## Usage
 
-You can build JSON-RPC 2.0 applications with ZigJR at several levels of abstraction:
+You can build JSON-RPC 2.0 applications with ZigJR at different levels of abstraction:
 * **Streaming API:** Handle message frames for continuous communication (recommended).
 * **RPC Pipeline:** Process individual requests and responses.
 * **Parsers and Composers:** Manually build and parse JSON-RPC messages for maximum control.
@@ -266,7 +267,7 @@ which routes it to a handler function based on the message's `method`.
 The `RequestDispatcher` and `ResponseDispatcher` interfaces define the required dispatching functions.
 
 ## RpcDispatcher
-The built-in `RpcDispatcher` is a registry of RPC handlers that also implements the `RequestDispatcher` interface and 
+The built-in `RpcDispatcher` is a dispatcher with a registry of RPC handlers that also implements the `RequestDispatcher` interface and 
 serves as a powerful, ready-to-use dispatcher. Use `RpcDispatcher.add(method_name, function)` 
 to register a handler function for a specific JSON-RPC method. When a request comes in, 
 the it looks up the handler from its registry, maps the request's parameters to the function's arguments, 
@@ -323,8 +324,8 @@ const Group = struct {
 const Counter = struct {
     count:  i64 = 0;
 
-    fn inc(self: *@This()) void { self.count += 1; }
-    fn get(self: *@This()) i64  { return self.count; }
+    fn inc(self: *Counter) void { self.count += 1; }
+    fn get(self: *Counter) i64  { return self.count; }
 };
 ```
 
@@ -347,6 +348,41 @@ for deserialization. Nested objects are supported, and you can implement custom
 parsing by adding a `jsonParseFromValue` function to your struct. See the `std.json` 
 documentation for details.
 
+Here's an example on using `struct` as parameter and return value of a RPC handler.
+```zig
+{
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    try rpc_dispatcher.add("weigh-cat", weighCat);
+    try rpc_dispatcher.add("make-cat", makeCat);
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{});
+}
+
+const CatInfo = struct {
+    cat_name: []const u8,
+    weight: f64,
+    eye_color: []const u8,
+};
+
+fn weighCat(cat: CatInfo) []const u8 {
+    if (std.mem.eql(u8, cat.cat_name, "Garfield")) return "Fat Cat!";
+    if (std.mem.eql(u8, cat.cat_name, "Odin")) return "Not a cat!";
+    if (0 < cat.weight and cat.weight <= 2.0) return "Tiny cat";
+    if (2.0 < cat.weight and cat.weight <= 10.0) return "Normal weight";
+    if (10.0 < cat.weight ) return "Heavy cat";
+    return "Something wrong";
+}
+
+fn makeCat(name: []const u8, eye_color: []const u8) CatInfo {
+    const seed: u64 = @truncate(name.len);
+    var prng = std.Random.DefaultPrng.init(seed);
+    return .{
+        .cat_name = name,
+        .weight = @floatFromInt(prng.random().uintAtMost(u32, 20)),
+        .eye_color = eye_color,
+    };
+}
+```
+
 ### Special Parameters
 
 #### Context
@@ -360,7 +396,7 @@ The first parameter's type and the context type need to be the same.
 If an `std.mem.Allocator` is the first parameter of a handler (or the second, 
 if a context is used as the first), an arena allocator is passed in. The handler does 
 not need to free memory allocated with it; the arena is automatically reset after the request completes.
-The arena memory is reset in dispatchEnd() called by higher level callers.
+The arena memory is reset in dispatchEnd() when the dispatching of a request has completed.
 
 #### Value
 To handle parameters manually, you can use `std.json.Value`:
@@ -423,8 +459,8 @@ when running as a sub-process in a MCP host.
 
 Note: `log_buf` is required for the new std.Io.Writer API.
 ```zig
-    var log_buf: [1024]u8 = undefined;
-    var logger = try zigjr.FileLogger.init("log.txt",  &log_buf);
+    var write_buf: [1024]u8 = undefined;
+    var logger = try zigjr.FileLogger.init("log.txt",  &write_buf);
     defer logger.deinit();
     try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = Logger.implBy(&logger) });
 ```
@@ -451,45 +487,59 @@ const MyLogger = struct {
 
 ## Extended Handlers
 
-`RpcDispatcher` supports setting up of pre-handler, post-handler, and fallback handler
-for each request. Before dispatching a request to its method's handler, the
-`onBefore()` handler is called, giving a chance to do pre-handling on every request.
-After the handler for a request has returned, the `onAfter()` handler is called,
-giving a chance to do post-handling on every request.
+`RpcDispatcher` supports adding of pre-handler, post handler, error handler and fallback handler
+for the requests. Before dispatching a request to its method's handler, the
+`OnBeforeFn` extended handler is called, allowing any pre-handling of the request.
+After the method's handler for a request has returned successfully, the `OnAfterFn` 
+extended handler is called, allowing any post-handling on the request. 
+When the method's handler returns error, the `OnErrorFn` extended handler is called,
+allowing any error handling on the request before sending it back to the client.
 
-If a request's method has no registered handler, the `fallback()` handler is called.
+If a request's method has no registered handler, the `OnFallbackFn` extended handler is called,
+allowing handling of any unknown requests.
 
-The extended handlers are set up via `setExtHandlers()` on `RpcDispatcher`. For example,
+The extended handlers are set up via `setOnBefore()`, `setOnAfter()`, `setOnError()`, and `setOnFallback()` on `RpcDispatcher`.
+Once set, these extended handlers are applied to all requests, regardless of the request methods.
+
+An extended handler takes in a context and an Allocator parameters. The context is passed
+in as the first parameter of the setOnXX() functions. The Allocator is the same arena allocator
+for request handling.
+
+For example,
 
 ```zig
 {
-        var registry = zigjr.RpcDispatcher.init(alloc);
-        defer registry.deinit();
-        var ext_handlers = MyExtHandlers {};
-        registry.setExtHandlers(&ext_handlers);
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
+    rpc_dispatcher.setOnBefore(null, onBefore);
+    rpc_dispatcher.setOnAfter(null, onAfter);
+    rpc_dispatcher.setOnError(null, onError);
+    rpc_dispatcher.setOnFallback(null, onFallback);
 }
 
-const MyExtHandlers = struct {
-    pub fn onBefore(self: *@This(), alloc: Allocator, req: RpcRequest) void {
-        std.debug.print("Before handling request, method: {s}, id: {any}\n", .{req.method, req.id});
-    }
+fn onBefore(_: *anyopaque, _: Allocator, req: RpcRequest) void {
+    std.debug.print("Before handling request, method: {s}, id: {any}\n", .{req.method, req.id});
+}
 
-    pub fn onAfter(self: *@This(), alloc: Allocator, req: RpcRequest, res: DispatchResult) void {
-        std.debug.print("After handling request, result: {any}\n", .{res});
-    }
+fn onAfter(_: *anyopaque, _: Allocator, req: RpcRequest, res: DispatchResult) void {
+    std.debug.print("After handling request, method: {s}, id: {any}, result: {any}\n", .{req.method, req.id, res});
+}
 
-    pub fn fallback(self: *@This(), alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        std.debug.print("Got request, method: {s}, id: {any}\n", .{req.method, req.id});
-        return DispatchResult.asNone();
-    }
-};
+fn onError(_: *anyopaque, _: Allocator, req: RpcRequest, err: anyerror) void {
+    std.debug.print("After handling request, method: {s}, id: {any}, error: {any}\n", .{req.method, req.id, err});
+}
+
+fn onFallback(_: *anyopaque, _: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    std.debug.print("Unknown request, method: {s}, id: {any}\n", .{req.method, req.id});
+    return DispatchResult.asNone(); // return a .none result to discard the request.
+}
 ```
 
 ## Universal Message Handling
 
 Some servers (e.g. LSP server) can send both responses to a client's requests and 
 its own server-to-client requests in the same channel. A client needs to be able
-to handle both JSON RPC responses and requests in the same channel. 
+to handle both JSON RPC responses and requests from the server in the same channel. 
 ZigJR provides universal message handling functions to handle message that is either a request or a response.
 
 * `stream.messagesByContentLength()`: handles a stream of mixed requests and responses.
