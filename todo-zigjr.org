@@ -53,6 +53,10 @@
 ** rpc_pipeline.runMessage() needs to pass in an allocator for response_buf.
 
 * Releases
+
+- Releases 1.6.0
+  * Breaking change. FileLogger allocates its own write_buf now instead of taking in a passed in buffer, making it easier to use and more self contained.
+
 - Releases 1.5.0
   * Breaking change. Simplify RpcPipeline.runRequest() API by removing of the passed in Allocator.
   * Breaking change. Simplify dispatcher API. Remove the need to pass in an Allocator to dispatch() and dispatchEnd(). The Dispatcher object is expected to manage its own allocator as needed.
