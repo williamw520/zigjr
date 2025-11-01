@@ -447,9 +447,9 @@ and debug handlers. You can use a pre-built logger or implement a custom one.
 #### DbgLogger
 This example uses a `DbgLogger` in a request pipeline. This logger prints to `stderr`.
 ```zig
-    var logger = zigjr.DbgLogger{};
+    var d_logger = zigjr.DbgLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.implBy(&registry), zigjr.Logger.implBy(&logger));
+        RequestDispatcher.implBy(&rpc_dispatcher), zigjr.Logger.implBy(&d_logger));
     
 ```
 #### FileLogger
@@ -457,31 +457,29 @@ This example uses a `FileLogger` in a request stream. This logger writes to a fi
 File based logging is great in situations where the stdout is not available, e.g.
 when running as a sub-process in a MCP host.
 
-Note: `log_buf` is required for the new std.Io.Writer API.
 ```zig
-    var write_buf: [1024]u8 = undefined;
-    var logger = try zigjr.FileLogger.init("log.txt",  &write_buf);
-    defer logger.deinit();
-    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = Logger.implBy(&logger) });
+    var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
+    defer f_logger.deinit();
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = Logger.implBy(&f_logger) });
 ```
 #### Custom Logger
 This example uses a custom logger in a request pipeline.
 ```zig
 {
-    var logger = MyLogger{};
+    var my_logger = MyLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.implBy(&rpc_dispatcher), zigjr.Logger.implBy(&logger));
+        RequestDispatcher.implBy(&rpc_dispatcher), zigjr.Logger.implBy(&my_logger));
 }
 
 const MyLogger = struct {
     count: usize = 0,
 
-    pub fn start(_: @This(), _: []const u8) void {}
-    pub fn log(self: *@This(), source:[] const u8, operation: []const u8, message: []const u8) void {
+    pub fn start(_: MyLogger, _: []const u8) void {}
+    pub fn log(self: *MyLogger, source:[] const u8, operation: []const u8, message: []const u8) void {
         self.count += 1;
         std.debug.print("LOG {}: {s} - {s} - {s}\n", .{self.count, source, operation, message});
     }
-    pub fn stop(_: @This(), _: []const u8) void {}
+    pub fn stop(_: MyLogger, _: []const u8) void {}
 };
 ```
 

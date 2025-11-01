@@ -31,8 +31,7 @@ pub fn main() !void {
 
     // Use a file-based logger since the executable is run in a MCP host
     // as a sub-process and cannot log to the host's stdout.
-    var log_buf: [1024]u8 = undefined;
-    var logger = try zigjr.FileLogger.init("log.txt", &log_buf);
+    var logger = try zigjr.FileLogger.init(alloc, "log.txt");
     defer logger.deinit();
 
     var registry = zigjr.RpcDispatcher.init(alloc);

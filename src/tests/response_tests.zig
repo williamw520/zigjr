@@ -667,8 +667,8 @@ test "Handle batch requests with the CounterDispatcher" {
     {
         var impl = CounterDispatcher{ .alloc = alloc };
         var logger = zigjr.DbgLogger{};
-        // var buf: [1024]u8 = undefined;
-        // var logger = try zigjr.FileLogger.init("log.txt", &buf);
+        // var logger = try zigjr.FileLogger.init(alloc, "log.txt");
+        // defer logger.deinit();
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl),
                                                            zigjr.Logger.implBy(&logger));
         defer pipeline.deinit();

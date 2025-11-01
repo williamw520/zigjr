@@ -7,6 +7,8 @@
 //
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 
 inline fn TPtr(T: type, opaque_ptr: *anyopaque) T {
     return @as(T, @ptrCast(@alignCast(opaque_ptr)));
@@ -89,23 +91,28 @@ pub const DbgLogger = struct {
 
 /// A logger that logs to file, implemented the Logger interface.
 pub const FileLogger = struct {
+    alloc: Allocator,
     count: usize = 0,
     file: std.fs.File,
     fwriter: std.fs.File.Writer,
+    write_buf: []const u8,
 
     /// Create a FileLogger to log to the file at 'file_path',
-    /// using 'buffer' for the Writer buffer.
-    pub fn init(file_path: []const u8, buffer: []u8) !FileLogger {
+    pub fn init(alloc: Allocator, file_path: []const u8) !FileLogger {
         const file = try fileOpenIf(file_path);
-        try file.seekFromEnd(0);    // seek to end for appending to file.
+        try file.seekFromEnd(0);                        // seek to end for appending to file.
+        const write_buf = try alloc.alloc(u8, 4096);    // buffer with the usual disk page size.
         return .{
+            .alloc = alloc,
             .file = file,
-            .fwriter = file.writer(buffer),
+            .fwriter = file.writer(write_buf),
+            .write_buf = write_buf,
         };
     }
 
     pub fn deinit(self: *@This()) void {
         self.file.close();
+        self.alloc.free(self.write_buf);
     }
 
     pub fn start(self: *@This(), message: []const u8) void {
