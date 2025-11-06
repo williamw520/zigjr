@@ -42,6 +42,7 @@ const HelloDispatcher = struct {
             .none => {},
             .result => {},
             .err => {},
+            .end_stream => {},
         }
     }
 };
@@ -87,6 +88,7 @@ const IntCalcDispatcher = struct {
             .none => {},
             .result => self.alloc.free(dresult.result),
             .err => {},
+            .end_stream => {},
         }
     }
     
@@ -849,18 +851,19 @@ test "Dispatch on the response to a request of float add" {
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var my_dispatcher = struct {
-            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!bool {
                 // std.debug.print("response: {any}\n", .{res});
                 try testing.expectEqual(res.result.integer, 3);
                 try testing.expect(res.resultEql(3));
                 try testing.expect(res.resultEql(3.0));
                 try testing.expect(res.id.eql(1));
+                return true;
             }
         } {};
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
-        try res_pipeline.runResponse(res_json, null);
+        _ = try res_pipeline.runResponse(res_json, null);
     }
 
 }
@@ -897,7 +900,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
         const non_exist_id = "xyz";
 
         var my_dispatcher = struct {
-            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!bool {
                 // std.debug.print("response: {any}\n", .{res});
                 if (res.id.eql(2)) {
                     try testing.expectEqual(res.result.integer, 1);
@@ -908,12 +911,13 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
                 } else if (res.id.eql(4)) {
                     try testing.expectEqual(res.result.integer, 0);
                 }
+                return true;
             }
         } {};
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
         const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
 
-        try res_pipeline.runResponse(batch_res_json, null);
+        _ = try res_pipeline.runResponse(batch_res_json, null);
     }
 
 }

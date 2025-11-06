@@ -123,6 +123,7 @@ const HelloDispatcher = struct {
             .none => {},
             .result => {},
             .err => {},
+            .end_stream => {},
         }
     }
 };
@@ -193,10 +194,11 @@ test "Dispatch on the request and response" {
         var req_dispatcher = HelloDispatcher{};
 
         var res_dispatcher = struct {
-            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!void {
+            pub fn dispatch(_: *@This(), _: Allocator, res: RpcResponse) anyerror!bool {
                 // std.debug.print("response: {any}\n", .{res});
                 try testing.expectEqualSlices(u8, res.result.string, "hello back");
                 try testing.expect(res.id.eql(1));
+                return true;
             }
         } {};
 
@@ -207,19 +209,19 @@ test "Dispatch on the request and response" {
 
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        const run_req_result = try pipeline.runMessage(alloc,
+        const req_run_status = try pipeline.runMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
             , &response_buf.writer, .{});
-        try testing.expect(run_req_result == .request_has_response);
+        try testing.expect(req_run_status.kind == .request);
         // std.debug.print("run_result: {}\n", .{run_result});
         // std.debug.print("response_buf: {s}\n", .{response_buf.items});
 
         // Feed the response from request back into the message pipeline.
         var response_buf2 = std.Io.Writer.Allocating.init(alloc);
         defer response_buf2.deinit();
-        const run_res_result = try pipeline.runMessage(alloc, response_buf.written(),
+        const res_run_status = try pipeline.runMessage(alloc, response_buf.written(),
                                                        &response_buf2.writer, .{});
-        try testing.expect(run_res_result == .response_processed);
+        try testing.expect(res_run_status.kind == .response);
 
     }
 

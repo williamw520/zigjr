@@ -26,8 +26,9 @@ const TRIM_SET = " \t\r\n";
 /// Runs a loop to read a stream of delimitered JSON request messages (frames) from the reader,
 /// handle each one with the RpcDispatcher, and write the JSON responses to the writer.
 pub fn runByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
-                      rpc_dispatcher: *RpcDispatcher, options: DelimiterOptions) !void {
-    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher);
+                      rpc_dispatcher: *const RpcDispatcher, options: DelimiterOptions) !void {
+    const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
+    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher_ptr);
     try requestsByDelimiter(alloc, reader, writer, dispatcher, options);
 }
 
@@ -57,9 +58,13 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
         const request_json = std.mem.trim(u8, frame_buf.written(), TRIM_SET);
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        if (try pipeline.runRequest(request_json, writer, .{})) {
+        const run_status = try pipeline.runRequest(request_json, writer, .{});
+        if (run_status.isReplied()) {
             try writer.writeByte(options.response_delimiter);
             try writer.flush();
+        }
+        if (run_status.end_stream) {
+            break;
         }
     }
 }
@@ -91,11 +96,16 @@ pub fn responsesByDelimiter(alloc: Allocator, reader: *std.Io.Reader,
         if (options.skip_blank_message and response_json.len == 0) continue;
 
         options.logger.log("stream.responsesByDelimiter", "receive response", response_json);
-        pipeline.runResponse(response_json, null) catch |err| {
+        const run_status = pipeline.runResponse(response_json, null) catch |err| {
             var stderr_writer = std.fs.File.stderr().writer(&.{});
             const stderr = &stderr_writer.interface;
             stderr.print("Error in runResponse(). {any}", .{err}) catch {};
+            continue;
         };
+        if (run_status.end_stream) {
+            break;
+        }
+        
     }
 }
 
@@ -126,7 +136,6 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
     defer frame_data.deinit();
     var response_buf = std.Io.Writer.Allocating.init(alloc);
     defer response_buf.deinit();
-    const output_writer = writer;
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
@@ -146,11 +155,17 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
 
         response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
         options.logger.log("stream.requestsByContentLength", "request ", request_json);
-        if (try pipeline.runRequest(request_json, &response_buf.writer, .{})) {
-            try frame.writeContentLengthFrame(output_writer, response_buf.written());
+
+        const run_status = try pipeline.runRequest(request_json, &response_buf.writer, .{});
+        if (run_status.isReplied()) {
+            try frame.writeContentLengthFrame(writer, response_buf.written());
             options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
         } else {
             options.logger.log("stream.requestsByContentLength", "response", "");
+        }
+
+        if (run_status.end_stream) {
+            break;
         }
     }
 }
@@ -217,19 +232,24 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
         if (options.skip_blank_message and message_json.len == 0) continue;
 
         req_response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
-        const run_result = try pipeline.runMessage(alloc, message_json, &req_response_buf.writer, .{});
-        switch (run_result) {
-            .request_has_response => {
-                try frame.writeContentLengthFrame(req_output_writer, req_response_buf.written());
-                try req_output_writer.flush();
-                options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.written());
+        const run_status = try pipeline.runMessage(alloc, message_json, &req_response_buf.writer, .{});
+        switch (run_status.kind) {
+            .request => {
+                if (run_status.isReplied())  {
+                    try frame.writeContentLengthFrame(req_output_writer, req_response_buf.written());
+                    try req_output_writer.flush();
+                    options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.written());
+                } else {
+                    options.logger.log("stream.messagesByContentLength", "request_no_response", "");
+                }
             },
-            .request_no_response => {
-                options.logger.log("stream.messagesByContentLength", "request_no_response", "");
-            },
-            .response_processed => {
+            .response => {
                 options.logger.log("stream.messagesByContentLength", "response_processed", "");
             },
+        }
+
+        if (run_status.end_stream) {
+            break;
         }
     }
 }

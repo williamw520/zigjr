@@ -76,22 +76,22 @@ pub const RequestPipeline = struct {
     /// The function returns a boolean flag indicating whether any response has been written,
     /// as notification requests have no response.
     pub fn runRequest(self: *RequestPipeline, request_json: []const u8, writer: *std.Io.Writer,
-                      req_opts: RequestOpts) std.Io.Writer.Error!bool {
+                      req_opts: RequestOpts) std.Io.Writer.Error!RunStatus {
         _=req_opts;
 
         self.logger.log("RequestPipeline.runRequest", "request ", request_json);
         var parsed_request = parseRpcRequest(self.alloc, request_json);
         defer parsed_request.deinit();
         self.buf_writer.clearRetainingCapacity();
-        const response_written = switch (parsed_request.request_msg) {
+        const run_status = switch (parsed_request.request_msg) {
             .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
             .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
         };
-        if (response_written) {
+        if (run_status.isReplied()) {
             try writer.writeAll(self.buf_writer.written());
             self.logger.log("RequestPipeline.runRequest", "response", self.buf_writer.written());
         }
-        return response_written;
+        return run_status;
     }
 
     /// Run the request and return the response(s) as a JSON string. Same as runRequest().
@@ -100,7 +100,8 @@ pub const RequestPipeline = struct {
                             request_json: []const u8) WriteAllocError!?[]const u8 {
         var response_buf = std.Io.Writer.Allocating.init(alloc);
         defer response_buf.deinit();
-        if (try self.runRequest(request_json, &response_buf.writer, .{})) {
+        const run_status = try self.runRequest(request_json, &response_buf.writer, .{});
+        if (run_status.isReplied()) {
             return try response_buf.toOwnedSlice();
         } else {
             return null;
@@ -122,29 +123,30 @@ pub const RequestPipeline = struct {
 };
 
 fn processRpcBatch(reqs: []RpcRequest, dispatcher: RequestDispatcher,
-                   writer: *std.Io.Writer) std.Io.Writer.Error!bool {
-    var has_output: bool = false;
+                   writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
+    var has_replied: bool = false;
+    var end_stream: bool = false;
     try writer.writeAll("[");
     for (reqs) |req| {
-        const delimiter = if (has_output) ", " else "";
-        if (try processRpcRequest(req, dispatcher, delimiter, writer)) {
-            has_output = true;
-        }
+        const delimiter = if (has_replied) ", " else "";
+        const r_status  = try processRpcRequest(req, dispatcher, delimiter, writer);
+        has_replied     = has_replied or r_status.isReplied();
+        end_stream      = end_stream  or r_status.end_stream;
     }
     try writer.writeAll("]");
-    return true;                    // batch always has some output like "[]".
+    return RunStatus.asRequest(true, end_stream);   // batch always has some output like "[]"
 }
 
 /// Handle request's error, dispatch the request, and write the response.
 /// Returns true if a response message is written, false for not as notification has no response.
 fn processRpcRequest(req: RpcRequest, req_dispatcher: RequestDispatcher,
-                     delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
-    if (try handleRequestError(req, writer)) return true;
+                     delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
+    if (try handleRequestError(req, writer)) return RunStatus.asRequestReplied();
     errdefer req_dispatcher.dispatchEnd(req, DispatchResult.asNone());   // for std.Io.Writer.Error
-    const dresult = try dispatchRequest(req, req_dispatcher);
-    const written = try writeResponse(dresult, req, delimiter, writer);
-    req_dispatcher.dispatchEnd(req, dresult);
-    return written;
+    const d_result = try dispatchRequest(req, req_dispatcher);
+    const r_status = try writeResponse(d_result, req, delimiter, writer);
+    req_dispatcher.dispatchEnd(req, d_result);
+    return r_status;
 }
 
 fn handleRequestError(req: RpcRequest, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
@@ -164,18 +166,18 @@ fn dispatchRequest(req: RpcRequest, req_dispatcher: RequestDispatcher) std.Io.Wr
 }
 
 fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8,
-                 writer: *std.Io.Writer) std.Io.Writer.Error!bool {
+                 writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
     switch (dresult) {
         .none => {
-            return false;       // notification request has no response written.
+            return RunStatus.asRequestNone();       // notification request has no response written.
         },
         .result => |json| {
             if (req.id.isNotification()) {
-                return false;   // notification request has no response written.
+                return RunStatus.asRequestNone();   // notification request has no response written.
             }
             try writer.writeAll(delimiter);
             try composer.writeResponseJson(req.id, json, writer);
-            return true;
+            return RunStatus.asRequestReplied();    // has response data written
         },
         .err => |err| {
             try writer.writeAll(delimiter);
@@ -184,10 +186,66 @@ fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8
             } else {
                 try composer.writeErrorResponseJson(req.id, err.code, err.msg, writer);
             }
-            return true;
+            return RunStatus.asRequestReplied();    // has response data written
         },
+        .end_stream =>
+            return RunStatus.asRequestEndStream(),
     }
 }
+
+pub const RunStatus = struct {
+    kind: union(enum) {         // status for processing request or response.
+        request: struct {
+            replied: bool,      // request has response data written
+        },
+        response: void,
+    },   
+    end_stream: bool = false,   // request/response handler wants to end the streaming session.
+
+    pub fn asRequest(has_reply: bool, end_stream: bool) RunStatus {
+        return .{
+            .kind = .{
+                .request = .{ .replied = has_reply }
+            },
+            .end_stream = end_stream,
+        };
+    }
+
+    pub fn asRequestNone() RunStatus {
+        return asRequest(false, false);
+    }
+
+    pub fn asRequestReplied() RunStatus {
+        return asRequest(true, false);
+    }
+
+    pub fn asRequestEndStream() RunStatus {
+        return asRequest(false, true);
+    }
+
+    pub fn asResponse() RunStatus {
+        return .{
+            .kind = .{
+                .response = {}
+            },
+            .end_stream = false,
+        };
+    }
+
+    pub fn asResponseEndStream() RunStatus {
+        return .{
+            .kind = .{
+                .response = {}
+            },
+            .end_stream = true,
+        };
+    }
+
+    pub fn isReplied(self: RunStatus) bool {
+        return if (self.kind == .request) self.kind.request.replied else false;
+    }
+
+};
 
 
 pub const ResponsePipeline = struct {
@@ -208,25 +266,39 @@ pub const ResponsePipeline = struct {
     /// Any error coming from the dispatcher is passed back to caller.
     /// For batch responses, the first error from the dispatcher stops the processing.
     pub fn runResponse(self: ResponsePipeline, response_json: []const u8,
-                       headers: ?std.StringHashMap([]const u8)) !void {
+                       headers: ?std.StringHashMap([]const u8)) !RunStatus {
         _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
         var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
-        try processResponseResult(self.alloc, response_result, self.res_dispatcher);
+        return try processResponseResult(self.alloc, response_result, self.res_dispatcher);
     }
 
 };
 
 fn processResponseResult(alloc: Allocator, response_result: RpcResponseResult,
-                         dispatcher: ResponseDispatcher) anyerror!void {
+                         dispatcher: ResponseDispatcher) anyerror!RunStatus {
     // Any errors (parsing or others) are forwarded to the handlers via the dispatcher.
     return switch (response_result.response_msg) {
-        .response   => |rpc_response|  try dispatcher.dispatch(alloc, rpc_response),
-        .batch      => |rpc_responses| for (rpc_responses) |rpc_response| {
-            try dispatcher.dispatch(alloc, rpc_response);
+        .response   => |rpc_response| {
+            return if (try dispatcher.dispatch(alloc, rpc_response))
+                RunStatus.asResponse()
+            else
+                RunStatus.asResponseEndStream();
         },
-        .none       => {},
+        .batch      => |rpc_responses| {
+            var continuing = true;
+            for (rpc_responses) |rpc_response| {
+                const to_continue = try dispatcher.dispatch(alloc, rpc_response);
+                continuing = continuing and to_continue;
+            }
+            return if (continuing)
+                RunStatus.asResponse()
+            else
+                RunStatus.asResponseEndStream();
+        },
+        .none       =>
+            return RunStatus.asResponse(),
     };
 }
 
@@ -256,7 +328,7 @@ pub const MessagePipeline = struct {
 
     pub fn runMessage(self: *MessagePipeline, alloc: Allocator,
                       message_json: []const u8, writer: *std.Io.Writer,
-                      req_opts: RequestOpts) anyerror!MessageRunResult {
+                      req_opts: RequestOpts) anyerror!RunStatus {
         _=req_opts;
 
         self.logger.log("runMessage", "message_json ", message_json);
@@ -266,30 +338,21 @@ pub const MessagePipeline = struct {
 
         switch (msg_result) {
             .request_result  => |request_result| {
-                const response_written = switch (request_result.request_msg) {
+                const run_status = switch (request_result.request_msg) {
                     .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
                     .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
                 };
-                if (response_written) {
+                if (run_status.isReplied()) {
                     self.logger.log("runMessage", "req_response_json", self.buf_writer.written());
                     try writer.writeAll(self.buf_writer.written());
-                    return .request_has_response;
-                } else {
-                    return .request_no_response;
                 }
+                return run_status;
             },
             .response_result => |response_result| {
-                try processResponseResult(alloc, response_result, self.res_dispatcher);
-                return .response_processed;
+                return try processResponseResult(alloc, response_result, self.res_dispatcher);
             },
         }
     }
-};
-
-pub const MessageRunResult = enum {
-    request_has_response,
-    request_no_response,
-    response_processed,
 };
 
 

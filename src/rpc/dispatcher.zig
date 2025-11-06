@@ -63,14 +63,14 @@ pub const RequestDispatcher = struct {
 /// This is for the response handlers in a RPC client handling the returned responses.
 pub const ResponseDispatcher = struct {
     impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!void,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!bool,
 
     // Interface is implemented by the 'impl' object.
     pub fn implBy(impl_obj: anytype) ResponseDispatcher {
         const ImplType = @TypeOf(impl_obj);
 
         const Delegate = struct {
-            fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!void {
+            fn dispatch(impl_ptr: *anyopaque, alloc: Allocator, res: RpcResponse) anyerror!bool {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatch(alloc, res);
             }
@@ -82,7 +82,7 @@ pub const ResponseDispatcher = struct {
         };
     }
 
-    pub fn dispatch(self: @This(), alloc: Allocator, res: RpcResponse) anyerror!void {
+    pub fn dispatch(self: @This(), alloc: Allocator, res: RpcResponse) anyerror!bool {
         return self.dispatch_fn(self.impl_ptr, alloc, res);
     }
 };
@@ -96,6 +96,7 @@ pub const DispatchResult = union(enum) {
     const Self = @This();
 
     none:           void,               // No result, for notification call.
+    end_stream:     void,               // Handler wants to end the current streaming session.
     result:         []const u8,         // JSON string for result value.
     err:            struct {
         code:       ErrorCode,
@@ -106,6 +107,11 @@ pub const DispatchResult = union(enum) {
     /// Create a DispatchResult with no result, for JSON-RPC notification.
     pub fn asNone() Self {
         return .{ .none = {} };
+    }
+
+    /// Create a DispatchResult with end_stream to end the current streaming session.
+    pub fn asEndStream() Self {
+        return .{ .end_stream = {} };
     }
 
     /// Create a DispatchResult with a result encoded in a JSON string.

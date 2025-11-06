@@ -114,6 +114,7 @@ const HelloDispatcher = struct {
             .none => {},
             .result => |result| self.alloc.free(result),
             .err => {},
+            .end_stream => {},
         }
     }
 };

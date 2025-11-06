@@ -44,6 +44,7 @@ pub const DispatchErrors = dispatcher.DispatchErrors;
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;
 pub const MessagePipeline = pipeline.MessagePipeline;
+pub const RunStatus = pipeline.RunStatus;
 
 pub const Logger = logger.Logger;
 pub const NopLogger = logger.NopLogger;

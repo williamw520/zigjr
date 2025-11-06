@@ -301,7 +301,7 @@ const ResDispatcher = struct {
     log_json:   bool,
     json_opt:   StringifyOptions,
 
-    pub fn dispatch(self: *@This(), alloc: Allocator, res: RpcResponse) anyerror!void {
+    pub fn dispatch(self: *@This(), alloc: Allocator, res: RpcResponse) anyerror!bool {
         // res.result has the result JSON object from server.
         // res.id is the request id; dispatch based on the id recorded in request_worker().
         if (res.hasErr()) {
@@ -315,6 +315,7 @@ const ResDispatcher = struct {
                 std.debug.print("{s}\n", .{result_json});
             }
         }
+        return true;
     }
 };
 

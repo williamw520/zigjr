@@ -33,6 +33,7 @@ const EchoDispatcher = struct {
             // Result is freed with self.alloc
             .result => |json| self.alloc.free(json),
             .err => {},
+            .end_stream => {},
         }
     }
 };
@@ -310,7 +311,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
 
         var my_response_dispatcher = struct {
             called: bool = false,
-            pub fn dispatch(self: *@This(), _: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(self: *@This(), _: Allocator, res: zigjr.RpcResponse) !bool {
                 self.called = true;
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql("5a"))
@@ -319,6 +320,7 @@ test "DelimiterStream.streamResponses on JSON responses, single param, id" {
                     try testing.expectEqualSlices(u8, res.result.string, "xyz");
                 if (res.id.eql("5c"))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.InvalidParams));
+                return true;
             }
         } {};
 
@@ -359,7 +361,7 @@ test "responsesByLength on JSON responses, single param, id" {
         defer writer_buf.deinit();
         try zigjr.stream.requestsByContentLength(alloc, &reader, &writer_buf.writer,
                                                  RequestDispatcher.implBy(&dispatcher), .{});
-        // std.debug.print("request_jsons: ##\n{s}##\n", .{write_buffer.items});
+        // std.debug.print("request_jsons: ##\n{s}##\n", .{writer_buf.written()});
 
         try testing.expectEqualSlices(u8, writer_buf.written(),
             \\Content-Length: 40
@@ -373,7 +375,7 @@ test "responsesByLength on JSON responses, single param, id" {
 
         var my_response_dispatcher = struct {
             called: bool = false,
-            pub fn dispatch(self: *@This(), _: Allocator, res: zigjr.RpcResponse) !void {
+            pub fn dispatch(self: *@This(), _: Allocator, res: zigjr.RpcResponse) !bool {
                 self.called = true;
                 // std.debug.print("RpcResponse: {any}\n", .{res});
                 if (res.id.eql(2))
@@ -382,6 +384,7 @@ test "responsesByLength on JSON responses, single param, id" {
                     try testing.expectEqual(res.result.integer, 0);
                 if (res.id.eql(99))
                     try testing.expectEqual(res.err().code, @intFromEnum(ErrorCode.MethodNotFound));
+                return true;
             }
         } {};
 
