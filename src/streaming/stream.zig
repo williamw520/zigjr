@@ -142,13 +142,13 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
 
     while (true) {
         frame_data.reset();
-        const has_more = frame.readContentLengthFrame(reader, &frame_data) catch |err| {
+        const has_data = frame.readContentLengthFrame(reader, &frame_data) catch |err| {
             if (err == JrErrors.MissingContentLengthHeader and options.recover_on_missing_header) {
                 continue;
             }
             return err;     // unrecoverable error while reading from reader.
         };
-        if (!has_more)
+        if (!has_data)
             break;
 
         const request_json = std.mem.trim(u8, frame_data.getContent(), " \t");

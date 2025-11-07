@@ -153,12 +153,12 @@ pub fn readHttpHeaders(reader: *std.Io.Reader, frame_data: *FrameData) !void {
 pub fn readContentLengthFrame(reader: *std.Io.Reader, frame_data: *FrameData) !bool {
     readHttpHeaders(reader, frame_data) catch |err| {
         if (err == error.EndOfStream)
-            return false;   // no more data.
-        return err;         // unrecoverable error while reading from reader.
+            return false;           // no more data.
+        return err;                 // unrecoverable error while reading from reader.
     };
     if (frame_data.content_length) |len| {
         _ = try reader.stream(frame_data.bufWriter(), .limited(len));
-        return true;            // has content data.
+        return true;                // has content data.
     } else {
         return JrErrors.MissingContentLengthHeader;
     }

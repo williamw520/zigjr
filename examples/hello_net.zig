@@ -72,18 +72,18 @@ fn runServer(is_http: bool, address: []const u8, dispatcher: *const zigjr.RpcDis
 }
 
 fn httpWorker(dispatcher: *const zigjr.RpcDispatcher, connection: std.net.Server.Connection) void {
-    std.debug.print("Start session (netWorker).\n", .{});
+    std.debug.print("Start HTTP session.\n", .{});
 
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
     runHttpSession(alloc, dispatcher, connection) catch |e| {
-        std.debug.print("Error in runSession: {any}\n", .{e});
+        std.debug.print("Error in HTTP session: {any}\n", .{e});
     };
 
     connection.stream.close();
-    std.debug.print("End session (netWorker).\n", .{});
+    std.debug.print("End HTTP session.\n", .{});
 }
 
 fn netWorker(dispatcher: *const zigjr.RpcDispatcher, connection: std.net.Server.Connection) void {
@@ -101,8 +101,10 @@ fn netWorker(dispatcher: *const zigjr.RpcDispatcher, connection: std.net.Server.
     std.debug.print("End session (netWorker).\n", .{});
 }
 
-fn runHttpSession(alloc: Allocator, dispatcher: *const zigjr.RpcDispatcher,
+fn runHttpSession(alloc: Allocator, rpc_dispatcher: *const zigjr.RpcDispatcher,
                   connection: std.net.Server.Connection) !void {
+    const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
+    const dispatcher = zigjr.RequestDispatcher.implBy(rpc_dispatcher_ptr);
     var rbuf: [1024]u8  = undefined;
     var wbuf: [1024]u8  = undefined;
     var s_reader        = connection.stream.reader(&rbuf);
@@ -111,15 +113,26 @@ fn runHttpSession(alloc: Allocator, dispatcher: *const zigjr.RpcDispatcher,
     const writer        = &s_writer.interface;
     var dbg_logger      = zigjr.DbgLogger{};
     const logger        = zigjr.Logger.implBy(&dbg_logger);
+    var frame           = zigjr.frame.FrameData.init(alloc);
+    defer frame.deinit();
+    var pipeline        = zigjr.RequestPipeline.init(alloc, dispatcher, logger);
+    defer pipeline.deinit();
 
-    // TODO: Read and parse HTTP line, though ZigJR's header parser can ignore them.
+    // TODO: Read and parse the HTTP request line, though ZigJR's header parser can ignore them.
 
-    // Run until client disconnects.
-    zigjr.stream.runByContentLength(alloc, reader, writer, dispatcher, .{
-        .logger = logger
-    }) catch |e| {
-        if (e == error.ReadFailed) return else return e;
-    };
+    const has_data = try zigjr.frame.readContentLengthFrame(reader, &frame);
+    if (!has_data)
+        return;
+
+    const request_json = std.mem.trim(u8, frame.getContent(), " \t");
+    if (try pipeline.runRequestToJson(alloc, request_json)) |response| {
+        defer alloc.free(response);
+        try writer.writeAll("HTTP/1.1 200 OK\r\n");
+        try zigjr.frame.writeContentLengthFrame(writer, response);
+        try writer.flush();
+    } else {
+        std.debug.print("No response\n", .{});
+    }
 }
 
 fn runNetSession(alloc: Allocator, dispatcher: *const zigjr.RpcDispatcher,
