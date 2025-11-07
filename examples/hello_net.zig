@@ -22,16 +22,18 @@ pub fn main() !void {
     defer args.deinit();
     args.parse() catch { usage(); return; };
 
-    const run_http = if (args.is_http) true else if (args.is_net) false
+    const run_http = if (args.is_http) true else if (args.is_tcp) false
     else {
         usage();
         return;
     };
+    const address = try std.fmt.allocPrint(alloc, "0.0.0.0:{s}", .{args.port});
+    defer alloc.free(address);
+    std.debug.print("Server listening at port: {s}\n", .{args.port});
 
     const rpc_dispatcher = try createDispatcher(alloc);
     defer destroyDispatcher(alloc, rpc_dispatcher);
-
-    try runServer(run_http, rpc_dispatcher);
+    try runServer(run_http, address, rpc_dispatcher);
 }
 
 fn createDispatcher(alloc: Allocator) !*zigjr.RpcDispatcher {
@@ -54,8 +56,7 @@ fn destroyDispatcher(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher) void {
     alloc.destroy(dispatcher);
 }
 
-fn runServer(is_http: bool, dispatcher: *const zigjr.RpcDispatcher) !void {
-    const address   = "0.0.0.0:25354";
+fn runServer(is_http: bool, address: []const u8, dispatcher: *const zigjr.RpcDispatcher) !void {
     const net_addr  = try std.net.Address.parseIpAndPort(address);
     var server      = try net_addr.listen(.{ .reuse_address = true });
     defer server.deinit();
@@ -184,10 +185,11 @@ fn endSession() zigjr.DispatchResult {
 
 fn usage() void {
     std.debug.print(
-        \\Usage:  hello_net [--http | --net]
+        \\Usage:  hello_net [--http | --tcp] [--port N]
         \\
         \\  --http - runs the server over HTTP. JSON-RPC messages using Content-Length headers.
-        \\  --net  - runs the server over plain TCP. JSON-RPC messages using LF delimiters.
+        \\  --tcp  - runs the server over plain TCP. JSON-RPC messages using LF delimiters.
+        \\  --port N - set the listening port of the server.
         \\
         , .{});
 }
@@ -198,7 +200,8 @@ const CmdArgs = struct {
 
     arg_itr:    std.process.ArgIterator,
     is_http:    bool = false,
-    is_net:     bool = false,
+    is_tcp:     bool = false,
+    port:       []const u8 = "35354",
 
     fn init(alloc: Allocator) !CmdArgs {
         var args = CmdArgs { .arg_itr = try std.process.argsWithAllocator(alloc) };
@@ -216,8 +219,12 @@ const CmdArgs = struct {
             const arg = std.mem.sliceTo(argz, 0);
             if (std.mem.eql(u8, arg, "--http")) {
                 self.is_http = true;
-            } else if (std.mem.eql(u8, arg, "--net")) {
-                self.is_net = true;
+            } else if (std.mem.eql(u8, arg, "--tcp")) {
+                self.is_tcp = true;
+            } else if (std.mem.eql(u8, arg, "--port")) {
+                if (argv.next())|argz1| {
+                    self.port = std.mem.sliceTo(argz1, 0);
+                }
             }
         }
     }
