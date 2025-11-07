@@ -120,8 +120,9 @@ pub const DelimiterOptions = struct {
 /// Runs a loop to read a stream of Content-length based JSON request messages (frames) from the reader,
 /// handle each one with the RpcDispatcher, and write the JSON responses to the buffered_writer.
 pub fn runByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
-                          rpc_dispatcher: *RpcDispatcher, options: ContentLengthOptions) !void {
-    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher);
+                          rpc_dispatcher: *const RpcDispatcher, options: ContentLengthOptions) !void {
+    const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
+    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher_ptr);
     try requestsByContentLength(alloc, reader, writer, dispatcher, options);
 }
 
@@ -159,11 +160,11 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
         const run_status = try pipeline.runRequest(request_json, &response_buf.writer, .{});
         if (run_status.isReplied()) {
             try frame.writeContentLengthFrame(writer, response_buf.written());
+            try writer.flush();
             options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
         } else {
             options.logger.log("stream.requestsByContentLength", "response", "");
         }
-
         if (run_status.end_stream) {
             break;
         }
