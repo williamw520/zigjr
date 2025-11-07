@@ -95,7 +95,7 @@ Response: {"jsonrpc": "2.0", "result": "Hello Spiderman", "id": 2}
 ## Installation
 
 Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page,
-and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.6.0.zip
+and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.7.0.zip
 
 Use `zig fetch` to add the ZigJR package to your project's dependencies. Replace `<VERSION>` with the version you selected.
 ```shell
@@ -569,6 +569,7 @@ The project has a number of examples showing how to build applications with ZigJ
 * [dispatcher_hello.zig](examples/dispatcher_hello.zig): Custom dispatcher.
 * [mcp_hello.zig](examples/mcp_hello.zig): A basic MCP server written from the ground up.
 * [lsp_client.zig](examples/lsp_client.zig): A LSP client interacting with LSP server.
+* [hello_net.zig](examples/hello_net.zig): A JSON-RPC server over network (HTTP or TCP).
 
 Check out [examples](examples) for other examples.
 
@@ -726,6 +727,23 @@ This dumps the LSP message in raw format, i.e. with the message frame headers.
 The `--stderr` option pipes the LSP server subprocess' stderr to stderr.
 ```shell
     lsp_client --dump --stderr /opt/zls/zls.exe
+```
+
+### Run the Network Server Example
+
+```shell
+    hello_net --tcp
+```
+Runs the `hello_net` server in TCP mode. Use clients like `telnet` or `netcat` to interact with the server.
+The JSON-RPC messages are delimited with LF.  See `data/hello.json` for sample data.
+
+```shell
+    hello_net --http
+```
+Runs the `hello_net` server in HTTP mode. Use a client like `curl` for testing.
+```shell
+curl localhost:15354 --request POST --json @data/hello.json
+curl localhost:15354 --request POST --json @data/hello_name.json
 ```
 
 
