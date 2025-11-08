@@ -426,6 +426,27 @@ Typically the normal error handling just returns the error code to the client.
 `DispatchResult` let you set the error code, error message, and additional error data
 to send back to the client.
 
+#### End-Stream Return Value
+Sometimes you want to end the streaming session of JSON-RPC requests and responses
+by a user's command coming from the request. E.g. the client sends a request as,
+```
+Request:  {"jsonrpc": "2.0", "method": "end-session"}
+```
+Your handler handles the `end-session` method and can return a `DispatchResult.end_stream` value
+to tell the calling streaming service to end its session. E.g.
+```zig
+    ...
+    try rpc_dispatcher.add("end-session", endSession);
+    ...
+
+fn endSession() zigjr.DispatchResult {
+    return zigjr.DispatchResult.asEndStream();
+}
+```
+
+See [hello_net.zig](examples/hello_net.zig) in TCP model for example. 
+Send a `{"jsonrpc": "2.0", "method": "end-session"}` message to it for test.
+
 ### Error
 A handler function can have an error union with the return type. Any error returned will be 
 packaged into a JSON-RPC error response with the `InternalError` code.
