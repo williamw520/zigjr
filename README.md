@@ -443,9 +443,13 @@ fn endSession() zigjr.DispatchResult {
     return zigjr.DispatchResult.asEndStream();
 }
 ```
-
 See [hello_net.zig](examples/hello_net.zig) in TCP model for example. 
 Send a `{"jsonrpc": "2.0", "method": "end-session"}` message to it for test.
+
+#### Process Termination via JSON-RPC Message
+
+See the `endServer()` handler in [hello_net.zig](examples/hello_net.zig) for example. 
+Send a `{"jsonrpc": "2.0", "method": "end-server"}` message to it for test.
 
 ### Error
 A handler function can have an error union with the return type. Any error returned will be 

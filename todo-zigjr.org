@@ -54,6 +54,7 @@
 - Releases 1.8.0
   * Make the example hello_net.zig return a proper HTTP response in the --http mode.
   * Allow setting listening port in hello_net server example.
+  * Handling server termination command as a JSON-RPC command.
 
 - Releases 1.7.0
   * Add a network based JSON-RPC server example, over either HTTP or plain TCP.
