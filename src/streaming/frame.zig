@@ -165,6 +165,11 @@ pub fn readContentLengthFrame(reader: *std.Io.Reader, frame_data: *FrameData) !b
 }
 
 
+pub fn writeHttpStatusLine(writer: *std.Io.Writer, http_version: []const u8,
+                           status_code: usize, status: []const u8) !void {
+    try writer.print("HTTP/{s} {d} {s}\r\n", .{http_version, status_code, status});
+}
+
 /// Write a data frame to a writer, with a header section containing
 /// the Content-Length header for the data.
 pub fn writeContentLengthFrame(writer: *std.Io.Writer, content: []const u8) !void {

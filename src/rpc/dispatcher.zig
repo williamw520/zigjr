@@ -27,6 +27,8 @@ pub const RequestDispatcher = struct {
     // Interface is implemented by the 'impl' object.
     pub fn implBy(impl_obj: anytype) RequestDispatcher {
         const ImplType = @TypeOf(impl_obj);
+        if (@typeInfo(ImplType) != .pointer)
+            @compileError("impl_obj should be a pointer, but its type is " ++ @typeName(ImplType));
 
         const Delegate = struct {
             fn dispatch(impl_ptr: *anyopaque, req: RpcRequest) anyerror!DispatchResult {
@@ -155,6 +157,15 @@ pub const DispatchResult = union(enum) {
     }
 
 };
+
+// Force a pointer type to a const pointer type.
+fn ptrToConstPtrType(comptime T: type) type {
+    var ptr = @typeInfo(T).pointer;
+    ptr.is_const = true;
+    return @Type(.{
+        .pointer = ptr,
+    });
+}
 
 
 pub const DispatchErrors = error {
