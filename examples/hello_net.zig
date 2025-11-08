@@ -27,16 +27,33 @@ pub fn main() !void {
         usage();
         return;
     };
-    const address = try std.fmt.allocPrint(alloc, "0.0.0.0:{s}", .{args.port});
-    defer alloc.free(address);
+
+    const listen_address = try std.fmt.allocPrint(alloc, "0.0.0.0:{s}", .{args.port});
+    defer alloc.free(listen_address);
+    const local_address = try std.fmt.allocPrint(alloc, "127.0.0.1:{s}", .{args.port});
+    defer alloc.free(local_address);
     std.debug.print("Server listening at port: {s}\n", .{args.port});
 
-    const rpc_dispatcher = try createDispatcher(alloc);
+    var ctx = ServerCtx {
+        .is_http = run_http,
+        .listen_address = listen_address,
+        .local_address = local_address,
+        .end_server = std.atomic.Value(bool).init(false),
+    };
+
+    const rpc_dispatcher = try createDispatcher(alloc, &ctx);
     defer destroyDispatcher(alloc, rpc_dispatcher);
-    try runServer(run_http, address, rpc_dispatcher);
+    try runServer(&ctx, rpc_dispatcher);
 }
 
-fn createDispatcher(alloc: Allocator) !*zigjr.RpcDispatcher {
+const ServerCtx = struct {
+    is_http: bool,
+    listen_address: []const u8,
+    local_address: []const u8,
+    end_server: std.atomic.Value(bool),
+};
+
+fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher {
     var rpc_dispatcher = try alloc.create(zigjr.RpcDispatcher);
     rpc_dispatcher.* = zigjr.RpcDispatcher.init(alloc);
     
@@ -47,6 +64,7 @@ fn createDispatcher(alloc: Allocator) !*zigjr.RpcDispatcher {
     try rpc_dispatcher.add("say", say);
     try rpc_dispatcher.add("opt-text", optionalText);
     try rpc_dispatcher.add("end-session", endSession);
+    try rpc_dispatcher.addWithCtx("end-server", ctx, endServer);
 
     return rpc_dispatcher;
 }
@@ -56,14 +74,19 @@ fn destroyDispatcher(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher) void {
     alloc.destroy(dispatcher);
 }
 
-fn runServer(is_http: bool, address: []const u8, dispatcher: *zigjr.RpcDispatcher) !void {
-    const net_addr  = try std.net.Address.parseIpAndPort(address);
+fn runServer(ctx: *ServerCtx, dispatcher: *zigjr.RpcDispatcher) !void {
+    const net_addr  = try std.net.Address.parseIpAndPort(ctx.listen_address);
     var server      = try net_addr.listen(.{ .reuse_address = true });
     defer server.deinit();
 
     while (true) {
+        if (ctx.end_server.load(std.builtin.AtomicOrder.seq_cst))
+            break;
         const connection = try server.accept();
-        if (is_http) {
+        if (ctx.end_server.load(std.builtin.AtomicOrder.seq_cst))
+            break;
+
+        if (ctx.is_http) {
             _ = try std.Thread.spawn(.{}, httpWorker, .{dispatcher, connection});
         } else {
             _ = try std.Thread.spawn(.{}, netWorker, .{dispatcher, connection});
@@ -124,7 +147,8 @@ fn runHttpSession(alloc: Allocator, rpc_dispatcher: *zigjr.RpcDispatcher,
     if (!has_data)
         return;
 
-    const request_json = std.mem.trim(u8, frame.getContent(), " \t");
+    const request_json = std.mem.trim(u8, frame.getContent(), " \t\n\r");
+    // std.debug.print("content_length: {any}, request_json: |{s}|\n", .{ frame.content_length, request_json });
     if (try pipeline.runRequestToJson(alloc, request_json)) |response| {
         defer alloc.free(response);
         try zigjr.frame.writeHttpStatusLine(writer, "1.1", 200, "OK");  // HTTP/1.1 200 OK\r\n
@@ -153,6 +177,11 @@ fn runNetSession(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher,
     };
 }
 
+fn touchServer(address: []const u8) !void {
+    const net_addr  = try std.net.Address.parseIpAndPort(address);
+    var stream      = try std.net.tcpConnectToAddress(net_addr);
+    defer stream.close();
+}
 
 // A handler with no parameter and returns a string.
 fn hello() []const u8 {
@@ -192,6 +221,16 @@ fn optionalText(text: ?[] const u8) []const u8 {
 }
 
 fn endSession() zigjr.DispatchResult {
+    return zigjr.DispatchResult.asEndStream();
+}
+
+fn endServer(ctx: *ServerCtx) zigjr.DispatchResult {
+    // Set server termination flag.
+    ctx.end_server.store(true, std.builtin.AtomicOrder.seq_cst);
+    // Need to wake up server blocking at the .accept() call.
+    touchServer(ctx.local_address) catch |e| {
+        std.debug.print("Error in touching server at {s}. Error: {any}\n", .{ctx.local_address, e});
+    };
     return zigjr.DispatchResult.asEndStream();
 }
 

@@ -1,0 +1,4 @@
+Content-Length: 42
+
+{"jsonrpc": "2.0", "method": "end-server"}
+
