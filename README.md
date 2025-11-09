@@ -1,7 +1,5 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
-**(Note: Version 1.3.0+ has been migrated to use the new API in Zig 0.15.1. There are breaking changes.)**
-
 ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
 with message streaming on top, and a smart function dispatcher that turns native Zig functions 
 into RPC handlers. It aims to make building JSON-RPC applications in Zig simple and straightforward.
@@ -474,7 +472,7 @@ This example uses a `DbgLogger` in a request pipeline. This logger prints to `st
 ```zig
     var d_logger = zigjr.DbgLogger{};
     const pipeline = zigjr.pipeline.RequestPipeline.init(alloc, 
-        RequestDispatcher.implBy(&rpc_dispatcher), zigjr.Logger.implBy(&d_logger));
+        RequestDispatcher.implBy(&rpc_dispatcher), d_logger.asLogger());
     
 ```
 #### FileLogger
@@ -485,7 +483,7 @@ when running as a sub-process in a MCP host.
 ```zig
     var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
     defer f_logger.deinit();
-    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = Logger.implBy(&f_logger) });
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{ .logger = f_logger.asLogger() });
 ```
 #### Custom Logger
 This example uses a custom logger in a request pipeline.

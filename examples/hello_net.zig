@@ -134,8 +134,7 @@ fn runHttpSession(alloc: Allocator, rpc_dispatcher: *zigjr.RpcDispatcher,
     const reader        = s_reader.interface();
     const writer        = &s_writer.interface;
     var dbg_logger      = zigjr.DbgLogger{};
-    const logger        = zigjr.Logger.implBy(&dbg_logger);
-    var pipeline        = zigjr.RequestPipeline.init(alloc, dispatcher, logger);
+    var pipeline        = zigjr.RequestPipeline.init(alloc, dispatcher, dbg_logger.asLogger());
     var frame           = zigjr.frame.FrameData.init(alloc);
 
     defer pipeline.deinit();
@@ -168,10 +167,9 @@ fn runNetSession(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher,
     const reader        = s_reader.interface();
     const writer        = &s_writer.interface;
     var dbg_logger      = zigjr.DbgLogger{};
-    const logger        = zigjr.Logger.implBy(&dbg_logger);
 
     zigjr.stream.runByDelimiter(alloc, reader, writer, dispatcher, .{
-        .logger = logger
+        .logger = dbg_logger.asLogger()
     }) catch |e| {
         if (e == error.ReadFailed) return else return e;
     };

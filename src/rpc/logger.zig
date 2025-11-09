@@ -75,17 +75,23 @@ var nopLogger = NopLogger{};
 
 /// A logger that prints to std.dbg, implemented the Logger interface.
 pub const DbgLogger = struct {
-    pub fn start(_: *@This(), message: []const u8) void {
+    pub fn start(_: *DbgLogger, message: []const u8) void {
         std.debug.print("{s}\n", .{message});
     }
 
-    pub fn log(_: *@This(), source: []const u8, operation: []const u8, message: []const u8) void {
+    pub fn log(_: *DbgLogger, source: []const u8, operation: []const u8, message: []const u8) void {
         std.debug.print("[{s}] {s} - {s}\n", .{source, operation, message});
     }
 
-    pub fn stop(_: *@This(), message: []const u8) void {
+    pub fn stop(_: *DbgLogger, message: []const u8) void {
         std.debug.print("{s}\n", .{message});
     }
+
+    /// Return a Logger interface for this DbgLogger.
+    pub fn asLogger(self: *DbgLogger) Logger {
+        return Logger.implBy(self);
+    }
+    
 };
 
 
@@ -110,12 +116,12 @@ pub const FileLogger = struct {
         };
     }
 
-    pub fn deinit(self: *@This()) void {
+    pub fn deinit(self: *FileLogger) void {
         self.file.close();
         self.alloc.free(self.write_buf);
     }
 
-    pub fn start(self: *@This(), message: []const u8) void {
+    pub fn start(self: *FileLogger, message: []const u8) void {
         const ts_sec = std.time.timestamp();
         self.fwriter.interface.print("Timestamp {d} - {s}\n", .{ts_sec, message})
             catch |err| std.debug.print("Error while printing in start(). {any}\n", .{err});
@@ -123,7 +129,7 @@ pub const FileLogger = struct {
             catch |err| std.debug.print("Error while flushing in log(). {any}\n", .{err});
     }
 
-    pub fn log(self: *@This(), source: []const u8, operation: []const u8, message: []const u8) void {
+    pub fn log(self: *FileLogger, source: []const u8, operation: []const u8, message: []const u8) void {
         self.count += 1;
         self.fwriter.interface.print("{}: [{s}] {s} - {s}\n", .{self.count, source, operation, message})
             catch |err| std.debug.print("Error while printing in log(). {any}\n", .{err});
@@ -131,7 +137,7 @@ pub const FileLogger = struct {
             catch |err| std.debug.print("Error while flushing in log(). {any}\n", .{err});
     }
     
-    pub fn stop(self: *@This(), message: []const u8) void {
+    pub fn stop(self: *FileLogger, message: []const u8) void {
         const ts_sec = std.time.timestamp();
         self.fwriter.interface.print("Timestamp {d} - {s}\n\n", .{ts_sec, message})
             catch |err| std.debug.print("Error while printing in stop(). {any}\n", .{err});
@@ -148,7 +154,12 @@ pub const FileLogger = struct {
             }
         };
     }
-    
+
+    /// Return a Logger interface for this FileLogger.
+    pub fn asLogger(self: *FileLogger) Logger {
+        return Logger.implBy(self);
+    }
+
 };
 
 

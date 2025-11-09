@@ -55,11 +55,11 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    var logger = MyLogger{};
+    var my_logger = MyLogger{};
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
         try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher,
-                                        .{ .logger = zigjr.Logger.implBy(&logger) });
+                                        .{ .logger = zigjr.Logger.implBy(&my_logger) });
     } else if (args.by_length) {
         // Handle streaming of requests separated by the Content-Length header.
         try zigjr.stream.runByContentLength(alloc, stdin, stdout, &rpc_dispatcher, .{});
