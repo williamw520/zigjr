@@ -93,7 +93,7 @@ Response: {"jsonrpc": "2.0", "result": "Hello Spiderman", "id": 2}
 ## Installation
 
 Select a version of the library in the [Releases](https://github.com/williamw520/zigjr/releases) page,
-and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.8.0.zip
+and copy its asset URL. E.g. https://github.com/williamw520/zigjr/archive/refs/tags/1.9.0.zip
 
 Use `zig fetch` to add the ZigJR package to your project's dependencies. Replace `<VERSION>` with the version you selected.
 ```shell
