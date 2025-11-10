@@ -140,8 +140,8 @@ fn runHttpSession(alloc: Allocator, rpc_dispatcher: *zigjr.RpcDispatcher,
     defer pipeline.deinit();
     defer frame.deinit();
 
-    // TODO: Read and parse the HTTP request line, though ZigJR's header parser can ignore it.
-
+    try zigjr.frame.readHttpLine(reader, &frame);
+    std.debug.print("HTTP Line: {s} {s} {s}\n", .{ frame.http_method, frame.http_path, frame.http_version });
     const has_data = try zigjr.frame.readContentLengthFrame(reader, &frame);
     if (!has_data)
         return;

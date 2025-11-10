@@ -28,6 +28,9 @@ const Pos = [4]usize;
 pub const FrameData = struct {
     alloc:          Allocator,
     buf:            std.Io.Writer.Allocating,   // The header and content data of the whole frame.
+    http_method:    []const u8 = "",
+    http_path:      []const u8 = "",
+    http_version:   []const u8 = "",
     header_pos:     ArrayList(Pos),
     content_start:  usize,
     content_length: ?usize = null,
@@ -113,6 +116,21 @@ pub const FrameData = struct {
 
 };
 
+/// Read the HTTP request line.
+/// e.g. GET /index.html HTTP/1.1\r\n
+pub fn readHttpLine(reader: *std.Io.Reader, frame: *FrameData) !void {
+    const start_pos     = frame.currentPos();
+    const read_len      = try reader.streamDelimiter(frame.bufWriter(), '\n');
+    const end_pos       = frame.currentPos();
+    reader.toss(1);
+    if (read_len == 0) return;
+    const line          = frame.bufData()[start_pos..end_pos];
+    const trimmed       = std.mem.trim(u8, line, "\r\n");
+    var tokens          = std.mem.tokenizeAny(u8, trimmed, " ");
+    frame.http_method   = tokens.next() orelse "";
+    frame.http_path     = tokens.next() orelse "";
+    frame.http_version  = tokens.next() orelse "";
+}
 
 /// Read the HTTP-style headers of a data frame.
 /// Content not read yet after this call. Use `readContentLengthFrame()` instead.
