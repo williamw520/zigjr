@@ -29,24 +29,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    // Use a file-based logger since the executable is run in a MCP host
-    // as a sub-process and cannot log to the host's stdout.
-    var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
-    defer f_logger.deinit();
-
-    var registry = zigjr.RpcDispatcher.init(alloc);
-    defer registry.deinit();
-
-    // Register the MCP RPC methods.
-    // Pass the logger in as the context so handlers can also log to the log file.
-    try registry.addWithCtx("initialize", &f_logger, mcp_initialize);
-    try registry.addWithCtx("notifications/initialized", &f_logger, mcp_notifications_initialized);
-    try registry.addWithCtx("tools/list", &f_logger, mcp_tools_list);
-    try registry.addWithCtx("tools/call", &f_logger, mcp_tools_call);
-
-    // RpcRegistry has implemented the RequestDispatcher interface.
-    const dispatcher = zigjr.RequestDispatcher.implBy(&registry);
-
+    // Getting the stdin and stdout boilerplate.
     var stdin_buffer: [1024]u8 = undefined;
     var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
     const stdin = &stdin_reader.interface;
@@ -55,9 +38,24 @@ pub fn main() !void {
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
+    // Use a file-based logger since the executable is run in a MCP host
+    // as a sub-process and cannot log to the host's stdout.
+    var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
+    defer f_logger.deinit();
+
+    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    defer rpc_dispatcher.deinit();
+
+    // Register the MCP RPC methods.
+    // Pass the logger in as the context so handlers can also log to the log file.
+    try rpc_dispatcher.addWithCtx("initialize", &f_logger, mcp_initialize);
+    try rpc_dispatcher.addWithCtx("notifications/initialized", &f_logger, mcp_notifications_initialized);
+    try rpc_dispatcher.addWithCtx("tools/list", &f_logger, mcp_tools_list);
+    try rpc_dispatcher.addWithCtx("tools/call", &f_logger, mcp_tools_call);
+
     // Starts the JSON streaming pipeline from stdin to stdout.
-    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
-                                         .{ .logger = f_logger.asLogger() });
+    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher,
+                                    .{ .logger = f_logger.asLogger() });
 }
 
 // The MCP message handlers.
