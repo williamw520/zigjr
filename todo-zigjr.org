@@ -51,6 +51,10 @@
 
 * Releases
 
+- Releases 1.9.0
+  * Add the .asLogger() convenient method in DbgLogger and FileLogger for ease of usage.
+  * Add frame.readHttpLine() to parse the HTTP request line.
+
 - Releases 1.8.0
   * Make the example hello_net.zig return a proper HTTP response in the --http mode.
   * Allow setting listening port in hello_net server example.
