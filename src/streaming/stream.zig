@@ -121,8 +121,7 @@ pub const DelimiterOptions = struct {
 /// handle each one with the RpcDispatcher, and write the JSON responses to the buffered_writer.
 pub fn runByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
                           rpc_dispatcher: *RpcDispatcher, options: ContentLengthOptions) !void {
-    const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
-    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher_ptr);
+    const dispatcher = RequestDispatcher.implBy(rpc_dispatcher);
     try requestsByContentLength(alloc, reader, writer, dispatcher, options);
 }
 
