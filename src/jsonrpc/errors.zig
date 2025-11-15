@@ -41,6 +41,7 @@ pub const JrErrors = error {
     RequiredF64Float,
     RequiredU8SliceForString,
     RequiredU8ArrayForString,
+    ResponseHasError,
 } || WriteAllocError;
 
 pub const WriteAllocError = error{

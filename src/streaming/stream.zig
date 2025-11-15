@@ -26,8 +26,8 @@ const TRIM_SET = " \t\r\n";
 /// Runs a loop to read a stream of delimitered JSON request messages (frames) from the reader,
 /// handle each one with the RpcDispatcher, and write the JSON responses to the writer.
 pub fn runByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
-                      rpc_dispatcher: *const RpcDispatcher, options: DelimiterOptions) !void {
-    const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
+                      rpc_dispatcher: *RpcDispatcher, options: DelimiterOptions) !void {
+    const rpc_dispatcher_ptr = rpc_dispatcher;
     const dispatcher = RequestDispatcher.implBy(rpc_dispatcher_ptr);
     try requestsByDelimiter(alloc, reader, writer, dispatcher, options);
 }
@@ -120,7 +120,7 @@ pub const DelimiterOptions = struct {
 /// Runs a loop to read a stream of Content-length based JSON request messages (frames) from the reader,
 /// handle each one with the RpcDispatcher, and write the JSON responses to the buffered_writer.
 pub fn runByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,
-                          rpc_dispatcher: *const RpcDispatcher, options: ContentLengthOptions) !void {
+                          rpc_dispatcher: *RpcDispatcher, options: ContentLengthOptions) !void {
     const rpc_dispatcher_ptr = @constCast(rpc_dispatcher);
     const dispatcher = RequestDispatcher.implBy(rpc_dispatcher_ptr);
     try requestsByContentLength(alloc, reader, writer, dispatcher, options);

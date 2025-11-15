@@ -120,6 +120,21 @@ pub const RequestPipeline = struct {
             return .{};
         }        
     }
+
+    /// Run the request and parse the result JSON to type T.
+    /// The returned Parsed(T) should be freed with its .deinit().
+    /// Same behaviour as runRequest(). Mainly for testing.
+    /// This skips the steps decoding the response/result, and goes directly to the result object.
+    pub fn runRequestToResult(self: *RequestPipeline, alloc: Allocator,
+                              request_json: []const u8, comptime T: type) !?std.json.Parsed(T) {
+        var rpc_response_result = try self.runRequestToResponse(alloc, request_json);
+        defer rpc_response_result.deinit();
+        const rpc_response = try rpc_response_result.response();
+        if (rpc_response.hasErr()) return JrErrors.ResponseHasError;
+        if (!rpc_response.hasResult()) return null;
+        return try std.json.parseFromValue(T, alloc, rpc_response.result, .{});
+    }
+
 };
 
 fn processRpcBatch(reqs: []RpcRequest, dispatcher: RequestDispatcher,
