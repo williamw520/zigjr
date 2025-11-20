@@ -23,39 +23,27 @@ const DispatchErrors = zigjr.DispatchErrors;
 
 /// Uniform call object that can be stored in a hash map.
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
+/// RpcHandler and its invoke() calls are thread-safe in general; 
+/// the only caveat is the user context and the user defined handler need to be thread-safe.
 pub const RpcHandler = struct {
-    arena: *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
-    arena_alloc: Allocator,
     context: ?*anyopaque,
-    call: *const fn(context: ?*anyopaque, arena_alloc: Allocator, params_value: Value) anyerror!DispatchResult,
+    call: *const fn(context: ?*anyopaque, req_arena: Allocator, params_value: Value) anyerror!DispatchResult,
 
     /// Call the handler call fn with the JSON Value parameters.
-    pub fn invoke(self: *RpcHandler, params_value: Value) anyerror!DispatchResult {
-        return self.call(self.context, self.arena_alloc, params_value);
+    pub fn invoke(self: *RpcHandler, req_arena: Allocator, params_value: Value) anyerror!DispatchResult {
+        return self.call(self.context, req_arena, params_value);
     }
 
     /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-    pub fn invokeJson(self: *RpcHandler, params_json: []const u8) anyerror!DispatchResult {
+    pub fn invokeJson(self: *RpcHandler, req_arena: Allocator, params_json: []const u8) anyerror!DispatchResult {
         const trimmed = std.mem.trim(u8, params_json, " ");
         if (trimmed.len == 0) {
-            return self.call(self.context, self.arena_alloc, .{ .null = {} });
+            return self.call(self.context, req_arena, .{ .null = {} });
         } else {
-            const parsed = try std.json.parseFromSlice(Value, self.arena_alloc, trimmed, .{});
+            const parsed = try std.json.parseFromSlice(Value, req_arena, trimmed, .{});
             defer parsed.deinit();
-            return self.call(self.context, self.arena_alloc, parsed.value);
+            return self.call(self.context, req_arena, parsed.value);
         }
-    }
-
-    /// Reset arena memory accumulated at each invoke()/invokeJson() call.
-    /// The frequency of reset is up to the caller. It can be for each invoke() or batched up.
-    pub fn reset(self: *RpcHandler) void {
-        _ = self.arena.reset(.{ .retain_with_limit = 1024 });
-    }
-
-    pub fn deinit(self: *RpcHandler) void {
-        self.arena.deinit();
-        const backing_alloc = self.arena.child_allocator;
-        backing_alloc.destroy(self.arena);
     }
 };
 
@@ -95,7 +83,7 @@ pub const RpcHandler = struct {
 /// stringified to JSON.  If the function has already built its own JSON string, it can
 /// return it in a JsonStr struct, which prevents it from being stringified again.
 /// 
-pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allocator) !RpcHandler {
+pub fn makeRpcHandler(context: anytype, comptime F: anytype) !RpcHandler {
     const hinfo = getHandlerInfo(F, context);
     try validateHandler(hinfo);
 
@@ -128,11 +116,7 @@ pub fn makeRpcHandler(context: anytype, comptime F: anytype, backing_alloc: Allo
         }
     };
 
-    const arena_ptr = try backing_alloc.create(ArenaAllocator);
-    arena_ptr.* = ArenaAllocator.init(backing_alloc);
     return .{
-        .arena = arena_ptr,
-        .arena_alloc = arena_ptr.allocator(),
         .context = if (hinfo.has_ctx) context else null,
         .call = wrapper.call,
     };

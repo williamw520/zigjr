@@ -28,7 +28,9 @@ const json_call = @import("json_call.zig");
 /// Extended handler: pre-dispatch handler, called before the request is dispatched.
 pub const OnBeforeFn    = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest) void;
 /// Extended handler: post-dispatch handler, called after the request has been dispatched.
-pub const OnAfterFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, result: DispatchResult) void;
+pub const OnAfterFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, dresult: DispatchResult) void;
+/// Extended handler: on-dispatch-end, called when dispatchEnd() is called.
+pub const OnEndFn       = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, dresult: DispatchResult) void;
 /// Extended handler: on-error handler, called when the request causes an error.
 pub const OnErrorFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, err: anyerror) void;
 /// Extended handler: fallback handler, called when no handler is found for the request's method.
@@ -37,42 +39,40 @@ pub const OnFallbackFn  = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequ
 
 /// Maintain a list of handlers to handle the RPC requests.
 /// Implements the RequestDispatcher interface.
+/// The dispatcher is thread-safe in general once it's set up, as long as
+/// the addXX and setXX() methods are not called afterward.
 pub const RpcDispatcher = struct {
     const Self = @This();
 
-    alloc:              Allocator,
     handlers:           StringHashMap(json_call.RpcHandler),
     on_before_fn:       *const OnBeforeFn,
     on_after_fn:        *const OnAfterFn,
+    on_end_fn:          *const OnEndFn,
     on_error_fn:        *const OnErrorFn,
     on_fallback_fn:     ?*const OnFallbackFn = null,
     on_before_ctx:      *anyopaque,
     on_after_ctx:       *anyopaque,
+    on_end_ctx:         *anyopaque,
     on_error_ctx:       *anyopaque,
     on_fallback_ctx:    *anyopaque,
 
     pub fn init(alloc: Allocator) Self {
         return .{
-            .alloc = alloc,
             .handlers = StringHashMap(json_call.RpcHandler).init(alloc),
             .on_before_fn   = onBeforeNop,
             .on_after_fn    = onAfterNop,
+            .on_end_fn      = onEndNop,
             .on_error_fn    = onErrorNop,
             .on_fallback_fn = null,
             .on_before_ctx  = &NopCtx,
             .on_after_ctx   = &NopCtx,
+            .on_end_ctx     = &NopCtx,
             .on_error_ctx   = &NopCtx,
             .on_fallback_ctx= &NopCtx,
         };
     }
 
     pub fn deinit(self: *Self) void {
-        // Clean up any contexts owned by the RpcHandler entries
-        var it = self.handlers.iterator();
-        while (it.next()) |entry| {
-            var rpc_handler = entry.value_ptr;
-            rpc_handler.deinit();
-        }
         self.handlers.deinit();
     }
 
@@ -82,12 +82,19 @@ pub const RpcDispatcher = struct {
         self.on_before_fn = on_before_fn;
     }
 
-    /// Install the post-dispatch extended handler, called after the request has been handled successfully
-    /// by a registered handler or the fallback handler.
+    /// Install the post-dispatch extended handler, called after the request has been handled 
+    /// successfully by a registered handler or the fallback handler.
     /// This won't be called with request resulted in error.  See setOnError().
     pub fn setOnAfter(self: *Self, ctx: ?*anyopaque, on_after_fn: *const OnAfterFn) void {
         self.on_after_ctx = ctx orelse &NopCtx;
         self.on_after_fn = on_after_fn;
+    }
+
+    /// Install the DispatchEnd extended handler, called after the result has been sent back.
+    /// This is for doing any cleanup per-request.
+    pub fn setOnEnd(self: *Self, ctx: ?*anyopaque, on_end_fn: *const OnEndFn) void {
+        self.on_end_ctx = ctx orelse &NopCtx;
+        self.on_end_fn = on_end_fn;
     }
 
     /// Install the on-error extended handler, called when the request causes an error.
@@ -111,14 +118,11 @@ pub const RpcDispatcher = struct {
         try validateMethod(method);
 
         // Free any existing handler of the same method name.
-        if (self.handlers.fetchRemove(method))|entry| {
-            var rpc_handler = entry.value;
-            rpc_handler.deinit();
-        }
+        _ = self.handlers.fetchRemove(method);
 
         var nul_context = {};   // dummy empty struct for no context.
         const ctx = if (@typeInfo(@TypeOf(context)) == .null) &nul_context else context;
-        const h = try json_call.makeRpcHandler(ctx, handler_fn, self.alloc);
+        const h = try json_call.makeRpcHandler(ctx, handler_fn);
         try self.handlers.put(method, h);
     }
 
@@ -129,34 +133,30 @@ pub const RpcDispatcher = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    pub fn dispatch(self: *const Self, req: RpcRequest) anyerror!DispatchResult {
-        self.on_before_fn(self.on_before_ctx, self.alloc, req);
-        return self.dispatchInner(req) catch |err| {
-            self.on_error_fn(self.on_error_ctx, self.alloc, req, err);
+    pub fn dispatch(self: *const Self, req_arena: Allocator, req: RpcRequest) anyerror!DispatchResult {
+        self.on_before_fn(self.on_before_ctx, req_arena, req);
+        return self.dispatchInner(req_arena, req) catch |err| {
+            self.on_error_fn(self.on_error_ctx, req_arena, req, err);
             return err;
         };
     }
 
-    fn dispatchInner(self: *const Self, req: RpcRequest) anyerror!DispatchResult {
+    fn dispatchInner(self: *const Self,  req_arena: Allocator, req: RpcRequest) anyerror!DispatchResult {
         if (self.handlers.getPtr(req.method)) |h| {
-            const result = try h.invoke(req.params);
-            self.on_after_fn(self.on_after_ctx, self.alloc, req, result);
+            const result = try h.invoke(req_arena, req.params);
+            self.on_after_fn(self.on_after_ctx, req_arena, req, result);
             return result;
         } else if (self.on_fallback_fn) |fallback_fn| {
-            const result = try fallback_fn(self.on_fallback_ctx, self.alloc, req);
-            self.on_after_fn(self.on_after_ctx, self.alloc, req, result);
+            const result = try fallback_fn(self.on_fallback_ctx, req_arena, req);
+            self.on_after_fn(self.on_after_ctx, req_arena, req, result);
             return result;
         } else {
             return DispatchErrors.MethodNotFound;
         }
     }
 
-    pub fn dispatchEnd(self: *const Self, req: RpcRequest, dresult: DispatchResult) void {
-        // RpcHandler uses ArenaAllocator so no need to explicitly free the dresult.
-        _=dresult;
-        if (self.handlers.getPtr(req.method))|h| {
-            h.reset();      // Reset after each request dispatching.
-        }
+    pub fn dispatchEnd(self: *const Self, req_arena: Allocator, req: RpcRequest, dresult: DispatchResult) void {
+        self.on_end_fn(self.on_end_ctx, req_arena, req, dresult);
     }
 
 };
@@ -170,6 +170,7 @@ fn validateMethod(method: []const u8) RegistrationErrors!void {
 
 fn onBeforeNop(_: *anyopaque, _: Allocator, _: RpcRequest) void {}
 fn onAfterNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: DispatchResult) void {}
+fn onEndNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: DispatchResult) void {}
 fn onErrorNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: anyerror) void {}
 fn onFallbackNop(_: *anyopaque, _: Allocator, _: RpcRequest) anyerror!DispatchResult {
     return DispatchResult.asNone();

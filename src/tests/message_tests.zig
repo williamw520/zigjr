@@ -102,7 +102,7 @@ test "Parsing valid request, single string param, string id" {
 
 
 const HelloDispatcher = struct {
-    pub fn dispatch(_: *@This(), req: RpcRequest) !DispatchResult {
+    pub fn dispatch(_: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
@@ -117,7 +117,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(_: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         // All result data are constant strings.  Nothing to free.
         switch (dresult) {
             .none => {},

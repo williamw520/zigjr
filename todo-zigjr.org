@@ -46,6 +46,8 @@
 ** DONE Add support for single optional parameter in rpc_pipeline.
 ** DONE Support optional "params" in JSON RPC 2.0.
 ** DONE Add network server example.
+** DONE Migrate allocator in RpcHandler to caller, to allow for per-thread allocator instead of global allocator in the RpcHandler.
+** TODO Per-request dispatch context.
 ** TODO Add request and notification message builders.
 
 

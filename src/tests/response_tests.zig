@@ -21,7 +21,7 @@ const DispatchErrors = zigjr.DispatchErrors;
 
 const HelloDispatcher = struct {
 
-    pub fn dispatch(_: *@This(), req: RpcRequest) !DispatchResult {
+    pub fn dispatch(_: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
@@ -36,7 +36,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(_: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         // All result data are constant strings.  Nothing to free.
         switch (dresult) {
             .none => {},
@@ -50,7 +50,7 @@ const HelloDispatcher = struct {
 const IntCalcDispatcher = struct {
     alloc:  Allocator,
 
-    pub fn dispatch(self: *@This(), req: RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
         if (req.hasError()) {
             return .withRequestErr(req);
         }
@@ -83,7 +83,7 @@ const IntCalcDispatcher = struct {
         };
     }
 
-    pub fn dispatchEnd(self: *@This(), _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             .result => self.alloc.free(dresult.result),
@@ -101,7 +101,7 @@ const IntCalcDispatcher = struct {
 const FloatCalcDispatcher = struct {
     alloc: Allocator,
 
-    pub fn dispatch(self: *@This(), req: RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
@@ -136,7 +136,7 @@ const FloatCalcDispatcher = struct {
         };
     }
 
-    pub fn dispatchEnd(self: *@This(), _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .result => self.alloc.free(dresult.result),
             .err => {},
@@ -150,7 +150,7 @@ const CounterDispatcher = struct {
     alloc:  Allocator,
     count:  isize = 0,
     
-    pub fn dispatch(self: *@This(), req: RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -164,7 +164,7 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(self: *@This(), _: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .result => self.alloc.free(dresult.result),
             else => {},

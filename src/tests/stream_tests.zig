@@ -15,7 +15,7 @@ const DispatchResult = zigjr.DispatchResult;
 const EchoDispatcher = struct {
     alloc:  Allocator,
 
-    pub fn dispatch(self: *@This(), req: zigjr.RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), _: Allocator, req: zigjr.RpcRequest) !DispatchResult {
         const params = req.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 1 or params.items[0] != .string) {
@@ -27,7 +27,7 @@ const EchoDispatcher = struct {
         };
     }
 
-    pub fn dispatchEnd(self: *@This(), _: zigjr.RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: Allocator, _: zigjr.RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .none => {},
             // Result is freed with self.alloc
@@ -42,7 +42,7 @@ const CounterDispatcher = struct {
     alloc:  Allocator,
     count:  isize = 0,
 
-    pub fn dispatch(self: *@This(), req: zigjr.RpcRequest) !DispatchResult {
+    pub fn dispatch(self: *@This(), _: Allocator, req: zigjr.RpcRequest) !DispatchResult {
         if (std.mem.eql(u8, req.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
@@ -56,7 +56,7 @@ const CounterDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(self: *@This(), _: zigjr.RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: *@This(), _: Allocator, _: zigjr.RpcRequest, dresult: DispatchResult) void {
         switch (dresult) {
             .result => self.alloc.free(dresult.result),
             else => {},

@@ -10,6 +10,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
+const ArenaAllocator = std.heap.ArenaAllocator;
 
 const zigjr = @import("../zigjr.zig");
 
@@ -47,17 +48,27 @@ const DupWriter = @import("../streaming/DupWriter.zig");
 pub const RequestOpts = struct {
 };
 
+/// Pipeline to process request.
+/// Not thread safe.  Each worker thread should have a separate pipeline instance.
 pub const RequestPipeline = struct {
     alloc:          Allocator,
+    arena_ptr:      *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
+    arena_alloc:    Allocator,
     req_dispatcher: RequestDispatcher,
     logger:         zigjr.Logger,
     buf_writer:     std.Io.Writer.Allocating,
 
-    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) @This() {
+    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) RequestPipeline {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline.init] Logging starts");
+
+        // const arena_ptr = try alloc.create(ArenaAllocator);
+        const arena_ptr = alloc.create(ArenaAllocator) catch unreachable;   // TODO: return error
+        arena_ptr.* = ArenaAllocator.init(alloc);
         return .{
             .alloc = alloc,
+            .arena_ptr = arena_ptr,
+            .arena_alloc = arena_ptr.allocator(),
             .req_dispatcher = req_dispatcher,
             .logger = l,
             .buf_writer = std.Io.Writer.Allocating.init(alloc),
@@ -67,6 +78,9 @@ pub const RequestPipeline = struct {
     pub fn deinit(self: *RequestPipeline) void {
         self.logger.stop("[RequestPipeline.deinit] Logging stops");
         self.buf_writer.deinit();
+        self.arena_ptr.deinit();
+        const backing_alloc = self.arena_ptr.child_allocator;
+        backing_alloc.destroy(self.arena_ptr);
     }
 
     /// Parse the JSON-RPC request message, run the dispatcher on request(s), 
@@ -84,8 +98,8 @@ pub const RequestPipeline = struct {
         defer parsed_request.deinit();
         self.buf_writer.clearRetainingCapacity();
         const run_status = switch (parsed_request.request_msg) {
-            .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
-            .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
+            .batch   => |reqs| try processRpcBatch(reqs, self.arena_alloc, self.req_dispatcher, &self.buf_writer.writer),
+            .request => |req|  try processRpcRequest(req, self.arena_alloc, self.req_dispatcher, "", &self.buf_writer.writer),
         };
         if (run_status.isReplied()) {
             try writer.writeAll(self.buf_writer.written());
@@ -137,14 +151,14 @@ pub const RequestPipeline = struct {
 
 };
 
-fn processRpcBatch(reqs: []RpcRequest, dispatcher: RequestDispatcher,
+fn processRpcBatch(reqs: []RpcRequest, req_arena: Allocator, dispatcher: RequestDispatcher,
                    writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
     var has_replied: bool = false;
     var end_stream: bool = false;
     try writer.writeAll("[");
     for (reqs) |req| {
         const delimiter = if (has_replied) ", " else "";
-        const r_status  = try processRpcRequest(req, dispatcher, delimiter, writer);
+        const r_status  = try processRpcRequest(req, req_arena, dispatcher, delimiter, writer);
         has_replied     = has_replied or r_status.isReplied();
         end_stream      = end_stream  or r_status.end_stream;
     }
@@ -154,13 +168,13 @@ fn processRpcBatch(reqs: []RpcRequest, dispatcher: RequestDispatcher,
 
 /// Handle request's error, dispatch the request, and write the response.
 /// Returns true if a response message is written, false for not as notification has no response.
-fn processRpcRequest(req: RpcRequest, req_dispatcher: RequestDispatcher,
+fn processRpcRequest(req: RpcRequest, req_arena: Allocator, req_dispatcher: RequestDispatcher,
                      delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
     if (try handleRequestError(req, writer)) return RunStatus.asRequestReplied();
-    errdefer req_dispatcher.dispatchEnd(req, DispatchResult.asNone());   // for std.Io.Writer.Error
-    const d_result = try dispatchRequest(req, req_dispatcher);
+    errdefer req_dispatcher.dispatchEnd(req_arena, req, DispatchResult.asNone());   // for std.Io.Writer.Error
+    const d_result = try dispatchRequest(req, req_arena, req_dispatcher);
     const r_status = try writeResponse(d_result, req, delimiter, writer);
-    req_dispatcher.dispatchEnd(req, d_result);
+    req_dispatcher.dispatchEnd(req_arena, req, d_result);
     return r_status;
 }
 
@@ -172,8 +186,8 @@ fn handleRequestError(req: RpcRequest, writer: *std.Io.Writer) std.Io.Writer.Err
     return false;
 }
 
-fn dispatchRequest(req: RpcRequest, req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
-    return req_dispatcher.dispatch(req) catch |err| {
+fn dispatchRequest(req: RpcRequest, req_arena: Allocator, req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
+    return req_dispatcher.dispatch(req_arena, req) catch |err| {
         // Turn dispatching error into DispatchResult.err.
         // Handle errors here so dispatchers don't have to worry about error handling.
         return DispatchResult.withAnyErr(err);
@@ -319,6 +333,9 @@ fn processResponseResult(alloc: Allocator, response_result: RpcResponseResult,
 
 
 pub const MessagePipeline = struct {
+    alloc:          Allocator,
+    arena_ptr:      *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
+    arena_alloc:    Allocator,
     req_dispatcher: RequestDispatcher,
     res_dispatcher: ResponseDispatcher,
     logger:         zigjr.Logger,
@@ -328,7 +345,14 @@ pub const MessagePipeline = struct {
                 logger: ?zigjr.Logger) MessagePipeline {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[MessagePipeline] Logging starts");
+        
+        // const arena_ptr = try alloc.create(ArenaAllocator);
+        const arena_ptr = alloc.create(ArenaAllocator) catch unreachable;   // TODO: return error
+        arena_ptr.* = ArenaAllocator.init(alloc);
         return .{
+            .alloc = alloc,
+            .arena_ptr = arena_ptr,
+            .arena_alloc = arena_ptr.allocator(),
             .logger = l,
             .req_dispatcher = req_dispatcher,
             .res_dispatcher = res_dispatcher,
@@ -339,32 +363,38 @@ pub const MessagePipeline = struct {
     pub fn deinit(self: *MessagePipeline) void {
         self.logger.stop("[MessagePipeline] Logging stops");
         self.buf_writer.deinit();
+        self.arena_ptr.deinit();
+        const backing_alloc = self.arena_ptr.child_allocator;
+        backing_alloc.destroy(self.arena_ptr);
     }
 
-    pub fn runMessage(self: *MessagePipeline, alloc: Allocator,
+    pub fn runMessage(self: *MessagePipeline, REMOVE_alloc: Allocator,
                       message_json: []const u8, writer: *std.Io.Writer,
                       req_opts: RequestOpts) anyerror!RunStatus {
         _=req_opts;
+        _=REMOVE_alloc;
 
         self.logger.log("runMessage", "message_json ", message_json);
-        var msg_result = parseRpcMessage(alloc, message_json);
+        var msg_result = parseRpcMessage(self.arena_alloc, message_json);
         defer msg_result.deinit();
         self.buf_writer.clearRetainingCapacity();
 
         switch (msg_result) {
             .request_result  => |request_result| {
                 const run_status = switch (request_result.request_msg) {
-                    .batch   => |reqs| try processRpcBatch(reqs, self.req_dispatcher, &self.buf_writer.writer),
-                    .request => |req|  try processRpcRequest(req, self.req_dispatcher, "", &self.buf_writer.writer),
+                    .batch   => |reqs| try processRpcBatch(reqs, self.arena_alloc, self.req_dispatcher, &self.buf_writer.writer),
+                    .request => |req|  try processRpcRequest(req, self.arena_alloc, self.req_dispatcher, "", &self.buf_writer.writer),
                 };
                 if (run_status.isReplied()) {
                     self.logger.log("runMessage", "req_response_json", self.buf_writer.written());
                     try writer.writeAll(self.buf_writer.written());
                 }
+                // TODO: _ = self.arena_ptr.reset(.{ .retain_with_limit = 1024 });
                 return run_status;
             },
             .response_result => |response_result| {
-                return try processResponseResult(alloc, response_result, self.res_dispatcher);
+                return try processResponseResult(self.arena_alloc, response_result, self.res_dispatcher);
+                // TODO: _ = self.arena_ptr.reset(.{ .retain_with_limit = 1024 });
             },
         }
     }
