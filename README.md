@@ -1,5 +1,8 @@
 # ZigJR - JSON-RPC 2.0 Library for Zig
 
+<strong>(Note: ZigJR 2.0 is under development. It will introduce some breaking changes. 
+The main changes are for adding session based handling support and multi-thread support.)</strong>
+
 ZigJR is a lightweight Zig library providing a full implementation of the JSON-RPC 2.0 protocol,
 with message streaming on top, and a smart function dispatcher that turns native Zig functions 
 into RPC handlers. It aims to make building JSON-RPC applications in Zig simple and straightforward.
