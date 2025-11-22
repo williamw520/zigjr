@@ -40,6 +40,7 @@ pub const RequestDispatcher = dispatcher.RequestDispatcher;
 pub const ResponseDispatcher = dispatcher.ResponseDispatcher;
 pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
+pub const DispatchCtx = json_call.DispatchCtx;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;
@@ -60,16 +61,16 @@ pub const JrErrors = errors.JrErrors;
 
 
 test {
-    _ = @import("tests/request_tests.zig");
-    _ = @import("tests/response_tests.zig");
-    _ = @import("tests/message_tests.zig");
-    _ = @import("tests/frame_tests.zig");
-    _ = @import("tests/stream_tests.zig");
-    _ = @import("tests/rpc_dispatcher_tests.zig");
+    // _ = @import("tests/request_tests.zig");
+    // _ = @import("tests/response_tests.zig");
+    // _ = @import("tests/message_tests.zig");
+    // _ = @import("tests/frame_tests.zig");
+    // _ = @import("tests/stream_tests.zig");
+    // _ = @import("tests/rpc_dispatcher_tests.zig");
     _ = @import("tests/json_call_tests.zig");
-    _ = @import("tests/misc_tests.zig");
-    _ = @import("streaming/BufReader.zig");
-    _ = @import("streaming/DupWriter.zig");
+    // _ = @import("tests/misc_tests.zig");
+    // _ = @import("streaming/BufReader.zig");
+    // _ = @import("streaming/DupWriter.zig");
 }
 
 

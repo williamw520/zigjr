@@ -68,6 +68,11 @@ pub const NopLogger = struct {
     pub fn start(_: @This(), _: []const u8) void {}
     pub fn log(_: @This(), _: []const u8, _: []const u8, _: []const u8) void {}
     pub fn stop(_: @This(), _: []const u8) void {}
+
+    /// Return a Logger interface for this DbgLogger.
+    pub fn asLogger(self: *NopLogger) Logger {
+        return Logger.implBy(self);
+    }
 };
 
 var nopLogger = NopLogger{};

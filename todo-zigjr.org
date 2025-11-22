@@ -47,9 +47,11 @@
 ** DONE Support optional "params" in JSON RPC 2.0.
 ** DONE Add network server example.
 ** DONE Migrate allocator in RpcHandler to caller, to allow for per-thread allocator instead of global allocator in the RpcHandler.
+** TODO Add DispatchCtx with user type support to handler.
 ** TODO Per-request dispatch context.
 *** TODO Per-request dispatch context setup on onBefore.
 *** TODO Per-request dispatch context cleanup on onEnd.
+** TODO Add session store.
 ** TODO Add request and notification message builders.
 
 
