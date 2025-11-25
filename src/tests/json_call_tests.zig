@@ -14,6 +14,12 @@ const json_call = zigjr.json_call;
 const DispatchResult = zigjr.DispatchResult;
 
 
+const ReqUserData = struct {
+    x: i64 = 10,
+};
+const UserDC = zigjr.DispatchCtx(ReqUserData);
+const DC0 = zigjr.DispatchCtx(void);            // No per-request user data
+
 var fn0_called = false;
 var fn0_with_err_called = false;
 var fn0_alloc_called = false;
@@ -154,6 +160,17 @@ fn fn_cat(a: CatInfo) void {
     fn_cat_called = true;
 }
 
+fn fn_cat_value(json_value: std.json.Value) CatInfo {
+    std.debug.print("fn_cat_value() called\n", .{});
+    fn_cat_called = true;
+    return .{
+        .cat_name = json_value.object.get("cat_name").?.string,
+        .weight = json_value.object.get("weight").?.float,
+        .eye_color = json_value.object.get("eye_color").?.string,
+    };
+}
+
+
 var fn_opt1_int_a: ?isize = null;
 
 fn fn_opt1_int(a: ?isize) void {
@@ -181,436 +198,504 @@ fn fn_opt1_cat(a: ?CatInfo) void {
 }
 
 
+test "Test rpc call on fn0." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-// test "Test rpc call on fn0." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     {
-//         var ctx = {};
-//         var h = try json_call.makeRpcHandler(&ctx, fn0);
-//         fn0_called = false;
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_called);
-//         fn0_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn0);
+        fn0_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_called);
+        fn0_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn0_called);
-//         fn0_called = false;
+        _ = try h.invokeJson(&dc, "");
+        try testing.expect(fn0_called);
+        fn0_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_called);
-//         fn0_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_called);
+        fn0_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_called);
-//         fn0_called = false;
-//     }
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_called);
+        fn0_called = false;
+    }
 
-//     {
-//         var ctx = {};
-//         var h = try json_call.makeRpcHandler(&ctx, fn0_with_err);
-//         fn0_with_err_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn0_with_err);
+        fn0_with_err_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_with_err_called);
-//         fn0_with_err_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_with_err_called);
+        fn0_with_err_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_with_err_called);
-//         fn0_with_err_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_with_err_called);
+        fn0_with_err_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn0_with_err_called);
-//         fn0_with_err_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_with_err_called);
+        fn0_with_err_called = false;
 
-//         const dresult = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_with_err_called);
-//         fn0_with_err_called = false;
-//         try testing.expect(dresult == .none);
-//     }
+        const dresult = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_with_err_called);
+        fn0_with_err_called = false;
+        try testing.expect(dresult == .none);
+    }
 
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn0_return_json_str);
+        _ = try h.invoke(&dc, .{ .null = {} });
+        _ = try h.invoke(&dc, .{ .null = {} });
+        _ = try h.invokeJson(&dc, "");
+        const dresult = try h.invoke(&dc, .{ .null = {} });
+        // std.debug.print("result {s}\n", .{dresult.result});
+        try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
+    }
 
-//     {
-//         var ctx = {};
-//         var h = try json_call.makeRpcHandler(&ctx, fn0_return_json_str);
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         _ = try h.invokeJson(arena_alloc, "");
-//         const dresult = try h.invoke(arena_alloc, .{ .null = {} });
-//         // std.debug.print("result {s}\n", .{dresult.result});
-//         try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
-//     }
-//     {
-//         var ctx = {};
-//         var h = try json_call.makeRpcHandler(&ctx, fn0_return_json_str_err);
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         _ = try h.invokeJson(arena_alloc, "");
-//         const dresult = try h.invoke(arena_alloc, .{ .null = {} });
-//         // std.debug.print("result {s}\n", .{dresult.result});
-//         try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
-//     }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn0_return_json_str_err);
+        _ = try h.invoke(&dc, .{ .null = {} });
+        _ = try h.invoke(&dc, .{ .null = {} });
+        _ = try h.invokeJson(&dc, "");
+        const dresult = try h.invoke(&dc, .{ .null = {} });
+        // std.debug.print("result {s}\n", .{dresult.result});
+        try testing.expectEqualSlices(u8, dresult.result, "{ \"foobar\": 42 }");
+    }
 
-//     {
-//         var ctx = {};
-//         var h = try json_call.makeRpcHandler(&ctx, fn0_alloc);
-//         fn0_alloc_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn0_alloc);
+        fn0_alloc_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_alloc_called);
-//         fn0_alloc_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_alloc_called);
+        fn0_alloc_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn0_alloc_called);
-//         fn0_alloc_called = false;
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn0_alloc_called);
+        fn0_alloc_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn0_alloc_called);
-//         fn0_alloc_called = false;
-//     }
-// }
+        _ = try h.invokeJson(&dc, "");
+        try testing.expect(fn0_alloc_called);
+        fn0_alloc_called = false;
+    }
+}
 
 
-// test "Test rpc call on fn1." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_integer);
-//         fn1_integer_called = false;
+test "Test rpc call on fn1." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-//         _ = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expect(fn1_integer_called);
-//         fn1_integer_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_integer);
+        fn1_integer_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "123");
-//         try testing.expect(fn1_integer_called);
-//         fn1_integer_called = false;
+        _ = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expect(fn1_integer_called);
+        fn1_integer_called = false;
 
-//         var array = std.json.Array.init(alloc);
-//         try array.append(.{ .integer = 456 });
-//         defer array.deinit();
-//         _ = try h.invoke(arena_alloc, .{ .array = array });
-//         try testing.expect(fn1_integer_called);
-//         fn1_integer_called = false;
+        _ = try h.invokeJson(&dc, "123");
+        try testing.expect(fn1_integer_called);
+        fn1_integer_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "[123]");
-//         try testing.expect(fn1_integer_called);
-//         fn1_integer_called = false;
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_alloc_with_err);
-//         _ = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expect(fn1_alloc_with_err_called);
-//         fn1_alloc_with_err_called = false;
+        var array = std.json.Array.init(alloc);
+        try array.append(.{ .integer = 456 });
+        defer array.deinit();
+        _ = try h.invoke(&dc, .{ .array = array });
+        try testing.expect(fn1_integer_called);
+        fn1_integer_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "123");
-//         try testing.expect(fn1_alloc_with_err_called);
-//     }
+        _ = try h.invokeJson(&dc, "[123]");
+        try testing.expect(fn1_integer_called);
+        fn1_integer_called = false;
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_alloc_with_err);
+        _ = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expect(fn1_alloc_with_err_called);
+        fn1_alloc_with_err_called = false;
 
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_float);
-//         _ = try h.invoke(arena_alloc, .{ .float = 1.23 });
-//         _ = try h.invokeJson(arena_alloc, "1.23");
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_float);
-//         var array = std.json.Array.init(alloc);
-//         try array.append(.{ .float = 4.56 });
-//         defer array.deinit();
-//         fn1_float_called = false;
+        _ = try h.invokeJson(&dc, "123");
+        try testing.expect(fn1_alloc_with_err_called);
+    }
+
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_float);
+        _ = try h.invoke(&dc, .{ .float = 1.23 });
+        _ = try h.invokeJson(&dc, "1.23");
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_float);
+        var array = std.json.Array.init(alloc);
+        try array.append(.{ .float = 4.56 });
+        defer array.deinit();
+        fn1_float_called = false;
         
-//         _ = try h.invoke(arena_alloc, .{ .array = array });
-//         try testing.expect(fn1_float_called);
-//         fn1_float_called = false;
+        _ = try h.invoke(&dc, .{ .array = array });
+        try testing.expect(fn1_float_called);
+        fn1_float_called = false;
         
-//         _ = try h.invokeJson(arena_alloc, "[1.23]");
-//         try testing.expect(fn1_float_called);
-//         fn1_float_called = false;
-//     }
+        _ = try h.invokeJson(&dc, "[1.23]");
+        try testing.expect(fn1_float_called);
+        fn1_float_called = false;
+    }
     
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_bool);
-//         fn1_bool_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_bool);
+        fn1_bool_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .bool = true });
-//         try testing.expect(fn1_bool_called);
-//         fn1_bool_called = false;
+        _ = try h.invoke(&dc, .{ .bool = true });
+        try testing.expect(fn1_bool_called);
+        fn1_bool_called = false;
         
-//         _ = try h.invokeJson(arena_alloc, "true");
-//         try testing.expect(fn1_bool_called);
-//         fn1_bool_called = false;
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_bool);
-//         var array = std.json.Array.init(alloc);
-//         try array.append(.{ .bool = false });
-//         defer array.deinit();
-//         fn1_bool_called = false;
+        _ = try h.invokeJson(&dc, "true");
+        try testing.expect(fn1_bool_called);
+        fn1_bool_called = false;
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_bool);
+        var array = std.json.Array.init(alloc);
+        try array.append(.{ .bool = false });
+        defer array.deinit();
+        fn1_bool_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .array = array });
-//         try testing.expect(fn1_bool_called);
-//         fn1_bool_called = false;
+        _ = try h.invoke(&dc, .{ .array = array });
+        try testing.expect(fn1_bool_called);
+        fn1_bool_called = false;
         
-//         _ = try h.invokeJson(arena_alloc, "[false]");
-//         try testing.expect(fn1_bool_called);
-//         fn1_bool_called = false;
+        _ = try h.invokeJson(&dc, "[false]");
+        try testing.expect(fn1_bool_called);
+        fn1_bool_called = false;
         
-//     }
+    }
     
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_string);
-//         fn1_string_called = false;
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_string);
+        fn1_string_called = false;
 
-//         _ = try h.invoke(arena_alloc, .{ .string = "Hello123" });
-//         try testing.expect(fn1_string_called);
-//         fn1_string_called = false;
+        _ = try h.invoke(&dc, .{ .string = "Hello123" });
+        try testing.expect(fn1_string_called);
+        fn1_string_called = false;
 
-//         _ = try h.invokeJson(arena_alloc, "\"Hello123\"");
-//         try testing.expect(fn1_string_called);
-//         fn1_string_called = false;
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_string);
-//         var array = std.json.Array.init(alloc);
-//         try array.append(.{ .string = "Hello456" });
-//         defer array.deinit();
-//         fn1_string_called = false;
+        _ = try h.invokeJson(&dc, "\"Hello123\"");
+        try testing.expect(fn1_string_called);
+        fn1_string_called = false;
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_string);
+        var array = std.json.Array.init(alloc);
+        try array.append(.{ .string = "Hello456" });
+        defer array.deinit();
+        fn1_string_called = false;
         
-//         _ = try h.invoke(arena_alloc, .{ .array = array });
-//         try testing.expect(fn1_string_called);
-//         fn1_string_called = false;
+        _ = try h.invoke(&dc, .{ .array = array });
+        try testing.expect(fn1_string_called);
+        fn1_string_called = false;
         
-//         _ = try h.invokeJson(arena_alloc, "[\"Hello456\"]");
-//         try testing.expect(fn1_string_called);
-//         fn1_string_called = false;
+        _ = try h.invokeJson(&dc, "[\"Hello456\"]");
+        try testing.expect(fn1_string_called);
+        fn1_string_called = false;
         
-//     }
-// }
+    }
+}
 
-// test "Test rpc call on fn1 with DispatchResult." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_none);
-//         const dres = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         // std.debug.print("fn1_with_dresult_none: {any}\n", .{dres});
-//         try testing.expectEqual(dres, DispatchResult.none);
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer);
-//         const dres = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expectEqualStrings(dres.result, "123");
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer_err);
-//         const dres = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expectEqualStrings(dres.result, "123");
-//     }
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn1_with_dresult_str_err);
-//         const dres = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expectEqualStrings(dres.result, "\"abc\"");
-//     }
-// }
+test "Test rpc call on fn1 with DispatchResult." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-// test "Test rpc call on fn4." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn4);
-//         _ = try h.invokeJson(arena_alloc, "[123, 4.56, true, \"abc\"]");
-//         try testing.expect(fn4_called);
-//     }
-// }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_with_dresult_none);
+        const dres = try h.invoke(&dc, .{ .integer = 123 });
+        // std.debug.print("fn1_with_dresult_none: {any}\n", .{dres});
+        try testing.expectEqual(dres, DispatchResult.none);
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_with_dresult_integer);
+        const dres = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "123");
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_with_dresult_integer_err);
+        const dres = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "123");
+    }
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn1_with_dresult_str_err);
+        const dres = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expectEqualStrings(dres.result, "\"abc\"");
+    }
+}
 
-// test "Test rpc call on fn_cat." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn_cat);
-//         _ = try h.invokeJson(arena_alloc, 
-//                 \\{
-//                 \\ "cat_name": "cat1",
-//                 \\ "weight": 5.5,
-//                 \\ "eye_color": "brown"
-//                 \\}
-//         );
-//         try testing.expect(fn_cat_called);
-//     }
-// }
+test "Test rpc call on fn4." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-// test "Test rpc call on fn_opt1_int with optional argument." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn_opt1_int);
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn4);
+        _ = try h.invokeJson(&dc, "[123, 4.56, true, \"abc\"]");
+        try testing.expect(fn4_called);
+    }
+}
 
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn_opt1_int_a == null);
+test "Test rpc call on fn_cat." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-//         _ = try h.invoke(arena_alloc, .{ .integer = 123 });
-//         try testing.expect(fn_opt1_int_a == 123);
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn_cat);
+        fn_cat_called = false;
+        _ = try h.invokeJson(&dc, 
+                \\{
+                \\ "cat_name": "cat1",
+                \\ "weight": 5.5,
+                \\ "eye_color": "brown"
+                \\}
+        );
+        try testing.expect(fn_cat_called);
+    }
+}
 
-//         _ = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn_opt1_int_a == null);
+test "Test rpc call on fn_cat_value on std.json.Value parameter." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-//         _ = try h.invokeJson(arena_alloc, "123");
-//         try testing.expect(fn_opt1_int_a == 123);
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn_cat_value);
+        fn_cat_called = false;
+        _ = try h.invokeJson(&dc, 
+                \\{
+                \\ "cat_name": "cat1",
+                \\ "weight": 5.5,
+                \\ "eye_color": "brown"
+                \\}
+        );
+        try testing.expect(fn_cat_called);
+    }
+}
 
-//         var array0 = std.json.Array.init(alloc);
-//         defer array0.deinit();
-//         _ = try h.invoke(arena_alloc, .{ .array = array0 });
-//         try testing.expect(fn_opt1_int_a == null);
+test "Test rpc call on fn_opt1_int with optional argument." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-//         var array1 = std.json.Array.init(alloc);
-//         try array1.append(.{ .integer = 456 });
-//         defer array1.deinit();
-//         _ = try h.invoke(arena_alloc, .{ .array = array1 });
-//         try testing.expect(fn_opt1_int_a == 456);
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn_opt1_int);
 
-//         _ = try h.invokeJson(arena_alloc, "[]");
-//         try testing.expect(fn_opt1_int_a == null);
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn_opt1_int_a == null);
 
-//         _ = try h.invokeJson(arena_alloc, "[123]");
-//         try testing.expect(fn_opt1_int_a == 123);
-//     }
-// }
+        _ = try h.invoke(&dc, .{ .integer = 123 });
+        try testing.expect(fn_opt1_int_a == 123);
 
-// test "Test rpc call on fn_opt1_str with optional argument and alloc." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn_opt1_str);
-//         var res: DispatchResult = undefined;
+        _ = try h.invokeJson(&dc, "");
+        try testing.expect(fn_opt1_int_a == null);
+
+        _ = try h.invokeJson(&dc, "123");
+        try testing.expect(fn_opt1_int_a == 123);
+
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        _ = try h.invoke(&dc, .{ .array = array0 });
+        try testing.expect(fn_opt1_int_a == null);
+
+        var array1 = std.json.Array.init(alloc);
+        try array1.append(.{ .integer = 456 });
+        defer array1.deinit();
+        _ = try h.invoke(&dc, .{ .array = array1 });
+        try testing.expect(fn_opt1_int_a == 456);
+
+        _ = try h.invokeJson(&dc, "[]");
+        try testing.expect(fn_opt1_int_a == null);
+
+        _ = try h.invokeJson(&dc, "[123]");
+        try testing.expect(fn_opt1_int_a == 123);
+    }
+}
+
+test "Test rpc call on fn_opt1_str with optional argument and alloc." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
+
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn_opt1_str);
+        var res: DispatchResult = undefined;
         
-//         res = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn_opt1_str_a == null);
-//         try testing.expectEqualStrings(res.result, "\"a is null\"");
+        res = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
 
-//         res = try h.invoke(arena_alloc, .{ .string = "abc" });
-//         try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
-//         try testing.expectEqualStrings(res.result, "\"abc\"");
+        res = try h.invoke(&dc, .{ .string = "abc" });
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
 
-//         res = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn_opt1_str_a == null);
-//         try testing.expectEqualStrings(res.result, "\"a is null\"");
+        res = try h.invokeJson(&dc, "");
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
 
-//         res = try h.invokeJson(arena_alloc, "\"abc\"");
-//         try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
-//         try testing.expectEqualStrings(res.result, "\"abc\"");
+        res = try h.invokeJson(&dc, "\"abc\"");
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
 
-//         var array0 = std.json.Array.init(alloc);
-//         defer array0.deinit();
-//         res = try h.invoke(arena_alloc, .{ .array = array0 });
-//         try testing.expect(fn_opt1_str_a == null);
-//         try testing.expectEqualStrings(res.result, "\"a is null\"");
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        res = try h.invoke(&dc, .{ .array = array0 });
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
 
-//         var array1 = std.json.Array.init(alloc);
-//         try array1.append(.{ .string = "xyz" });
-//         defer array1.deinit();
-//         res = try h.invoke(arena_alloc, .{ .array = array1 });
-//         try testing.expectEqualStrings(fn_opt1_str_a.?, "xyz");
-//         try testing.expectEqualStrings(res.result, "\"xyz\"");
+        var array1 = std.json.Array.init(alloc);
+        try array1.append(.{ .string = "xyz" });
+        defer array1.deinit();
+        res = try h.invoke(&dc, .{ .array = array1 });
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "xyz");
+        try testing.expectEqualStrings(res.result, "\"xyz\"");
 
-//         res = try h.invokeJson(arena_alloc, "[]");
-//         try testing.expect(fn_opt1_str_a == null);
-//         try testing.expectEqualStrings(res.result, "\"a is null\"");
+        res = try h.invokeJson(&dc, "[]");
+        try testing.expect(fn_opt1_str_a == null);
+        try testing.expectEqualStrings(res.result, "\"a is null\"");
 
-//         res = try h.invokeJson(arena_alloc, "[\"abc\"]");
-//         try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
-//         try testing.expectEqualStrings(res.result, "\"abc\"");
-//     }
-// }
+        res = try h.invokeJson(&dc, "[\"abc\"]");
+        try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
+        try testing.expectEqualStrings(res.result, "\"abc\"");
+    }
+}
 
-// test "Test rpc call on fn_opt1_cat with optional object argument." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     const arena_alloc = arena.allocator();
-//     defer arena.deinit();
-//     var ctx = {};
-//     {
-//         var h = try json_call.makeRpcHandler(&ctx, fn_opt1_cat);
+test "Test rpc call on fn_opt1_cat with optional object argument." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    const arena_alloc = arena.allocator();
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
+    var dc: DC0 = .{
+        .arena = arena_alloc,
+        .logger = nop_logger.asLogger(),
+    };
+    var ctx = {};
 
-//         _ = try h.invokeJson(arena_alloc, 
-//                 \\{
-//                 \\ "cat_name": "cat1",
-//                 \\ "weight": 5.5,
-//                 \\ "eye_color": "brown"
-//                 \\}
-//         );
-//         try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
+    {
+        var h = try json_call.makeRpcHandler(&ctx, DC0, fn_opt1_cat);
+
+        _ = try h.invokeJson(&dc, 
+                \\{
+                \\ "cat_name": "cat1",
+                \\ "weight": 5.5,
+                \\ "eye_color": "brown"
+                \\}
+        );
+        try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
         
-//         _ = try h.invoke(arena_alloc, .{ .null = {} });
-//         try testing.expect(fn_opt1_cat_a == null);
+        _ = try h.invoke(&dc, .{ .null = {} });
+        try testing.expect(fn_opt1_cat_a == null);
 
-//         _ = try h.invokeJson(arena_alloc, "");
-//         try testing.expect(fn_opt1_cat_a == null);
+        _ = try h.invokeJson(&dc, "");
+        try testing.expect(fn_opt1_cat_a == null);
 
-//         var array0 = std.json.Array.init(alloc);
-//         defer array0.deinit();
-//         _ = try h.invoke(arena_alloc, .{ .array = array0 });
-//         try testing.expect(fn_opt1_cat_a == null);
-//     }
-// }
+        var array0 = std.json.Array.init(alloc);
+        defer array0.deinit();
+        _ = try h.invoke(&dc, .{ .array = array0 });
+        try testing.expect(fn_opt1_cat_a == null);
+    }
+}
 
-const ReqCtx = struct {
-    x: i64 = 10,
-};
-const DC = zigjr.DispatchCtx(ReqCtx);
 
 const CalledCtx = struct {
     called: bool = false,
 };
 
-fn fn_dc_integer1(dc: *DC, a: i64) ![]const u8 {
-    dc.req_data.x = a;
-    return try allocPrint(dc.req_arena, "a is {}", .{a});
+fn fn_dc_integer1(dc: *UserDC, a: i64) ![]const u8 {
+    dc.user_data.x = a;
+    return try allocPrint(dc.arena, "a is {}", .{a});
 }
 
-fn fn_ctx_dc_integer1(ctx: *CalledCtx, dc: *DC, a: i64) ![]const u8 {
+fn fn_ctx_dc_integer1(ctx: *CalledCtx, dc: *UserDC, a: i64) ![]const u8 {
     ctx.called = true;
-    dc.req_data.x = a;
-    return try allocPrint(dc.req_arena, "a is {}", .{a});
+    dc.user_data.x = a;
+    return try allocPrint(dc.arena, "a is {}", .{a});
 }
 
-fn fn_alloc_integer1(req_arena: Allocator, a: i64) ![]const u8 {
-    return try allocPrint(req_arena, "a is {}", .{a});
+fn fn_alloc_integer1(arena: Allocator, a: i64) ![]const u8 {
+    return try allocPrint(arena, "a is {}", .{a});
 }
 
 
@@ -623,50 +708,39 @@ test "Test rpc call with DispatchCtx." {
     defer arena.deinit();
     var nop_logger = zigjr.NopLogger{};
     var ctx = CalledCtx {};
+    var userData = ReqUserData{};
     {
-        var dc: DC = .{
-            .req_arena = arena_alloc,
+        var dc: UserDC = .{
+            .arena = arena_alloc,
             .logger = nop_logger.asLogger(),
-            .req_data = ReqCtx{},
+            .user_data = &userData,
         };
 
-        var h1 = try json_call.makeRpcHandlerDC(&ctx, DC, fn_dc_integer1);
+        var h1 = try json_call.makeRpcHandler(&ctx, UserDC, fn_dc_integer1);
         const dr1 = try h1.invokeJson(&dc, "[123]");
         _=dr1;
         // std.debug.print("dr1.result: {s}\n", .{dr1.result});
-        // _ = try h.invoke(&dc, .{ .integer = 123 });
-        try testing.expect(dc.req_data.x == 123);
+        _ = try h1.invoke(&dc, .{ .integer = 123 });
+        try testing.expect(dc.user_data.x == 123);
 
-        var h2 = try json_call.makeRpcHandlerDC(&ctx, DC, fn_alloc_integer1);
+        var h2 = try json_call.makeRpcHandler(&ctx, UserDC, fn_alloc_integer1);
         const dr2 = try h2.invokeJson(&dc, "[123]");
         // std.debug.print("dr2.result: {s}\n", .{dr2.result});
         try testing.expectEqualStrings("\"a is 123\"", dr2.result);
 
-        var h3 = try json_call.makeRpcHandlerDC(&ctx, DC, fn_ctx_dc_integer1);
+        var h3 = try json_call.makeRpcHandler(&ctx, UserDC, fn_ctx_dc_integer1);
         ctx.called = false;
         _ = try h3.invokeJson(&dc, "[123]");
         // std.debug.print("dr3.result: {s}\n", .{dr3.result});
         try testing.expect(ctx.called);
-
-        // _ = try h.invokeJson(arena_alloc, "123");
-        // try testing.expect(fn1_integer_called);
-        // fn1_integer_called = false;
-
-        // var array = std.json.Array.init(alloc);
-        // try array.append(.{ .integer = 456 });
-        // defer array.deinit();
-        // _ = try h.invoke(arena_alloc, .{ .array = array });
-        // try testing.expect(fn1_integer_called);
-        // fn1_integer_called = false;
-
-        // _ = try h.invokeJson(arena_alloc, "[123]");
-        // try testing.expect(fn1_integer_called);
-        // fn1_integer_called = false;
     }
-    {
-        // Uncomment to test compile time check on the DispatchCtx type requirement.
-        // _ = try json_call.makeRpcHandlerDC(&ctx, void, fn_alloc_integer1);
-    }        
+}
+
+test "Test rpc call with missing DispatchCtx when registering a handler." {
+
+    // Uncomment the following to test compile time check on the DispatchCtx type requirement.
+    // var ctx = CalledCtx {};
+    // _ = try json_call.makeRpcHandler(&ctx, void, fn_alloc_integer1);
 }
 
 
