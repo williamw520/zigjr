@@ -42,6 +42,7 @@ pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
 pub const DispatchCtx = json_call.DispatchCtx;
 pub const asPtr = json_call.asPtr;
+pub const asTPtr = json_call.asTPtr;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;
@@ -67,7 +68,7 @@ test {
     // _ = @import("tests/message_tests.zig");
     // _ = @import("tests/frame_tests.zig");
     // _ = @import("tests/stream_tests.zig");
-    // _ = @import("tests/rpc_dispatcher_tests.zig");
+    _ = @import("tests/rpc_dispatcher_tests.zig");
     _ = @import("tests/json_call_tests.zig");
     // _ = @import("tests/misc_tests.zig");
     // _ = @import("streaming/BufReader.zig");

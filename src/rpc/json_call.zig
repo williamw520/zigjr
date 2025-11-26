@@ -26,6 +26,11 @@ pub inline fn asPtr(T: type, opaque_ptr: *anyopaque) *T {
     return @as(*T, @ptrCast(@alignCast(opaque_ptr)));
 }
 
+pub inline fn asTPtr(T: type, opaque_ptr: *anyopaque) T {
+    return @as(T, @ptrCast(@alignCast(opaque_ptr)));
+}
+
+
 pub const DispatchCtx = struct {
     arena:          Allocator,      // per-request arena allocator
     logger:         zigjr.Logger,

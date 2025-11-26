@@ -21,6 +21,7 @@ const RpcRequest = zigjr.RpcRequest;
 const RequestDispatcher = zigjr.RequestDispatcher;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
+const DispatchCtx = zigjr.DispatchCtx;
 
 const json_call = @import("json_call.zig");
 
@@ -133,30 +134,30 @@ pub const RpcDispatcher = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    pub fn dispatch(self: *const Self, req_arena: Allocator, req: RpcRequest) anyerror!DispatchResult {
-        self.on_before_fn(self.on_before_ctx, req_arena, req);
-        return self.dispatchInner(req_arena, req) catch |err| {
-            self.on_error_fn(self.on_error_ctx, req_arena, req, err);
+    pub fn dispatch(self: *const Self, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult {
+        self.on_before_fn(self.on_before_ctx, dc.arena, req);
+        return self.dispatchInner(dc, req) catch |err| {
+            self.on_error_fn(self.on_error_ctx, dc.arena, req, err);
             return err;
         };
     }
 
-    fn dispatchInner(self: *const Self,  req_arena: Allocator, req: RpcRequest) anyerror!DispatchResult {
+    fn dispatchInner(self: *const Self, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult {
         if (self.handlers.getPtr(req.method)) |h| {
-            const result = try h.invoke(req_arena, req.params);
-            self.on_after_fn(self.on_after_ctx, req_arena, req, result);
+            const result = try h.invoke(dc, req.params);
+            self.on_after_fn(self.on_after_ctx, dc.arena, req, result);
             return result;
         } else if (self.on_fallback_fn) |fallback_fn| {
-            const result = try fallback_fn(self.on_fallback_ctx, req_arena, req);
-            self.on_after_fn(self.on_after_ctx, req_arena, req, result);
+            const result = try fallback_fn(self.on_fallback_ctx, dc.arena, req);
+            self.on_after_fn(self.on_after_ctx, dc.arena, req, result);
             return result;
         } else {
             return DispatchErrors.MethodNotFound;
         }
     }
 
-    pub fn dispatchEnd(self: *const Self, req_arena: Allocator, req: RpcRequest, dresult: DispatchResult) void {
-        self.on_end_fn(self.on_end_ctx, req_arena, req, dresult);
+    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtx, req: RpcRequest, dresult: DispatchResult) void {
+        self.on_end_fn(self.on_end_ctx, dc.arena, req, dresult);
     }
 
 };
