@@ -21,48 +21,50 @@ const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
 
-pub fn DispatchCtx(U: type) type {
-    return struct {
-        DC_SIGNATURE:   void = {},      // comptime identifier to identify a DispatchCtx struct.
-        arena:          Allocator,      // per-request arena allocator
-        logger:         zigjr.Logger,
-        user_data:      *U = undefined, // set up by the pre-request hook and cleaned up by post-request hook.
 
-        // TODO: add session id, session manager, and others.
-        // session_id:     SessionId,
-        // session_mgr:    *SessionMgr,
-        // session_arena:  Allocator,
-    };
+pub inline fn asPtr(T: type, opaque_ptr: *anyopaque) *T {
+    return @as(*T, @ptrCast(@alignCast(opaque_ptr)));
 }
+
+pub const DispatchCtx = struct {
+    arena:          Allocator,      // per-request arena allocator
+    logger:         zigjr.Logger,
+    // per-request user data; set up by the before-request and cleaned up by the after-request hook.
+    user_data:      *anyopaque = undefined,
+
+    // TODO: add session id, session manager, and others.
+    // session_id:     SessionId,
+    // session_mgr:    *SessionMgr,
+    // session_arena:  Allocator,
+};
 
 
 /// Uniform call object that can be stored in a hash map.
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 /// RpcHandler and its invoke() calls are thread-safe in general; 
 /// the only caveat is the user context and the user defined handler need to be thread-safe.
-pub fn RpcHandler(DCtx: type) type {
-    return struct {
-        context: ?*anyopaque,
-        call: *const fn(context: ?*anyopaque, dc: *DCtx, params_value: Value) anyerror!DispatchResult,
+pub const RpcHandler = struct {
+    context: ?*anyopaque,
+    call: *const fn(context: ?*anyopaque, dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
 
-        /// Call the handler call fn with the JSON Value parameters.
-        pub fn invoke(self: *@This(), dc: *DCtx, params_value: Value) anyerror!DispatchResult {
-            return self.call(self.context, dc, params_value);
-        }
+    /// Call the handler call fn with the JSON Value parameters.
+    pub fn invoke(self: *@This(), dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+        return self.call(self.context, dc, params_value);
+    }
 
-        /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-        pub fn invokeJson(self: *@This(), dc: *DCtx, params_json: []const u8) anyerror!DispatchResult {
-            const trimmed = std.mem.trim(u8, params_json, " ");
-            if (trimmed.len == 0) {
-                return self.call(self.context, dc, .{ .null = {} });
-            } else {
-                const parsed = try std.json.parseFromSlice(Value, dc.arena, trimmed, .{});
-                defer parsed.deinit();
-                return self.call(self.context, dc, parsed.value);
-            }
+    /// Call the handler call fn with the JSON string parameters, convenient method for testing.
+    pub fn invokeJson(self: *@This(), dc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
+        const trimmed = std.mem.trim(u8, params_json, " ");
+        if (trimmed.len == 0) {
+            return self.call(self.context, dc, .{ .null = {} });
+        } else {
+            const parsed = try std.json.parseFromSlice(Value, dc.arena, trimmed, .{});
+            defer parsed.deinit();
+            return self.call(self.context, dc, parsed.value);
         }
-    };
-}
+    }
+};
+
 
 /// Package a user context, a DispatchCtx type, a handler function along with its parameters,
 /// its return type, and its return error type into a RpcHandler object.
@@ -109,14 +111,12 @@ pub fn RpcHandler(DCtx: type) type {
 /// stringified to JSON.  The function can just return a value and it will be automatically
 /// stringified to JSON.  If the function has already built its own JSON string, it can
 /// return it in a JsonStr struct, which prevents it from being stringified again.
-/// 
-pub fn makeRpcHandler(context: anytype, DCtx: type, comptime F: anytype) !RpcHandler(DCtx) {
-    const hinfo = getHandlerInfo(F, context, DCtx);
-    if (!hinfo.dctx_is_valid)
-        @compileError("The DCtx must be a type of DispatchCtx");
+///
+pub fn makeRpcHandler(context: anytype, comptime F: anytype) !RpcHandler {
+    const hinfo = getHandlerInfo(F, context);
 
     const wrapper = struct {
-        fn call(ctx: ?*anyopaque, dc: *DCtx, params_value: Value) anyerror!DispatchResult {
+        fn call(ctx: ?*anyopaque, dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
             // Function expects a single Value or a single struct object.
             if (hinfo.is_value1) {
                 return callOnValueDC(F, hinfo, ctx, dc, params_value);
@@ -159,8 +159,6 @@ pub const JsonStr = struct {
 // This is a comptime struct capturing the needed comptime info to do the call on the handler.
 const HandlerInfo = struct {
     ctx_type:       type,                   // The type of the context object (the self pointer type).
-    dctx_type:      type,                   // The type of the DispatchCtx.
-    dctx_is_valid:  bool,                   // dctx_type has DispatchCtx signature.
     fn_info:        Type.Fn,                // Info on the handler function.
     params:         []const Type.Fn.Param,  // The parameter array of the handler function.
     tuple_type:     type,                   // The type of parameter tuple for calling the handler function.
@@ -185,13 +183,12 @@ const HandlerInfo = struct {
 
 // Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
 
-inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype, dctx_type: type) HandlerInfo {
+inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype) HandlerInfo {
     const fn_info       = getFnInfo(handler_fn);
     const params        = fn_info.params;
-    const dctx_is_valid = hasField(dctx_type, "DC_SIGNATURE");      // has a well known signature field.
     const ctx_type      = @TypeOf(context);
     const ctx_idx       = typeInParams(params, ctx_type);
-    const dc_idx        = typeInParams(params, *dctx_type);
+    const dc_idx        = typeInParams(params, *DispatchCtx);
     const alloc_idx     = typeInParams(params, std.mem.Allocator);
     const user_idx      = findUserIdx(ctx_idx, dc_idx, alloc_idx);
     const is_value1     = params.len == user_idx + 1 and isValue(params[user_idx].type);
@@ -202,8 +199,6 @@ inline fn getHandlerInfo(comptime handler_fn: anytype, context: anytype, dctx_ty
 
     return .{
         .ctx_type       = ctx_type,
-        .dctx_type      = dctx_type,
-        .dctx_is_valid  = dctx_is_valid,
         .fn_info        = fn_info,
         .params         = params,
         .tuple_type     = ArgsTupleType(params),
@@ -361,7 +356,7 @@ inline fn hasField(comptime T: type, f_name: []const u8) bool {
 }
 
 fn callOnPrimitiveDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                     dc: *hinfo.dctx_type, json_primitive: Value) anyerror!DispatchResult {
+                     dc: *DispatchCtx, json_primitive: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -372,7 +367,7 @@ fn callOnPrimitiveDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*an
 }
 
 fn callOnValueDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                 dc: *hinfo.dctx_type, params_value: Value) anyerror!DispatchResult {
+                 dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
@@ -384,7 +379,7 @@ fn callOnValueDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopa
 }
 
 fn callOnObjectDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, 
-                  dc: *hinfo.dctx_type, params_value: Value) anyerror!DispatchResult {
+                  dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -410,7 +405,7 @@ fn callOnObjectDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyop
 }
 
 fn callOnArrayDC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                 dc: *hinfo.dctx_type, array: Array) anyerror!DispatchResult {
+                 dc: *DispatchCtx, array: Array) anyerror!DispatchResult {
     if (hinfo.is_optional1 and array.items.len == 0) {
         var nullArray = Array.init(dc.arena);
         try nullArray.append( .{ .null = {} } );
@@ -465,7 +460,7 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
     }
 }
 
-fn initArgsTupleDC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type) hinfo.tuple_type {
+fn initArgsTupleDC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     // Assign the context and alloc to the appropriate function argument slots in the tuple.
@@ -492,7 +487,7 @@ inline fn idxStr(comptime idx: usize) []const u8 {
     unreachable;
 }
 
-fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type,
+fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                     value: Value) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTupleDC(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -501,7 +496,7 @@ fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dc
     return tuple;
 }
 
-fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type,
+fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                     primitive_value: Value) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTupleDC(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -511,7 +506,7 @@ fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dc
     return tuple;
 }
 
-fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type,
+fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                 values: Array) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTupleDC(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -536,7 +531,7 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_t
     return tuple;
 }
 
-fn arrayToTupleDC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type,
+fn arrayToTupleDC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                   values: Array) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTupleDC(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -562,7 +557,7 @@ fn arrayToTupleDC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx
 }
 
 // For optional paramenter, hinfo.obj1_type already has the optional type.
-fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *hinfo.dctx_type,
+fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                  object: hinfo.obj1_type) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTupleDC(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
