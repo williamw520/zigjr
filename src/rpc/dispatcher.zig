@@ -22,8 +22,8 @@ const DispatchCtx = zigjr.DispatchCtx;
 /// This is for the request handlers in a RPC server handling the incoming requests.
 pub const RequestDispatcher = struct {
     impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult,
-    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx, req: RpcRequest, dresult: DispatchResult) void,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult,
+    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx) void,
 
     // Interface is implemented by the 'impl' object.
     pub fn implBy(impl_obj: anytype) RequestDispatcher {
@@ -32,14 +32,14 @@ pub const RequestDispatcher = struct {
             @compileError("impl_obj should be a pointer, but its type is " ++ @typeName(ImplType));
 
         const Delegate = struct {
-            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult {
+            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatch(dc, req);
             }
 
-            fn dispatchEnd(impl_ptr: *anyopaque, dc: *DispatchCtx, req: RpcRequest, dresult: DispatchResult) void {
+            fn dispatchEnd(impl_ptr: *anyopaque, dc: *DispatchCtx) void {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return impl.dispatchEnd(dc, req, dresult);
+                return impl.dispatchEnd(dc);
             }
         };
 
@@ -52,11 +52,11 @@ pub const RequestDispatcher = struct {
 
     // The implementation must have these methods.
 
-    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult {
+    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
         return self.dispatch_fn(self.impl_ptr, dc, req);
     }
 
-    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtx, req: RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtx, req: *const RpcRequest, dresult: DispatchResult) void {
         return self.dispatchEnd_fn(self.impl_ptr, dc, req, dresult);
     }
 };

@@ -17,6 +17,7 @@ const Array = std.json.Array;
 
 const zigjr = @import("../zigjr.zig");
 const JrErrors = zigjr.JrErrors;
+const RpcRequest = zigjr.RpcRequest;
 const DispatchResult = zigjr.DispatchResult;
 const DispatchErrors = zigjr.DispatchErrors;
 
@@ -30,13 +31,14 @@ pub inline fn asTPtr(T: type, opaque_ptr: *anyopaque) T {
     return @as(T, @ptrCast(@alignCast(opaque_ptr)));
 }
 
+pub const nop_request = RpcRequest{};
 
 pub const DispatchCtx = struct {
     arena:          Allocator,      // per-request arena allocator
     logger:         zigjr.Logger,
     // per-request request and result
-    request:        *const zigjr.RpcRequest = undefined,
-    result:         *const zigjr.DispatchResult = undefined,
+    request:        *const zigjr.RpcRequest = &nop_request,
+    result:         *const zigjr.DispatchResult = undefined,    // TODO: set to nop_result
     err:            anyerror = undefined,
     // per-request user data; set up by the before-request and cleaned up by the after-request hook.
     user_data:      *anyopaque = undefined,
@@ -45,6 +47,14 @@ pub const DispatchCtx = struct {
     // session_id:     SessionId,
     // session_mgr:    *SessionMgr,
     // session_arena:  Allocator,
+
+    pub fn reset(self: *DispatchCtx) void {
+        self.request = &nop_request;
+        // TODO: 
+        // self.result = ;
+        // self.err = ;
+        // self.user_data = ;
+    }
 };
 
 

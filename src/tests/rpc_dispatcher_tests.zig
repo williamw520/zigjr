@@ -362,7 +362,8 @@ test "rpc_dispatcher fn0 and variants with DispatchCtx" {
             \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
         );
         defer parsed_req.deinit();
-        const d_result = try req_dispatcher.dispatch(&dc, try parsed_req.request());
+        const req = try parsed_req.request();
+        const d_result = try req_dispatcher.dispatch(&dc, &req);
         _=d_result;
         // std.debug.print("result: {any}\n", .{d_result});
         try testing.expect(fn0_called);
@@ -373,7 +374,8 @@ test "rpc_dispatcher fn0 and variants with DispatchCtx" {
             \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
         );
         defer parsed_req.deinit();
-        const d_result = try req_dispatcher.dispatch(&dc, try parsed_req.request());
+        const req = try parsed_req.request();
+        const d_result = try req_dispatcher.dispatch(&dc, &req);
         std.debug.print("result: {any}\n", .{d_result});
         try testing.expect(fn0_with_err_called);
     }
@@ -407,7 +409,8 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
             \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
         );
         defer parsed_req.deinit();
-        _ = try req_dispatcher.dispatch(&dc, try parsed_req.request());
+        const req = try parsed_req.request();
+        _ = try req_dispatcher.dispatch(&dc, &req);
         try testing.expect(fn1_called);
     }
 
@@ -416,7 +419,8 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
             \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
         );
         defer parsed_req.deinit();
-        _ = try req_dispatcher.dispatch(&dc, try parsed_req.request());
+        const req = try parsed_req.request();
+        _ = try req_dispatcher.dispatch(&dc, &req);
         try testing.expect(fn1_with_err_called);
     }
 }

@@ -31,16 +31,6 @@ pub const H_FALLBACK    = "rpc.fallback";       // called when no handler is fou
 pub const H_END_REQUEST = "rpc.end-request";    // called after the result is sent back.
 pub const H_ON_ERROR    = "rpc.on-error";       // called when handler returns an error.
 
-// /// Extended handler: pre-dispatch handler, called before the request is dispatched.
-// pub const OnBeforeFn    = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest) void;
-// /// Extended handler: post-dispatch handler, called after the request has been dispatched.
-// pub const OnAfterFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, dresult: DispatchResult) void;
-// /// Extended handler: on-dispatch-end, called when dispatchEnd() is called.
-// pub const OnEndFn       = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, dresult: DispatchResult) void;
-// /// Extended handler: on-error handler, called when the request causes an error.
-// pub const OnErrorFn     = fn(ctx: *anyopaque, alloc: Allocator, request: RpcRequest, err: anyerror) void;
-
-
 /// Maintain a list of handlers to handle the RPC requests.
 /// Implements the RequestDispatcher interface.
 /// The dispatcher is thread-safe in general once it's set up, as long as
@@ -49,28 +39,11 @@ pub const RpcDispatcher = struct {
     const Self = @This();
 
     handlers:           StringHashMap(json_call.RpcHandler),
-    // on_before_fn:       *const OnBeforeFn,
-    // on_after_fn:        *const OnAfterFn,
-    // on_end_fn:          *const OnEndFn,
-    // on_error_fn:        *const OnErrorFn,
-    // on_before_ctx:      *anyopaque,
-    // on_after_ctx:       *anyopaque,
-    // on_end_ctx:         *anyopaque,
-    // on_error_ctx:       *anyopaque,
 
     pub fn init(alloc: Allocator) error{OutOfMemory}!Self {
         var self: Self = .{
             .handlers = StringHashMap(json_call.RpcHandler).init(alloc),
-            // .on_before_fn   = onBeforeNop,
-            // .on_after_fn    = onAfterNop,
-            // .on_end_fn      = onEndNop,
-            // .on_error_fn    = onErrorNop,
-            // .on_before_ctx  = &NopCtx,
-            // .on_after_ctx   = &NopCtx,
-            // .on_end_ctx     = &NopCtx,
-            // .on_error_ctx   = &NopCtx,
         };
-
         try self.addInner(H_PRE_REQUEST, null, defaultPreRequest);
         try self.addInner(H_FALLBACK, null, defaultFallback);
         try self.addInner(H_END_REQUEST, null, defaultEndRequest);
@@ -81,33 +54,6 @@ pub const RpcDispatcher = struct {
     pub fn deinit(self: *Self) void {
         self.handlers.deinit();
     }
-
-    // /// Install the pre-dispatch extended handler, called before the request is dispatched.
-    // pub fn setOnBefore(self: *Self, ctx: ?*anyopaque, on_before_fn: *const OnBeforeFn) void {
-    //     self.on_before_ctx = ctx orelse &NopCtx;
-    //     self.on_before_fn = on_before_fn;
-    // }
-
-    // /// Install the post-dispatch extended handler, called after the request has been handled 
-    // /// successfully by a registered handler or the fallback handler.
-    // /// This won't be called with request resulted in error.  See setOnError().
-    // pub fn setOnAfter(self: *Self, ctx: ?*anyopaque, on_after_fn: *const OnAfterFn) void {
-    //     self.on_after_ctx = ctx orelse &NopCtx;
-    //     self.on_after_fn = on_after_fn;
-    // }
-
-    // /// Install the DispatchEnd extended handler, called after the result has been sent back.
-    // /// This is for doing any cleanup per-request.
-    // pub fn setOnEnd(self: *Self, ctx: ?*anyopaque, on_end_fn: *const OnEndFn) void {
-    //     self.on_end_ctx = ctx orelse &NopCtx;
-    //     self.on_end_fn = on_end_fn;
-    // }
-
-    // /// Install the on-error extended handler, called when the request causes an error.
-    // pub fn setOnError(self: *Self, ctx: ?*anyopaque, on_error_fn: *const OnErrorFn) void {
-    //     self.on_error_ctx = ctx orelse &NopCtx;
-    //     self.on_error_fn = on_error_fn;
-    // }
 
     pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) RegistrationErrors!void {
         return self.addWithCtx(method, null, handler_fn);
@@ -124,8 +70,8 @@ pub const RpcDispatcher = struct {
 
     fn addInner(self: *Self, method: []const u8, context: anytype,
                 comptime handler_fn: anytype) error{OutOfMemory}!void {
-        var nul_context = {};   // dummy empty struct for no context.
-        const ctx = if (@typeInfo(@TypeOf(context)) == .null) &nul_context else context;
+        var dummy_null_ctx = {};
+        const ctx = if (@typeInfo(@TypeOf(context)) == .null) &dummy_null_ctx else context;
         const h = json_call.makeRpcHandler(ctx, handler_fn);
         try self.handlers.put(method, h);
     }
@@ -137,11 +83,9 @@ pub const RpcDispatcher = struct {
     /// Run a handler on the request and generate a DispatchResult.
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
-    // TODO: remove anyerror. Make req a pointer. Remove DispatchResult; move it to dc.
-    pub fn dispatch(self: *const Self, dc: *DispatchCtx, req: RpcRequest) anyerror!DispatchResult {
-        dc.request = &req;      // TODO: pointer
-        defer { dc.request = undefined; }
-        
+    // TODO: remove anyerror. Remove DispatchResult; move it to dc.
+    pub fn dispatch(self: *const Self, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
+        dc.request = req;
         self.callHook(dc, H_PRE_REQUEST);
 
         return self.callMethod(dc) catch |err| {
@@ -175,13 +119,12 @@ pub const RpcDispatcher = struct {
         }
     }
 
-    // TODO: remove req and dresult
-    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtx, req: RpcRequest, dresult: DispatchResult) void {
-        _=req;
-        _=dresult;
+    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtx) void {
         self.callHook(dc, H_END_REQUEST);
+        dc.reset();
+        // Caller is responsible to reset the arena after this point.
+        // Caller might batch processing several requests before reseting the arena.
     }
-
 };
 
 fn validateMethod(method: []const u8) RegistrationErrors!void {
