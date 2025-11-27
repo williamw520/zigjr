@@ -34,6 +34,10 @@ pub inline fn asTPtr(T: type, opaque_ptr: *anyopaque) T {
 pub const DispatchCtx = struct {
     arena:          Allocator,      // per-request arena allocator
     logger:         zigjr.Logger,
+    // per-request request and result
+    request:        *const zigjr.RpcRequest = undefined,
+    result:         *const zigjr.DispatchResult = undefined,
+    err:            anyerror = undefined,
     // per-request user data; set up by the before-request and cleaned up by the after-request hook.
     user_data:      *anyopaque = undefined,
 
@@ -117,7 +121,7 @@ pub const RpcHandler = struct {
 /// stringified to JSON.  If the function has already built its own JSON string, it can
 /// return it in a JsonStr struct, which prevents it from being stringified again.
 ///
-pub fn makeRpcHandler(context: anytype, comptime F: anytype) !RpcHandler {
+pub fn makeRpcHandler(context: anytype, comptime F: anytype) RpcHandler {
     const hinfo = getHandlerInfo(F, context);
 
     const wrapper = struct {

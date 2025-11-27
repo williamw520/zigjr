@@ -48,7 +48,7 @@ or errors, which are automatically mapped to the JSON data types.
 
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
 
     try rpc_dispatcher.add"say", say);
@@ -157,7 +157,7 @@ The following example handles a stream of messages prefixed with a `Content-Leng
 reading requests from `stdin` and writing responses to `stdout`.
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
     try rpc_dispatcher.add("add", addTwoNums);
 
@@ -173,7 +173,7 @@ This example streams messages from one in-memory buffer to another,
 using a newline character (`\n`) as a delimiter.
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
     try rpc_dispatcher.add("add", addTwoNums);
 
@@ -200,7 +200,7 @@ dispatching, and response composition.
 ```zig
 {
     // Set up the rpc_dispatcher as the dispatcher.
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
     try rpc_dispatcher.add("add", addTwoNums);
     const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
@@ -276,7 +276,7 @@ calls the function, and captures the result or error to formulate a response.
 
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
 
     try rpc_dispatcher.add("add", addTwoNums);
@@ -352,7 +352,7 @@ documentation for details.
 Here's an example on using `struct` as parameter and return value of a RPC handler.
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     try rpc_dispatcher.add("weigh-cat", weighCat);
     try rpc_dispatcher.add("make-cat", makeCat);
     try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{});
@@ -533,7 +533,7 @@ For example,
 
 ```zig
 {
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
     rpc_dispatcher.setOnBefore(null, onBefore);
     rpc_dispatcher.setOnAfter(null, onAfter);

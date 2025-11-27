@@ -18,7 +18,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Create a RpcDispatcher for the JSON-RPC handlers.
-    var rpc_dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
 
     // Register each RPC method with a handling function.

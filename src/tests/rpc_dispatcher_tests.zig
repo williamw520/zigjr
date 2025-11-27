@@ -348,7 +348,7 @@ test "rpc_dispatcher fn0 and variants with DispatchCtx" {
         .logger = nop_logger.asLogger(),
     };
 
-    var dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer dispatcher.deinit();
     const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
     try dispatcher.add("fn0", fn0);
@@ -393,7 +393,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
         .logger = nop_logger.asLogger(),
     };
 
-    var dispatcher = zigjr.RpcDispatcher.init(alloc);
+    var dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer dispatcher.deinit();
     const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
     try dispatcher.add("fn1", fn1);
@@ -427,7 +427,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -452,7 +452,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -525,7 +525,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -594,7 +594,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -678,7 +678,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -711,7 +711,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -785,7 +785,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -822,7 +822,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -861,7 +861,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -900,7 +900,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -938,7 +938,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -979,7 +979,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1025,7 +1025,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1056,7 +1056,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1087,7 +1087,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1118,7 +1118,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1157,7 +1157,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1196,7 +1196,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1237,7 +1237,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1278,7 +1278,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1354,7 +1354,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
@@ -1440,7 +1440,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
