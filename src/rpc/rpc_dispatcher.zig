@@ -37,108 +37,210 @@ pub const H_ON_ERROR    = "rpc.on-error";       // called when handler returns a
 /// Implements the RequestDispatcher interface.
 /// The dispatcher is thread-safe in general once it's set up, as long as
 /// the addXX and setXX() methods are not called afterward.
-pub const RpcDispatcher = struct {
-    const Self = @This();
+/// P is the type of data struct for the per-request user props.
+pub fn RpcDispatcher(P: type) type {
+    const RpcHandlerP = json_call.RpcHandler(P);
+    const DispatchCtxP = DispatchCtx(P);
 
-    handlers:           StringHashMap(json_call.RpcHandler),
+    return struct {
+        const Self = @This();
 
-    pub fn init(alloc: Allocator) error{OutOfMemory}!Self {
-        var self: Self = .{
-            .handlers = StringHashMap(json_call.RpcHandler).init(alloc),
-        };
-        try self.addInner(H_PRE_REQUEST, null, defaultPreRequest);
-        try self.addInner(H_FALLBACK, null, defaultFallback);
-        try self.addInner(H_END_REQUEST, null, defaultEndRequest);
-        try self.addInner(H_ON_ERROR, null, defaultOnError);
-        return self;
-    }
+        handlers:   StringHashMap(RpcHandlerP),
 
-    pub fn deinit(self: *Self) void {
-        self.handlers.deinit();
-    }
+        pub fn init(alloc: Allocator) error{OutOfMemory}!Self {
+            var self: Self = .{
+                .handlers = StringHashMap(RpcHandlerP).init(alloc),
+            };
+            try self.addInner(H_PRE_REQUEST, null, defaultPreRequest);
+            try self.addInner(H_FALLBACK, null, defaultFallback);
+            try self.addInner(H_END_REQUEST, null, defaultEndRequest);
+            try self.addInner(H_ON_ERROR, null, defaultOnError);
+            return self;
+        }
 
-    pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) RegistrationErrors!void {
-        return self.addWithCtx(method, null, handler_fn);
-    }    
+        pub fn deinit(self: *Self) void {
+            self.handlers.deinit();
+        }
 
-    pub fn addWithCtx(self: *Self, method: []const u8, context: anytype,
-                      comptime handler_fn: anytype) RegistrationErrors!void {
-        try validateMethod(method);
+        pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) RegistrationErrors!void {
+            return self.addWithCtx(method, null, handler_fn);
+        }    
 
-        // Free any existing handler of the same method name.
-        _ = self.handlers.fetchRemove(method);
-        try self.addInner(method, context, handler_fn);
-    }
+        pub fn addWithCtx(self: *Self, method: []const u8, context: anytype,
+                          comptime handler_fn: anytype) RegistrationErrors!void {
+            try validateMethod(method);
 
-    fn addInner(self: *Self, method: []const u8, context: anytype,
-                comptime handler_fn: anytype) error{OutOfMemory}!void {
-        var dummy_null_ctx = {};
-        const ctx = if (@typeInfo(@TypeOf(context)) == .null) &dummy_null_ctx else context;
-        const h = json_call.makeRpcHandler(ctx, handler_fn);
-        try self.handlers.put(method, h);
-    }
+            // Free any existing handler of the same method name.
+            _ = self.handlers.fetchRemove(method);
+            try self.addInner(method, context, handler_fn);
+        }
 
-    pub fn has(self: *const Self, method: []const u8) bool {
-        return self.handlers.getPtr(method) != null;
-    }
+        fn addInner(self: *Self, method: []const u8, context: anytype,
+                    comptime handler_fn: anytype) error{OutOfMemory}!void {
+            var dummy_null_ctx = {};
+            const ctx = if (@typeInfo(@TypeOf(context)) == .null) &dummy_null_ctx else context;
+            const h = json_call.makeRpcHandler(ctx, P, handler_fn);
+            try self.handlers.put(method, h);
+        }
 
-    /// Run a handler on the request and generate a DispatchResult.
-    /// Return any error during the function call.  Caller handles any error.
-    /// Call free() to free the DispatchResult.
-    // TODO: remove anyerror. Remove DispatchResult; move it to dc.
-    pub fn dispatch(self: *const Self, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
-        var cc: DispatchCtx = .{
-            .arena = dc.arena,
-            .logger = dc.logger,
-            .request = req,
-        };
+        pub fn has(self: *const Self, method: []const u8) bool {
+            return self.handlers.getPtr(method) != null;
+        }
 
-        // zigjr.asPtr(UR, dc.user_data);
-        self.callHook(&cc, H_PRE_REQUEST);
+        /// Run a handler on the request and generate a DispatchResult.
+        /// Return any error during the function call.  Caller handles any error.
+        /// Call free() to free the DispatchResult.
+        // TODO: remove anyerror. Remove DispatchResult; move it to dc.
+        pub fn dispatch(self: *const Self, dc: *DispatchCtxImpl) anyerror!DispatchResult {
+            var cc: DispatchCtxP = .{ .dc_impl = dc };
 
-        return self.callMethod(&cc) catch |err| {
-            // TODO: set dc.err and result
-            self.callHook(&cc, H_ON_ERROR);
-            return DispatchResult.withAnyErr(err);
-        };
-    }
+            // zigjr.asPtr(UR, dc.user_data);
+            self.callHook(&cc, H_PRE_REQUEST);
 
-    fn callMethod(self: *const Self, cc: *DispatchCtx) anyerror!DispatchResult {
-        const result = if (self.handlers.getPtr(cc.request.method)) |h| blk: {
-            break :blk try h.invoke(cc, cc.request.params);
-        } else blk: {
-            if (self.handlers.getPtr(H_FALLBACK)) |h| {
-                break :blk try h.invoke(cc, .{ .null = {}});
-            }
-            unreachable;
-        };
-        // TODO: set dc.result
-        return result;
-    }
+            return self.callMethod(&cc) catch |err| {
+                // TODO: set dc.err and result
+                self.callHook(&cc, H_ON_ERROR);
+                return DispatchResult.withAnyErr(err);
+            };
+        }
 
-    fn callHook(self: *const Self, cc: *DispatchCtx, method: []const u8) void {
-        if (self.handlers.getPtr(method)) |h| {
-            _ = h.invoke(cc, .{ .null = {} }) catch |e| {
-                std.debug.print("Pre-request handler {s} cannot return an error, but got error: {any}\n", .{method, e});
+        fn callMethod(self: *const Self, cc: *DispatchCtxP) anyerror!DispatchResult {
+            const result = if (self.handlers.getPtr(cc.request().method)) |h| blk: {
+                break :blk try h.invoke(cc, cc.request().params);
+            } else blk: {
+                if (self.handlers.getPtr(H_FALLBACK)) |h| {
+                    break :blk try h.invoke(cc, .{ .null = {}});
+                }
                 unreachable;
             };
-        } else {
-            unreachable;
+            // TODO: set dc.result
+            return result;
         }
-    }
 
-    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtxImpl) void {
-        var cc: DispatchCtx = .{
-            .arena = dc.arena,
-            .logger = dc.logger,
-            .request = dc.request,
-        };
-        self.callHook(&cc, H_END_REQUEST);
-        dc.reset();
-        // Caller is responsible to reset the arena after this point.
-        // Caller might batch processing several requests before reseting the arena.
-    }
-};
+        fn callHook(self: *const Self, cc: *DispatchCtxP, method: []const u8) void {
+            if (self.handlers.getPtr(method)) |h| {
+                _ = h.invoke(cc, .{ .null = {} }) catch |e| {
+                    std.debug.print("Pre-request handler {s} cannot return an error, but got error: {any}\n", .{method, e});
+                    unreachable;
+                };
+            } else {
+                unreachable;
+            }
+        }
+
+        pub fn dispatchEnd(self: *const Self, dc: *DispatchCtxImpl) void {
+            var cc: DispatchCtxP = .{ .dc_impl = dc };
+            self.callHook(&cc, H_END_REQUEST);
+            dc.reset();
+            // Caller is responsible to reset the arena after this point.
+            // Caller might batch processing several requests before reseting the arena.
+        }
+    };
+}
+
+// pub const RpcDispatcher = struct {
+//     const Self = @This();
+
+//     handlers:           StringHashMap(json_call.RpcHandler),
+
+//     pub fn init(alloc: Allocator) error{OutOfMemory}!Self {
+//         var self: Self = .{
+//             .handlers = StringHashMap(json_call.RpcHandler).init(alloc),
+//         };
+//         try self.addInner(H_PRE_REQUEST, null, defaultPreRequest);
+//         try self.addInner(H_FALLBACK, null, defaultFallback);
+//         try self.addInner(H_END_REQUEST, null, defaultEndRequest);
+//         try self.addInner(H_ON_ERROR, null, defaultOnError);
+//         return self;
+//     }
+
+//     pub fn deinit(self: *Self) void {
+//         self.handlers.deinit();
+//     }
+
+//     pub fn add(self: *Self, method: []const u8, comptime handler_fn: anytype) RegistrationErrors!void {
+//         return self.addWithCtx(method, null, handler_fn);
+//     }    
+
+//     pub fn addWithCtx(self: *Self, method: []const u8, context: anytype,
+//                       comptime handler_fn: anytype) RegistrationErrors!void {
+//         try validateMethod(method);
+
+//         // Free any existing handler of the same method name.
+//         _ = self.handlers.fetchRemove(method);
+//         try self.addInner(method, context, handler_fn);
+//     }
+
+//     fn addInner(self: *Self, method: []const u8, context: anytype,
+//                 comptime handler_fn: anytype) error{OutOfMemory}!void {
+//         var dummy_null_ctx = {};
+//         const ctx = if (@typeInfo(@TypeOf(context)) == .null) &dummy_null_ctx else context;
+//         const h = json_call.makeRpcHandler(ctx, handler_fn);
+//         try self.handlers.put(method, h);
+//     }
+
+//     pub fn has(self: *const Self, method: []const u8) bool {
+//         return self.handlers.getPtr(method) != null;
+//     }
+
+//     /// Run a handler on the request and generate a DispatchResult.
+//     /// Return any error during the function call.  Caller handles any error.
+//     /// Call free() to free the DispatchResult.
+//     // TODO: remove anyerror. Remove DispatchResult; move it to dc.
+//     pub fn dispatch(self: *const Self, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
+//         var cc: DispatchCtx = .{
+//             .arena = dc.arena,
+//             .logger = dc.logger,
+//             .request = req,
+//         };
+
+//         // zigjr.asPtr(UR, dc.user_data);
+//         self.callHook(&cc, H_PRE_REQUEST);
+
+//         return self.callMethod(&cc) catch |err| {
+//             // TODO: set dc.err and result
+//             self.callHook(&cc, H_ON_ERROR);
+//             return DispatchResult.withAnyErr(err);
+//         };
+//     }
+
+//     fn callMethod(self: *const Self, cc: *DispatchCtx) anyerror!DispatchResult {
+//         const result = if (self.handlers.getPtr(cc.request.method)) |h| blk: {
+//             break :blk try h.invoke(cc, cc.request.params);
+//         } else blk: {
+//             if (self.handlers.getPtr(H_FALLBACK)) |h| {
+//                 break :blk try h.invoke(cc, .{ .null = {}});
+//             }
+//             unreachable;
+//         };
+//         // TODO: set dc.result
+//         return result;
+//     }
+
+//     fn callHook(self: *const Self, cc: *DispatchCtx, method: []const u8) void {
+//         if (self.handlers.getPtr(method)) |h| {
+//             _ = h.invoke(cc, .{ .null = {} }) catch |e| {
+//                 std.debug.print("Pre-request handler {s} cannot return an error, but got error: {any}\n", .{method, e});
+//                 unreachable;
+//             };
+//         } else {
+//             unreachable;
+//         }
+//     }
+
+//     pub fn dispatchEnd(self: *const Self, dc: *DispatchCtxImpl) void {
+//         var cc: DispatchCtx = .{
+//             .arena = dc.arena,
+//             .logger = dc.logger,
+//             .request = dc.request,
+//         };
+//         self.callHook(&cc, H_END_REQUEST);
+//         dc.reset();
+//         // Caller is responsible to reset the arena after this point.
+//         // Caller might batch processing several requests before reseting the arena.
+//     }
+// };
+
 
 fn validateMethod(method: []const u8) RegistrationErrors!void {
     if (std.mem.startsWith(u8, method, "rpc.")) {   // By the JSON-RPC spec, "rpc." is reserved.
@@ -146,10 +248,10 @@ fn validateMethod(method: []const u8) RegistrationErrors!void {
     }
 }
 
-fn defaultPreRequest(_: *DispatchCtx) void {}
-fn defaultEndRequest(_: *DispatchCtx) void {}
-fn defaultOnError(_: *DispatchCtx) void {}
-fn defaultFallback(_: *DispatchCtx) anyerror!DispatchResult {
+fn defaultPreRequest() void {}
+fn defaultEndRequest() void {}
+fn defaultOnError() void {}
+fn defaultFallback() anyerror!DispatchResult {
     return DispatchErrors.MethodNotFound;
 }
 

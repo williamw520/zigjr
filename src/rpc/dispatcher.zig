@@ -46,7 +46,7 @@ pub const DispatchCtxImpl = struct {
 /// This is for the request handlers in a RPC server handling the incoming requests.
 pub const RequestDispatcher = struct {
     impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) anyerror!DispatchResult,
     dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) void,
 
     // Interface is implemented by the 'impl' object.
@@ -56,9 +56,9 @@ pub const RequestDispatcher = struct {
             @compileError("impl_obj should be a pointer, but its type is " ++ @typeName(ImplType));
 
         const Delegate = struct {
-            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
+            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) anyerror!DispatchResult {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
-                return impl.dispatch(dc, req);
+                return impl.dispatch(dc);
             }
 
             fn dispatchEnd(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) void {
@@ -76,8 +76,8 @@ pub const RequestDispatcher = struct {
 
     // The implementation must have these methods.
 
-    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
-        return self.dispatch_fn(self.impl_ptr, dc, req);
+    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtxImpl) anyerror!DispatchResult {
+        return self.dispatch_fn(self.impl_ptr, dc);
     }
 
     pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtxImpl, req: *const RpcRequest, dresult: DispatchResult) void {
