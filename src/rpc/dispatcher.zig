@@ -15,15 +15,39 @@ const zigjr = @import("../zigjr.zig");
 const RpcRequest = zigjr.RpcRequest;
 const RpcResponse = zigjr.RpcResponse;
 const ErrorCode = zigjr.errors.ErrorCode;
-const DispatchCtx = zigjr.DispatchCtx;
+
+
+pub const nop_request = RpcRequest{};
+
+
+pub const DispatchCtxImpl = struct {
+    arena:          Allocator,      // per-request arena allocator
+    logger:         zigjr.Logger,
+    // per-request request and result
+    request:        *const zigjr.RpcRequest = &nop_request,
+    result:         ?*const zigjr.DispatchResult = null,    // TODO: set to nop_result
+    // per-request user data; set up by the pre-request and cleaned up by the end-request hook.
+    user_props:     *anyopaque = undefined,
+
+    // TODO: add session id, session manager, and others.
+    // session_id:     SessionId,
+    // session_mgr:    *SessionMgr,
+    // session_arena:  Allocator,
+
+    pub fn reset(self: *DispatchCtxImpl) void {
+        self.request = &nop_request;
+        // TODO: 
+        // self.result = ;
+    }
+};
 
 
 /// RequestDispatcher interface
 /// This is for the request handlers in a RPC server handling the incoming requests.
 pub const RequestDispatcher = struct {
     impl_ptr:       *anyopaque,
-    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult,
-    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, dc: *DispatchCtx) void,
+    dispatch_fn:    *const fn(impl_ptr: *anyopaque, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult,
+    dispatchEnd_fn: *const fn(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) void,
 
     // Interface is implemented by the 'impl' object.
     pub fn implBy(impl_obj: anytype) RequestDispatcher {
@@ -32,12 +56,12 @@ pub const RequestDispatcher = struct {
             @compileError("impl_obj should be a pointer, but its type is " ++ @typeName(ImplType));
 
         const Delegate = struct {
-            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
+            fn dispatch(impl_ptr: *anyopaque, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatch(dc, req);
             }
 
-            fn dispatchEnd(impl_ptr: *anyopaque, dc: *DispatchCtx) void {
+            fn dispatchEnd(impl_ptr: *anyopaque, dc: *DispatchCtxImpl) void {
                 const impl: ImplType = @ptrCast(@alignCast(impl_ptr));
                 return impl.dispatchEnd(dc);
             }
@@ -52,11 +76,11 @@ pub const RequestDispatcher = struct {
 
     // The implementation must have these methods.
 
-    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
+    pub fn dispatch(self: RequestDispatcher, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
         return self.dispatch_fn(self.impl_ptr, dc, req);
     }
 
-    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtx, req: *const RpcRequest, dresult: DispatchResult) void {
+    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtxImpl, req: *const RpcRequest, dresult: DispatchResult) void {
         return self.dispatchEnd_fn(self.impl_ptr, dc, req, dresult);
     }
 };

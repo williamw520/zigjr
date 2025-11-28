@@ -15,15 +15,17 @@ const StringHashMap = std.hash_map.StringHashMap;
 const AutoHashMap = std.hash_map.AutoHashMap;
 const allocPrint = std.fmt.allocPrint;
 
-const zigjr = @import("../zigjr.zig");
+const request = @import("../jsonrpc/request.zig");
+const RpcRequest = request.RpcRequest;
 
-const RpcRequest = zigjr.RpcRequest;
-const RequestDispatcher = zigjr.RequestDispatcher;
-const DispatchResult = zigjr.DispatchResult;
-const DispatchErrors = zigjr.DispatchErrors;
-const DispatchCtx = zigjr.DispatchCtx;
+const dispatcher = @import("dispatcher.zig");
+const RequestDispatcher = dispatcher.RequestDispatcher;
+const DispatchResult = dispatcher.DispatchResult;
+const DispatchErrors = dispatcher.DispatchErrors;
+const DispatchCtxImpl = dispatcher.DispatchCtxImpl;
 
 const json_call = @import("json_call.zig");
+const DispatchCtx = json_call.DispatchCtx;
 
 /// Handler names for hooks on different stages of request handling:
 pub const H_PRE_REQUEST = "rpc.pre-request";    // called before a request is handled.
@@ -84,23 +86,29 @@ pub const RpcDispatcher = struct {
     /// Return any error during the function call.  Caller handles any error.
     /// Call free() to free the DispatchResult.
     // TODO: remove anyerror. Remove DispatchResult; move it to dc.
-    pub fn dispatch(self: *const Self, dc: *DispatchCtx, req: *const RpcRequest) anyerror!DispatchResult {
-        dc.request = req;
-        self.callHook(dc, H_PRE_REQUEST);
+    pub fn dispatch(self: *const Self, dc: *DispatchCtxImpl, req: *const RpcRequest) anyerror!DispatchResult {
+        var cc: DispatchCtx = .{
+            .arena = dc.arena,
+            .logger = dc.logger,
+            .request = req,
+        };
 
-        return self.callMethod(dc) catch |err| {
+        // zigjr.asPtr(UR, dc.user_data);
+        self.callHook(&cc, H_PRE_REQUEST);
+
+        return self.callMethod(&cc) catch |err| {
             // TODO: set dc.err and result
-            self.callHook(dc, H_ON_ERROR);
+            self.callHook(&cc, H_ON_ERROR);
             return DispatchResult.withAnyErr(err);
         };
     }
 
-    fn callMethod(self: *const Self, dc: *DispatchCtx) anyerror!DispatchResult {
-        const result = if (self.handlers.getPtr(dc.request.method)) |h| blk: {
-            break :blk try h.invoke(dc, dc.request.params);
+    fn callMethod(self: *const Self, cc: *DispatchCtx) anyerror!DispatchResult {
+        const result = if (self.handlers.getPtr(cc.request.method)) |h| blk: {
+            break :blk try h.invoke(cc, cc.request.params);
         } else blk: {
             if (self.handlers.getPtr(H_FALLBACK)) |h| {
-                break :blk try h.invoke(dc, .{ .null = {}});
+                break :blk try h.invoke(cc, .{ .null = {}});
             }
             unreachable;
         };
@@ -108,9 +116,9 @@ pub const RpcDispatcher = struct {
         return result;
     }
 
-    fn callHook(self: *const Self, dc: *DispatchCtx, method: []const u8) void {
+    fn callHook(self: *const Self, cc: *DispatchCtx, method: []const u8) void {
         if (self.handlers.getPtr(method)) |h| {
-            _ = h.invoke(dc, .{ .null = {} }) catch |e| {
+            _ = h.invoke(cc, .{ .null = {} }) catch |e| {
                 std.debug.print("Pre-request handler {s} cannot return an error, but got error: {any}\n", .{method, e});
                 unreachable;
             };
@@ -119,8 +127,13 @@ pub const RpcDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtx) void {
-        self.callHook(dc, H_END_REQUEST);
+    pub fn dispatchEnd(self: *const Self, dc: *DispatchCtxImpl) void {
+        var cc: DispatchCtx = .{
+            .arena = dc.arena,
+            .logger = dc.logger,
+            .request = dc.request,
+        };
+        self.callHook(&cc, H_END_REQUEST);
         dc.reset();
         // Caller is responsible to reset the arena after this point.
         // Caller might batch processing several requests before reseting the arena.
@@ -132,12 +145,6 @@ fn validateMethod(method: []const u8) RegistrationErrors!void {
         return RegistrationErrors.InvalidMethodName;
     }
 }
-
-// var NopCtx = {};
-// fn onBeforeNop(_: *anyopaque, _: Allocator, _: RpcRequest) void {}
-// fn onAfterNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: DispatchResult) void {}
-// fn onEndNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: DispatchResult) void {}
-// fn onErrorNop(_: *anyopaque, _: Allocator, _: RpcRequest, _: anyerror) void {}
 
 fn defaultPreRequest(_: *DispatchCtx) void {}
 fn defaultEndRequest(_: *DispatchCtx) void {}
