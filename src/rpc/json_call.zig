@@ -34,29 +34,6 @@ pub inline fn asTPtr(T: type, opaque_ptr: *anyopaque) T {
     return @as(T, @ptrCast(@alignCast(opaque_ptr)));
 }
 
-// pub const DispatchCtx = struct {
-//     arena:          Allocator,      // per-request arena allocator
-//     logger:         zigjr.Logger,
-//     // per-request request and result
-//     request:        *const zigjr.RpcRequest = &dispatcher.nop_request,
-//     result:         *const zigjr.DispatchResult = undefined,    // TODO: set to nop_result
-//     err:            anyerror = undefined,
-//     // per-request user data; set up by the before-request and cleaned up by the after-request hook.
-//     user_data:      *anyopaque = undefined,
-
-//     // TODO: add session id, session manager, and others.
-//     // session_id:     SessionId,
-//     // session_mgr:    *SessionMgr,
-//     // session_arena:  Allocator,
-
-//     pub fn reset(self: *DispatchCtx) void {
-//         self.request = &dispatcher.nop_request;
-//         // TODO: 
-//         // self.result = ;
-//         // self.err = ;
-//         // self.user_data = ;
-//     }
-// };
 
 /// P as the type of the user_props.
 pub fn DispatchCtx(P: type) type {
@@ -86,9 +63,6 @@ pub fn DispatchCtx(P: type) type {
         pub fn setProps(self: *Self, p: *P) void {
             self.dc_impl.user_props = p;
         }
-        // pub fn reset(self: *Self) void {
-        //     self.dc.reset();
-        // }
     };
 }
 
@@ -176,9 +150,9 @@ pub fn makeRpcHandler(context: anytype, comptime P: type, comptime F: anytype) R
         fn call(ctx: ?*anyopaque, cc: *DispatchCtx(P), params_value: Value) anyerror!DispatchResult {
             // Function expects a single Value or a single struct object.
             if (hinfo.is_value1) {
-                return callOnValueCC(F, hinfo, ctx, cc, params_value);
+                return callOnValue(F, hinfo, ctx, cc, params_value);
             } else if (hinfo.is_obj1) {
-                return callOnObjectCC(F, hinfo, ctx, cc, params_value);
+                return callOnObject(F, hinfo, ctx, cc, params_value);
             }
             // Function expects no parameter or an array of parameters.
             switch (params_value) {
@@ -186,12 +160,12 @@ pub fn makeRpcHandler(context: anytype, comptime P: type, comptime F: anytype) R
                     return callOnNull(F, hinfo, ctx, cc);
                 },
                 .array  => {
-                    return callOnArrayCC(F, hinfo, ctx, cc, params_value.array);
+                    return callOnArray(F, hinfo, ctx, cc, params_value.array);
                 },
                 .bool, .integer, .float, .string => {
                     // JSON-RPC spec doesn't support primitive JSON types for the "params" property.
                     // Add them here for completeness.
-                    return callOnPrimitiveCC(F, hinfo, ctx, cc, params_value);
+                    return callOnPrimitive(F, hinfo, ctx, cc, params_value);
                 },
                 else    => {
                     std.debug.print("Unexpected JSON params: {any}\n", .{params_value});
@@ -414,8 +388,8 @@ inline fn hasField(comptime T: type, f_name: []const u8) bool {
     return false;
 }
 
-fn callOnPrimitiveCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                     cc: *DispatchCtx(hinfo.DCP), json_primitive: Value) anyerror!DispatchResult {
+fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
+                   cc: *DispatchCtx(hinfo.DCP), json_primitive: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -425,8 +399,8 @@ fn callOnPrimitiveCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*an
     return callF(F, hinfo, args, cc.arena());
 }
 
-fn callOnValueCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                 cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
+fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
+               cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
@@ -437,8 +411,8 @@ fn callOnValueCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopa
     return callF(F, hinfo, args, cc.arena());
 }
 
-fn callOnObjectCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, 
-                  cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
+fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, 
+                cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -471,8 +445,8 @@ fn callOnNull(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque
     return callF(F, hinfo, args, cc.arena());
 }
 
-fn callOnArrayCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                 cc: *DispatchCtx(hinfo.DCP), array: Array) anyerror!DispatchResult {
+fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
+               cc: *DispatchCtx(hinfo.DCP), array: Array) anyerror!DispatchResult {
     if (hinfo.is_optional1 and array.items.len == 0) {
         var nullArray = Array.init(cc.arena());
         try nullArray.append( .{ .null = {} } );
@@ -485,7 +459,7 @@ fn callOnArrayCC(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopa
     }
 
     // Pack the JSON array params into a tuple for F's params.
-    const args: hinfo.tuple_type = try arrayToTupleCC(hinfo, ctx, cc, array);
+    const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, cc, array);
     return callF(F, hinfo, args, cc.arena());
 }
 
@@ -527,7 +501,7 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
     }
 }
 
-fn initArgsTupleCC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP)) hinfo.tuple_type {
+fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP)) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     // Assign the context and alloc to the appropriate function argument slots in the tuple.
@@ -556,7 +530,7 @@ inline fn idxStr(comptime idx: usize) []const u8 {
 
 fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
                     value: Value) hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTupleCC(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     @field(tuple, t_field.name) = value;        // Value for the single argument.
@@ -565,7 +539,7 @@ fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
 
 fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
                     primitive_value: Value) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTupleCC(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     const value = try ValueAs(t_field.type).from(primitive_value);
@@ -575,32 +549,7 @@ fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
 
 fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
                 values: Array) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTupleCC(hinfo, ctx, cc);
-    const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
-    const start_idx = hinfo.user_idx;
-    // Fill in the rest of the user specific parameters.
-    inline for (start_idx .. tt_info.fields.len) |i| {
-        const t_field = tt_info.fields[i];
-        const j_value = values.items[i - start_idx];
-        if (isValue(t_field.type)) {
-            @field(tuple, t_field.name) = j_value;
-        } else if (isStruct(t_field.type)) {
-            const parsed = try std.json.parseFromValue(t_field.type, cc.arena(), j_value, .{
-                .ignore_unknown_fields = true,
-            });
-            @field(tuple, t_field.name) = parsed.value;
-        // } else if (isArray(t_field.type)) {
-        //     // TODO: handle Array function paramenter.
-        } else {
-            @field(tuple, t_field.name) = try ValueAs(t_field.type).from(j_value);
-        }
-    }
-    return tuple;
-}
-
-fn arrayToTupleCC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
-                  values: Array) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTupleCC(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const start_idx = hinfo.user_idx;
     // Fill in the rest of the user specific parameters.
@@ -626,7 +575,7 @@ fn arrayToTupleCC(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCt
 // For optional paramenter, hinfo.obj1_type already has the optional type.
 fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
                  object: hinfo.obj1_type) hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTupleCC(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     @field(tuple, t_field.name) = object;
