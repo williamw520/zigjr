@@ -391,48 +391,50 @@ test "rpc_dispatcher fn0 and variants with DispatchCtx" {
 
 }
 
-// test "rpc_dispatcher fn1 and variants with DispatchCtx" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-//     var arena = ArenaAllocator.init(alloc);
-//     defer arena.deinit();
-//     var nop_logger = zigjr.NopLogger{};
+test "rpc_dispatcher fn1 and variants with DispatchCtx" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+    var arena = ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    var nop_logger = zigjr.NopLogger{};
 
-//     var dc: zigjr.DispatchCtx = .{
-//         .arena = arena.allocator(),
-//         .logger = nop_logger.asLogger(),
-//     };
+    var dc: DispatchCtxImpl = .{
+        .arena = arena.allocator(),
+        .logger = nop_logger.asLogger(),
+    };
 
-//     var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//     defer dispatcher.deinit();
-//     const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
-//     try dispatcher.add("fn1", fn1);
-//     try dispatcher.add("fn1_with_err", fn1_with_err);
-//     try dispatcher.add("fn1_return_value", fn1_return_value);
-//     try dispatcher.add("fn1_return_value_with_err", fn1_return_value_with_err);
-//     try dispatcher.add("fn1_alloc_with_err", fn1_alloc_with_err);
+    var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    defer dispatcher.deinit();
+    const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
+    try dispatcher.add("fn1", fn1);
+    try dispatcher.add("fn1_with_err", fn1_with_err);
+    try dispatcher.add("fn1_return_value", fn1_return_value);
+    try dispatcher.add("fn1_return_value_with_err", fn1_return_value_with_err);
+    try dispatcher.add("fn1_alloc_with_err", fn1_alloc_with_err);
 
-//     {
-//         var parsed_req = zigjr.parseRpcRequest(alloc,
-//             \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-//         );
-//         defer parsed_req.deinit();
-//         const req = try parsed_req.request();
-//         _ = try req_dispatcher.dispatch(&dc, &req);
-//         try testing.expect(fn1_called);
-//     }
+    {
+        var parsed_req = zigjr.parseRpcRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
+        );
+        defer parsed_req.deinit();
+        const req = try parsed_req.request();
+        dc.request = &req;
+        _ = try req_dispatcher.dispatch(&dc);
+        try testing.expect(fn1_called);
+    }
 
-//     {
-//         var parsed_req = zigjr.parseRpcRequest(alloc,
-//             \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
-//         );
-//         defer parsed_req.deinit();
-//         const req = try parsed_req.request();
-//         _ = try req_dispatcher.dispatch(&dc, &req);
-//         try testing.expect(fn1_with_err_called);
-//     }
-// }
+    {
+        var parsed_req = zigjr.parseRpcRequest(alloc,
+            \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
+        );
+        defer parsed_req.deinit();
+        const req = try parsed_req.request();
+        dc.request = &req;
+        _ = try req_dispatcher.dispatch(&dc);
+        try testing.expect(fn1_with_err_called);
+    }
+}
 
 // test "rpc_dispatcher fn0" {
 //     var gpa = std.heap.DebugAllocator(.{}){};

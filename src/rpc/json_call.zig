@@ -542,7 +542,7 @@ fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
     var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
-    const value = try ValueAs(t_field.type).from(primitive_value);
+    const value = try valueAs(t_field.type).from(primitive_value);
     @field(tuple, t_field.name) = value;
     return tuple;
 }
@@ -566,7 +566,7 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(
         // } else if (isArray(t_field.type)) {
         //     // TODO: handle Array function paramenter.
         } else {
-            @field(tuple, t_field.name) = try ValueAs(t_field.type).from(j_value);
+            @field(tuple, t_field.name) = try valueAs(t_field.type).from(j_value);
         }
     }
     return tuple;
@@ -584,7 +584,7 @@ fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx
 
 /// Convert the std.json.Value to the primitive type (bool, i64, f64, []const u8),
 /// within the scope of JSON data type.
-fn ValueAs(comptime ParamType: type) type {
+fn valueAs(comptime ParamType: type) type {
     const is_optional = @typeInfo(ParamType) == .optional;
     const OParamType = unwrapOptionalType(ParamType).?;
     const pt_info = @typeInfo(OParamType);
@@ -683,26 +683,26 @@ test "Test simple JSON value conversion." {
     const alloc = gpa.allocator();
     _=alloc;
 
-    try testing.expectEqual(ValueAs(i64).from(.{ .integer = 10 }), 10);
-    try testing.expectEqual(ValueAs(i128).from(.{ .integer = 10 }), 10);
+    try testing.expectEqual(valueAs(i64).from(.{ .integer = 10 }), 10);
+    try testing.expectEqual(valueAs(i128).from(.{ .integer = 10 }), 10);
 
-    try testing.expectEqual(ValueAs(bool).from(.{ .bool = true }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .bool = false }), false);
-    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 0 }), false);
-    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 1 }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .integer = 2 }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .integer = -2 }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .float = 0 }), false);
-    try testing.expectEqual(ValueAs(bool).from(.{ .float = 1 }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .float = -1 }), true);
-    try testing.expectEqual(ValueAs(bool).from(.{ .float = -1.2 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .bool = true }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .bool = false }), false);
+    try testing.expectEqual(valueAs(bool).from(.{ .integer = 0 }), false);
+    try testing.expectEqual(valueAs(bool).from(.{ .integer = 1 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .integer = 2 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .integer = -2 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .float = 0 }), false);
+    try testing.expectEqual(valueAs(bool).from(.{ .float = 1 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .float = -1 }), true);
+    try testing.expectEqual(valueAs(bool).from(.{ .float = -1.2 }), true);
 
-    try testing.expectEqual(ValueAs(f64).from(.{ .float = 1.2 }), 1.2);
-    try testing.expectEqual(ValueAs(f64).from(.{ .float = -1.2 }), -1.2);
-    try testing.expectEqual(ValueAs(f128).from(.{ .float = 10 }), 10);
-    try testing.expectEqual(ValueAs(f64).from(.{ .integer = 12 }), 12);
+    try testing.expectEqual(valueAs(f64).from(.{ .float = 1.2 }), 1.2);
+    try testing.expectEqual(valueAs(f64).from(.{ .float = -1.2 }), -1.2);
+    try testing.expectEqual(valueAs(f128).from(.{ .float = 10 }), 10);
+    try testing.expectEqual(valueAs(f64).from(.{ .integer = 12 }), 12);
 
-    try testing.expectEqualSlices(u8, try ValueAs([]const u8).from(.{ .string = "hello" }), "hello");
+    try testing.expectEqualSlices(u8, try valueAs([]const u8).from(.{ .string = "hello" }), "hello");
 }
 
 test "Test simple JSON value conversion on invalid JSON values." {
@@ -711,22 +711,22 @@ test "Test simple JSON value conversion on invalid JSON values." {
     const alloc = gpa.allocator();
 
     _=alloc;
-    try testing.expectEqual(ValueAs(i64).from(.{ .float = 0 }), JrErrors.InvalidJsonValueType);
-    try testing.expectEqual(ValueAs(i128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
-    try testing.expectEqual(ValueAs(i64).from(.{ .string = "abc" }), error.InvalidCharacter);
+    try testing.expectEqual(valueAs(i64).from(.{ .float = 0 }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(valueAs(i128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(valueAs(i64).from(.{ .string = "abc" }), error.InvalidCharacter);
 
-    try testing.expectEqual(ValueAs(f128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
-    try testing.expectEqual(ValueAs(f64).from(.{ .string = "abc" }), error.InvalidCharacter);
+    try testing.expectEqual(valueAs(f128).from(.{ .bool = true }), JrErrors.InvalidJsonValueType);
+    try testing.expectEqual(valueAs(f64).from(.{ .string = "abc" }), error.InvalidCharacter);
 }
 
 test "Test JSON value conversion with alloc." {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
-    const x = try ValueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });
+    const x = try valueAs([]const u8).fromAlloc(.{ .string = "hello" }, .{ .alloc = alloc });
     try testing.expectEqualSlices(u8, x, "hello");
 
-    try testing.expectEqual(ValueAs(i64).fromAlloc(.{ .integer = 10 }, .{ .alloc = alloc }), 10);
+    try testing.expectEqual(valueAs(i64).fromAlloc(.{ .integer = 10 }, .{ .alloc = alloc }), 10);
     
     alloc.free(x);
 }
