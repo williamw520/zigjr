@@ -58,8 +58,9 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
         const request_json = std.mem.trim(u8, frame_buf.written(), TRIM_SET);
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        const run_status = try pipeline.runRequest(request_json, writer, .{});
+        const run_status = try pipeline.runRequest(request_json);
         if (run_status.hasReply()) {
+            try writer.writeAll(pipeline.responseJson());
             try writer.writeByte(options.response_delimiter);
             try writer.flush();
         }
@@ -134,8 +135,8 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
 
     var frame_data = frame.FrameData.init(alloc);
     defer frame_data.deinit();
-    var response_buf = std.Io.Writer.Allocating.init(alloc);
-    defer response_buf.deinit();
+    // var response_buf = std.Io.Writer.Allocating.init(alloc);
+    // defer response_buf.deinit();
     var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
@@ -153,14 +154,17 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
         const request_json = std.mem.trim(u8, frame_data.getContent(), " \t");
         if (options.skip_blank_message and request_json.len == 0) continue;
 
-        response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
+        // response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
         options.logger.log("stream.requestsByContentLength", "request ", request_json);
 
-        const run_status = try pipeline.runRequest(request_json, &response_buf.writer, .{});
+        const run_status = try pipeline.runRequest(request_json);
         if (run_status.hasReply()) {
-            try frame.writeContentLengthFrame(writer, response_buf.written());
+            try frame.writeContentLengthFrame(writer, pipeline.responseJson());
             try writer.flush();
-            options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
+            options.logger.log("stream.requestsByContentLength", "response", pipeline.responseJson());
+            // try frame.writeContentLengthFrame(writer, response_buf.written());
+            // try writer.flush();
+            // options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
         } else {
             options.logger.log("stream.requestsByContentLength", "response", "");
         }
