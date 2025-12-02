@@ -133,7 +133,7 @@ pub fn RpcDispatcher(P: type) type {
             self.callHook(&cc, H_END_REQUEST);
             dc.reset();
             // Caller is responsible to reset the arena after this point.
-            // Caller might batch processing several requests before reseting the arena.
+            // Caller might be batch-processing several requests before reseting the arena.
         }
     };
 }

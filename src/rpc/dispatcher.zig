@@ -36,8 +36,8 @@ pub const DispatchCtxImpl = struct {
 
     pub fn reset(self: *DispatchCtxImpl) void {
         self.request = &nop_request;
-        // TODO: 
-        // self.result = ;
+        self.result = null;
+        // TODO: clean up self.user_props?
     }
 };
 
@@ -80,8 +80,8 @@ pub const RequestDispatcher = struct {
         return self.dispatch_fn(self.impl_ptr, dc);
     }
 
-    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtxImpl, req: *const RpcRequest, dresult: DispatchResult) void {
-        return self.dispatchEnd_fn(self.impl_ptr, dc, req, dresult);
+    pub fn dispatchEnd(self: RequestDispatcher, dc: *DispatchCtxImpl) void {
+        return self.dispatchEnd_fn(self.impl_ptr, dc);
     }
 };
 

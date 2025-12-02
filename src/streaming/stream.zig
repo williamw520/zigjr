@@ -59,7 +59,7 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
         if (options.skip_blank_message and request_json.len == 0) continue;
 
         const run_status = try pipeline.runRequest(request_json, writer, .{});
-        if (run_status.isReplied()) {
+        if (run_status.hasReply()) {
             try writer.writeByte(options.response_delimiter);
             try writer.flush();
         }
@@ -157,7 +157,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
         options.logger.log("stream.requestsByContentLength", "request ", request_json);
 
         const run_status = try pipeline.runRequest(request_json, &response_buf.writer, .{});
-        if (run_status.isReplied()) {
+        if (run_status.hasReply()) {
             try frame.writeContentLengthFrame(writer, response_buf.written());
             try writer.flush();
             options.logger.log("stream.requestsByContentLength", "response", response_buf.written());
@@ -235,7 +235,7 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
         const run_status = try pipeline.runMessage(alloc, message_json, &req_response_buf.writer, .{});
         switch (run_status.kind) {
             .request => {
-                if (run_status.isReplied())  {
+                if (run_status.hasReply())  {
                     try frame.writeContentLengthFrame(req_output_writer, req_response_buf.written());
                     try req_output_writer.flush();
                     options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.written());
