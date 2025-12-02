@@ -23,6 +23,7 @@ const frame = @import("frame.zig");
 const TRIM_SET = " \t\r\n";
 
 
+// TODO: Remove and update README
 /// Runs a loop to read a stream of delimitered JSON request messages (frames) from the reader,
 /// handle each one with the RpcDispatcher, and write the JSON responses to the writer.
 pub fn runByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *std.Io.Writer,

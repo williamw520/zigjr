@@ -43,7 +43,7 @@ pub fn main() !void {
     var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
     defer f_logger.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer rpc_dispatcher.deinit();
 
     // Register the MCP RPC methods.
@@ -54,8 +54,9 @@ pub fn main() !void {
     try rpc_dispatcher.addWithCtx("tools/call", &f_logger, mcp_tools_call);
 
     // Starts the JSON streaming pipeline from stdin to stdout.
-    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher,
-                                    .{ .logger = f_logger.asLogger() });
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, 
+                                         .{ .logger = f_logger.asLogger() });
 }
 
 // The MCP message handlers.

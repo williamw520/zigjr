@@ -18,7 +18,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Create a registry for the JSON-RPC registry.
-    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer rpc_dispatcher.deinit();
 
     // Register each RPC method with a handling function.
@@ -48,9 +48,9 @@ pub fn main() !void {
         std.debug.print("Request:  {s}\n", .{read_buf.written()});
 
         // Dispatch the JSON-RPC request to the handler, with result in response JSON.
-        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-            defer alloc.free(response);
-            std.debug.print("Response: {s}\n", .{response});
+        const run_status = try pipeline.runRequest(read_buf.written());
+        if (run_status.hasReply()) {
+            std.debug.print("Response: {s}\n", .{pipeline.responseJson()});
         } else {
             std.debug.print("No response\n", .{});
         }

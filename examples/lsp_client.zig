@@ -237,7 +237,7 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     } else {
         // LSP server can send 'server_to_client' notifications/events as JSON-RPC requests.
         // Use ZigJR's RpcRegistry and Fallback to process the request messages.
-        var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+        var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
         defer rpc_dispatcher.deinit();
 
         rpc_dispatcher.setOnBefore(null, onBefore);

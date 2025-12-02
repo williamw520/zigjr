@@ -28,8 +28,9 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer rpc_dispatcher.deinit();
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
 
     try rpc_dispatcher.add("add", Basic.add);                   // register functions in a struct scope.
     try rpc_dispatcher.add("subtract", Basic.subtract);
@@ -58,11 +59,11 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var my_logger = MyLogger{};
     if (args.by_delimiter) {
         // Handle streaming of requests separated by a delimiter (LF).
-        try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher,
-                                        .{ .logger = zigjr.Logger.implBy(&my_logger) });
+        try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher,
+                                             .{ .logger = zigjr.Logger.implBy(&my_logger) });
     } else if (args.by_length) {
         // Handle streaming of requests separated by the Content-Length header.
-        try zigjr.stream.runByContentLength(alloc, stdin, stdout, &rpc_dispatcher, .{});
+        try zigjr.stream.requestsByContentLength(alloc, stdin, stdout, dispatcher, .{});
     } else {
         usage();
     }

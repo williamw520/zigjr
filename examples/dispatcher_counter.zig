@@ -53,9 +53,9 @@ pub fn main() !void {
         try stdout.print("Request:  {s}\n", .{read_buf.written()});
 
         // Run request through the pipeline.
-        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-            defer alloc.free(response);
-            try stdout.print("Response: {s}\n", .{response});
+        const run_status = try pipeline.runRequest(read_buf.written());
+        if (run_status.hasReply()) {
+            try stdout.print("Response: {s}\n", .{pipeline.responseJson()});
         } else {
             try stdout.print("No response\n", .{});
         }
@@ -69,25 +69,22 @@ pub fn main() !void {
 const CounterDispatcher = struct {
     count:  isize = 1,                      // start with 1.
     
-    pub fn dispatch(self: *@This(), req_arena: Allocator, req: RpcRequest) !DispatchResult {
-        if (std.mem.eql(u8, req.method, "inc")) {
+    pub fn dispatch(self: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (std.mem.eql(u8, dc.request.method, "inc")) {
             self.count += 1;
             return DispatchResult.asNone(); // treat request as notification
-        } else if (std.mem.eql(u8, req.method, "dec")) {
+        } else if (std.mem.eql(u8, dc.request.method, "dec")) {
             self.count -= 1;
             return DispatchResult.asNone(); // treat request as notification
-        } else if (std.mem.eql(u8, req.method, "get")) {
-            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(req_arena, self.count, .{}));
+        } else if (std.mem.eql(u8, dc.request.method, "get")) {
+            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(dc.arena, self.count, .{}));
         } else {
             return DispatchResult.withErr(ErrorCode.MethodNotFound, "");
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), req_arena: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        switch (dresult) {
-            .result => req_arena.free(dresult.result),
-            else => {},
-        }
+    pub fn dispatchEnd(_: *@This(), dc: *zigjr.DispatchCtxImpl) void {
+        _=dc;
     }
 };
 

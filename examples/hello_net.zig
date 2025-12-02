@@ -42,8 +42,12 @@ pub fn main() !void {
     };
 
     const rpc_dispatcher = try createDispatcher(alloc, &ctx);
-    defer destroyDispatcher(alloc, rpc_dispatcher);
-    try runServer(&ctx, rpc_dispatcher);
+    defer {
+        rpc_dispatcher.deinit();
+        alloc.destroy(rpc_dispatcher);
+    }
+    const dispatcher = zigjr.RequestDispatcher.implBy(rpc_dispatcher);
+    try runServer(&ctx, dispatcher);
 }
 
 const ServerCtx = struct {
@@ -53,9 +57,9 @@ const ServerCtx = struct {
     end_server: std.atomic.Value(bool),
 };
 
-fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher {
-    var rpc_dispatcher = try alloc.create(zigjr.RpcDispatcher);
-    rpc_dispatcher.* = try zigjr.RpcDispatcher.init(alloc);
+fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher(void) {
+    var rpc_dispatcher = try alloc.create(zigjr.RpcDispatcher(void));
+    rpc_dispatcher.* = try zigjr.RpcDispatcher(void).init(alloc);
     
     try rpc_dispatcher.add("hello", hello);
     try rpc_dispatcher.add("hello-name", helloName);
@@ -69,12 +73,7 @@ fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher {
     return rpc_dispatcher;
 }
 
-fn destroyDispatcher(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher) void {
-    dispatcher.deinit();
-    alloc.destroy(dispatcher);
-}
-
-fn runServer(ctx: *ServerCtx, dispatcher: *zigjr.RpcDispatcher) !void {
+fn runServer(ctx: *ServerCtx, dispatcher: zigjr.RequestDispatcher) !void {
     const net_addr  = try std.net.Address.parseIpAndPort(ctx.listen_address);
     var server      = try net_addr.listen(.{ .reuse_address = true });
     defer server.deinit();
@@ -94,7 +93,7 @@ fn runServer(ctx: *ServerCtx, dispatcher: *zigjr.RpcDispatcher) !void {
     }
 }
 
-fn httpWorker(dispatcher: *zigjr.RpcDispatcher, connection: std.net.Server.Connection) void {
+fn httpWorker(dispatcher: zigjr.RequestDispatcher, connection: std.net.Server.Connection) void {
     std.debug.print("Start HTTP session.\n", .{});
 
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -109,7 +108,7 @@ fn httpWorker(dispatcher: *zigjr.RpcDispatcher, connection: std.net.Server.Conne
     std.debug.print("End HTTP session.\n", .{});
 }
 
-fn netWorker(dispatcher: *zigjr.RpcDispatcher, connection: std.net.Server.Connection) void {
+fn netWorker(dispatcher: zigjr.RequestDispatcher, connection: std.net.Server.Connection) void {
     std.debug.print("Start session (netWorker).\n", .{});
 
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -124,9 +123,8 @@ fn netWorker(dispatcher: *zigjr.RpcDispatcher, connection: std.net.Server.Connec
     std.debug.print("End session (netWorker).\n", .{});
 }
 
-fn runHttpSession(alloc: Allocator, rpc_dispatcher: *zigjr.RpcDispatcher,
+fn runHttpSession(alloc: Allocator, dispatcher: zigjr.RequestDispatcher,
                   connection: std.net.Server.Connection) !void {
-    const dispatcher    = zigjr.RequestDispatcher.implBy(rpc_dispatcher);
     var rbuf: [1024]u8  = undefined;
     var wbuf: [1024]u8  = undefined;
     var s_reader        = connection.stream.reader(&rbuf);
@@ -148,17 +146,18 @@ fn runHttpSession(alloc: Allocator, rpc_dispatcher: *zigjr.RpcDispatcher,
 
     const request_json = std.mem.trim(u8, frame.getContent(), " \t\n\r");
     // std.debug.print("content_length: {any}, request_json: |{s}|\n", .{ frame.content_length, request_json });
-    if (try pipeline.runRequestToJson(alloc, request_json)) |response| {
-        defer alloc.free(response);
+
+    const run_status = try pipeline.runRequest(request_json);
+    if (run_status.hasReply()) {
         try zigjr.frame.writeHttpStatusLine(writer, "1.1", 200, "OK");  // HTTP/1.1 200 OK\r\n
-        try zigjr.frame.writeContentLengthFrame(writer, response);
+        try zigjr.frame.writeContentLengthFrame(writer, pipeline.responseJson());
         try writer.flush();
     } else {
         std.debug.print("No response\n", .{});
     }
 }
 
-fn runNetSession(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher,
+fn runNetSession(alloc: Allocator, dispatcher: zigjr.RequestDispatcher,
                  connection: std.net.Server.Connection) !void {
     var rbuf: [1024]u8  = undefined;
     var wbuf: [1024]u8  = undefined;
@@ -168,7 +167,7 @@ fn runNetSession(alloc: Allocator, dispatcher: *zigjr.RpcDispatcher,
     const writer        = &s_writer.interface;
     var dbg_logger      = zigjr.DbgLogger{};
 
-    zigjr.stream.runByDelimiter(alloc, reader, writer, dispatcher, .{
+    zigjr.stream.requestsByDelimiter(alloc, reader, writer, dispatcher, .{
         .logger = dbg_logger.asLogger()
     }) catch |e| {
         if (e == error.ReadFailed) return else return e;

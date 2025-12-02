@@ -50,9 +50,9 @@ pub fn main() !void {
         try stdout.print("Request:  {s}\n", .{read_buf.written()});
 
         // Run request through the pipeline.
-        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-            defer alloc.free(response);
-            try stdout.print("Response: {s}\n", .{response});
+        const run_status = try pipeline.runRequest(read_buf.written());
+        if (run_status.hasReply()) {
+            try stdout.print("Response: {s}\n", .{pipeline.responseJson()});
         } else {
             try stdout.print("No response\n", .{});
         }
@@ -66,34 +66,35 @@ pub fn main() !void {
 
 const HelloDispatcher = struct {
     // The JSON-RPC request has been parsed into a RpcRequest.  Dispatch on it here.
-    pub fn dispatch(_: @This(), req_arena: Allocator, req: RpcRequest) !DispatchResult {
-        if (std.mem.eql(u8, req.method, "hello")) {
-            // Result needs to be in JSON.
-            return DispatchResult.withResult(try std.json.Stringify.valueAlloc(req_arena, "Hello World", .{}));
-        } else if (std.mem.eql(u8, req.method, "hello-name")) {
-            if (req.params == .array) {
-                const items = req.params.array.items;
+    pub fn dispatch(_: @This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (std.mem.eql(u8, dc.request.method, "hello")) {
+            // Result needs to be in JSON. Memory allocated from arena will be freed automatically.
+            const resultJson = try std.json.Stringify.valueAlloc(dc.arena, "Hello World", .{});
+            return DispatchResult.withResult(resultJson);
+        } else if (std.mem.eql(u8, dc.request.method, "hello-name")) {
+            if (dc.request.params == .array) {
+                const items = dc.request.params.array.items;
                 if (items.len > 0 and items[0] == .string) {
-                    const result = try std.fmt.allocPrint(req_arena, "Hello {s}", .{ items[0].string });
-                    defer req_arena.free(result);
-                    return DispatchResult.withResult(try std.json.Stringify.valueAlloc(req_arena, result, .{}));
+                    const result = try std.fmt.allocPrint(dc.arena, "Hello {s}", .{ items[0].string });
+                    const resultJson = try std.json.Stringify.valueAlloc(dc.arena, result, .{});
+                    return DispatchResult.withResult(resultJson);
                 }
             }
             return DispatchResult.withErr(ErrorCode.InvalidParams, "Invalid params.");
-        } else if (std.mem.eql(u8, req.method, "hello-xtimes")) {
-            if (req.params == .array) {
-                const items = req.params.array.items;
+        } else if (std.mem.eql(u8, dc.request.method, "hello-xtimes")) {
+            if (dc.request.params == .array) {
+                const items = dc.request.params.array.items;
                 if (items.len > 1 and items[0] == .string and items[1] == .integer) {
-                    const result = try std.fmt.allocPrint(req_arena, "Hello {s} X {} times",
+                    const result = try std.fmt.allocPrint(dc.arena, "Hello {s} X {} times",
                                                           .{ items[0].string, items[1].integer });
-                    defer req_arena.free(result);
-                    return DispatchResult.withResult(try std.json.Stringify.valueAlloc(req_arena, result, .{}));
+                    const resultJson = try std.json.Stringify.valueAlloc(dc.arena, result, .{});
+                    return DispatchResult.withResult(resultJson);
                 }
             }
             return DispatchResult.withErr(ErrorCode.InvalidParams, "Invalid params.");
-        } else if (std.mem.eql(u8, req.method, "say")) {
-            if (req.params == .array) {
-                const items = req.params.array.items;
+        } else if (std.mem.eql(u8, dc.request.method, "say")) {
+            if (dc.request.params == .array) {
+                const items = dc.request.params.array.items;
                 if (items.len > 0 and items[0] == .string) {
                     std.debug.print("Say: {s}\n", .{items[0].string});
                 }
@@ -104,16 +105,10 @@ const HelloDispatcher = struct {
         }
     }
 
-    // The result has been processed; this call is the chance to clean up DispatchResult.
-    pub fn dispatchEnd(_: @This(), req_arena: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        // If alloc passed in to runRequestToJson() above is set up as an ArenaAllocator,
-        // no need to free memory here.
-        switch (dresult) {
-            .none => {},
-            .result => |result| req_arena.free(result),
-            .err => {},
-            .end_stream => {},
-        }
+    // The result has been processed; this call is the chance to clean up.
+    // After this call, the request and result in dc will be reset.
+    pub fn dispatchEnd(_: @This(), dc: *zigjr.DispatchCtxImpl) void {
+        _=dc;
     }
 };
 

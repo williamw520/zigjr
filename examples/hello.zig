@@ -18,7 +18,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
 
     // Create a RpcDispatcher for the JSON-RPC handlers.
-    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer rpc_dispatcher.deinit();
 
     // Register each RPC method with a handling function.
@@ -38,7 +38,8 @@ pub fn main() !void {
     const stdout = &stdout_writer.interface;
 
     // Read requests from stdin, dispatch to handlers, and write responses to stdout.
-    try zigjr.stream.runByDelimiter(alloc, stdin, stdout, &rpc_dispatcher, .{});
+    const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
+    try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
     try stdout.flush();
 }
 

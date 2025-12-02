@@ -762,14 +762,18 @@ The `--stderr` option pipes the LSP server subprocess' stderr to stderr.
 ```
 Runs the `hello_net` server in TCP mode. Use clients like `telnet` or `netcat` to interact with the server.
 The JSON-RPC messages are delimited with LF.  See `data/hello.json` for sample data.
+```shell
+nc64 localhost 35354 < data\hello.json
+nc64 localhost 35354 < data\hello_name.json
+```
 
 ```shell
     hello_net --http
 ```
 Runs the `hello_net` server in HTTP mode. Use a client like `curl` for testing.
 ```shell
-curl localhost:15354 --request POST --json @data/hello.json
-curl localhost:15354 --request POST --json @data/hello_name.json
+curl localhost:35354 --request POST --json @data/hello.json
+curl localhost:35354 --request POST --json @data/hello_name.json
 ```
 
 

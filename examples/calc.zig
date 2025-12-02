@@ -21,7 +21,7 @@ pub fn main() !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer rpc_dispatcher.deinit();
 
     try rpc_dispatcher.add("add", Basic.add);                   // register functions in a struct scope.
@@ -60,9 +60,9 @@ pub fn main() !void {
     if (read_len > 0) {
         std.debug.print("Request:  {s}\n", .{read_buf.written()});
 
-        if (try pipeline.runRequestToJson(alloc, read_buf.written())) |response| {
-            defer alloc.free(response);
-            std.debug.print("Response: {s}\n", .{response});
+        const run_status = try pipeline.runRequest(read_buf.written());
+        if (run_status.hasReply()) {
+            std.debug.print("Response: {s}\n", .{pipeline.responseJson()});
         } else {
             std.debug.print("No response\n", .{});
         }
