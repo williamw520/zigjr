@@ -157,7 +157,8 @@ pub const DispatchResult = union(enum) {
     }
 
     /// Create a DispatchResult with the parse error from RpcRequest.
-    pub fn withRequestErr(req: RpcRequest) Self {
+    /// DispatchResult references memory in RpcRequest. Their lifetime must be managed together.
+    pub fn withRequestErr(req: *const RpcRequest) Self {
         return .{
             .err = .{
                 .code = req.err().code,

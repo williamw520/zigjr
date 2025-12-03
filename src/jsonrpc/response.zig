@@ -50,9 +50,10 @@ fn parseRpcResponseOpts(alloc: Allocator, response_json: []const u8, opts: Parse
 /// Parse response_json into a RpcResponseResult.
 /// Caller transfers ownership of response_json to RpcResponseResult.
 /// They will be freed in the RpcResponseResult.deinit().
-pub fn parseRpcResponseOwned(alloc: Allocator, response_json: []const u8, opts: ParseOptions) RpcResponseResult {
-    var rresult = parseRpcResponseOpts(alloc, response_json, opts);
-    rresult.jsonOwned(response_json, alloc);
+pub fn parseRpcResponseOwned(alloc: Allocator, response_json: []const u8, opts: ParseOptions) error{OutOfMemory}!RpcResponseResult {
+    const dup_json = try alloc.dupe(u8, response_json);
+    var rresult = parseRpcResponseOpts(alloc, dup_json, opts);
+    rresult.jsonOwned(dup_json, alloc);
     return rresult;
 }
 

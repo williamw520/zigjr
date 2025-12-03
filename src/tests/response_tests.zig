@@ -21,8 +21,8 @@ const DispatchErrors = zigjr.DispatchErrors;
 
 const HelloDispatcher = struct {
 
-    pub fn dispatch(_: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
-        if (std.mem.eql(u8, req.method, "hello")) {
+    pub fn dispatch(_: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (std.mem.eql(u8, dc.request.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
             };
@@ -36,25 +36,17 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        // All result data are constant strings.  Nothing to free.
-        switch (dresult) {
-            .none => {},
-            .result => {},
-            .err => {},
-            .end_stream => {},
-        }
+    pub fn dispatchEnd(_: *@This(), _: *zigjr.DispatchCtxImpl) void {
     }
 };
 
 const IntCalcDispatcher = struct {
-    alloc:  Allocator,
 
-    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
-        if (req.hasError()) {
-            return .withRequestErr(req);
+    pub fn dispatch(_: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (dc.request.hasError()) {
+            return .withRequestErr(dc.request);
         }
-        const params = req.arrayParams() orelse
+        const params = dc.request.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
@@ -66,30 +58,24 @@ const IntCalcDispatcher = struct {
         const a = params.items[0].integer;
         const b = params.items[1].integer;
         var result: i64 = 0;
-        if (std.mem.eql(u8, req.method, "add")) {
+        if (std.mem.eql(u8, dc.request.method, "add")) {
             result = add(a, b);
-        } else if (std.mem.eql(u8, req.method, "sub")) {
+        } else if (std.mem.eql(u8, dc.request.method, "sub")) {
             result = sub(a, b);
-        } else if (std.mem.eql(u8, req.method, "multiply")) {
+        } else if (std.mem.eql(u8, dc.request.method, "multiply")) {
             result = multiply(a, b);
-        } else if (std.mem.eql(u8, req.method, "divide")) {
+        } else if (std.mem.eql(u8, dc.request.method, "divide")) {
             result = divide(a, b);
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
 
         return .{
-            .result = try Stringify.valueAlloc(self.alloc, result, .{})
+            .result = try Stringify.valueAlloc(dc.arena, result, .{})
         };
     }
 
-    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        switch (dresult) {
-            .none => {},
-            .result => self.alloc.free(dresult.result),
-            .err => {},
-            .end_stream => {},
-        }
+    pub fn dispatchEnd(_: *@This(), _: *zigjr.DispatchCtxImpl) void {
     }
     
     fn add(a: i64, b: i64) i64 { return a + b; }
@@ -99,10 +85,9 @@ const IntCalcDispatcher = struct {
 };
 
 const FloatCalcDispatcher = struct {
-    alloc: Allocator,
 
-    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
-        const params = req.arrayParams() orelse
+    pub fn dispatch(_: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        const params = dc.request.arrayParams() orelse
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
         if (params.items.len != 2) {
             return .{ .err = .{ .code = ErrorCode.InvalidParams } };
@@ -119,56 +104,46 @@ const FloatCalcDispatcher = struct {
         };
 
         var result: f64 = 0;
-        if (std.mem.eql(u8, req.method, "add")) {
+        if (std.mem.eql(u8, dc.request.method, "add")) {
             result = a + b;
-        } else if (std.mem.eql(u8, req.method, "sub")) {
+        } else if (std.mem.eql(u8, dc.request.method, "sub")) {
             result = a - b;
-        } else if (std.mem.eql(u8, req.method, "multiply")) {
+        } else if (std.mem.eql(u8, dc.request.method, "multiply")) {
             result = a * b;
-        } else if (std.mem.eql(u8, req.method, "divide")) {
+        } else if (std.mem.eql(u8, dc.request.method, "divide")) {
             result = a / b;
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
 
         return .{
-            .result = try Stringify.valueAlloc(self.alloc, result, .{})
+            .result = try Stringify.valueAlloc(dc.arena, result, .{})
         };
     }
 
-    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        switch (dresult) {
-            .result => self.alloc.free(dresult.result),
-            .err => {},
-            else => {},
-        }
+    pub fn dispatchEnd(_: *@This(), _: *zigjr.DispatchCtxImpl) void {
     }
 
 };
 
 const CounterDispatcher = struct {
-    alloc:  Allocator,
     count:  isize = 0,
     
-    pub fn dispatch(self: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
-        if (std.mem.eql(u8, req.method, "inc")) {
+    pub fn dispatch(self: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (std.mem.eql(u8, dc.request.method, "inc")) {
             self.count += 1;
             return .{ .none = {} };     // treat request as notification
-        } else if (std.mem.eql(u8, req.method, "dec")) {
+        } else if (std.mem.eql(u8, dc.request.method, "dec")) {
             self.count -= 1;
             return .{ .none = {} };     // treat request as notification
-        } else if (std.mem.eql(u8, req.method, "get")) {
-            return .{ .result = try Stringify.valueAlloc(self.alloc, self.count, .{}) };
+        } else if (std.mem.eql(u8, dc.request.method, "get")) {
+            return .{ .result = try Stringify.valueAlloc(dc.arena, self.count, .{}) };
         } else {
             return .{ .err = .{ .code = ErrorCode.MethodNotFound } };
         }
     }
 
-    pub fn dispatchEnd(self: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        switch (dresult) {
-            .result => self.alloc.free(dresult.result),
-            else => {},
-        }
+    pub fn dispatchEnd(_: *@This(), _: *zigjr.DispatchCtxImpl) void {
     }
 };
 
@@ -194,14 +169,12 @@ test "Response to a request of hello method" {
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        var response_buf = std.Io.Writer.Allocating.init(alloc);
-        defer response_buf.deinit();
         _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-            , &response_buf.writer, .{});
-        // std.debug.print("response: {s}\n", .{response_buf.items});
+            );
+        // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
 
-        var parsed_res = zigjr.parseRpcResponse(alloc, response_buf.written());
+        var parsed_res = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -223,13 +196,13 @@ test "Handle a request of hello method" {
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        const res_json = try pipeline.runRequestToJson(alloc, 
+        _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
-        defer if (res_json)|json| alloc.free(json);
-        // std.debug.print("response: {s}\n", .{res_json.?});
+        const res_json = pipeline.responseJson();
+        // std.debug.print("response: {s}\n", .{res_json});
 
-        var parsed_res = zigjr.parseRpcResponse(alloc, res_json.?);
+        var parsed_res = zigjr.parseRpcResponse(alloc, res_json);
         defer parsed_res.deinit();
         const res = try parsed_res.response();
         // std.debug.print("res.result: {s}\n", .{res.result.string});
@@ -269,7 +242,7 @@ test "Response to a request of integer add" {
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -295,7 +268,7 @@ test "runRequestToJson on a request of integer add" {
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -318,7 +291,7 @@ test "Response to a request of integer sub" {
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -341,7 +314,7 @@ test "Response to a request of integer multiply" {
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -364,7 +337,7 @@ test "Response to a request of integer divide" {
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -388,7 +361,7 @@ test "Response to a request of integer add with missing parameter, expect error"
     const alloc = gpa.allocator();
 
     {
-        var impl = IntCalcDispatcher{ .alloc = alloc };
+        var impl = IntCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -411,7 +384,7 @@ test "Response to a request of float add" {
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -434,7 +407,7 @@ test "Response to a request of float sub" {
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -457,7 +430,7 @@ test "Response to a request of float multiply" {
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -480,7 +453,7 @@ test "Response to a request of float divide" {
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -503,7 +476,7 @@ test "Response using an object based dispatcher." {
     const alloc = gpa.allocator();
 
     {
-        var impl = CounterDispatcher{ .alloc = alloc };
+        var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -552,7 +525,7 @@ test "Response to a request of integer add with invalid parameter type, expect e
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
         
@@ -575,12 +548,13 @@ test "Construct a normal response message, simple integer result" {
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, .{ .num = 1 }, "10");
         if (response_json)|res_json| {
+            defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json, .{});
+            var parsed_res = try zigjr.parseRpcResponseOwned(alloc, res_json, .{});
             defer parsed_res.deinit();
             const res = try parsed_res.response();
-            
+
             try testing.expect(!res.hasErr());
             try testing.expectEqual(res.result.integer, 10);
             try testing.expect(res.resultEql(10));
@@ -598,9 +572,10 @@ test "Construct a normal response message, array result" {
     {
         const response_json = try zigjr.composer.makeResponseJson(alloc, zigjr.RpcId{ .str = "2" }, "[1, 2, 3]");
         if (response_json)|res_json| {
+            defer alloc.free(res_json);
             // std.debug.print("res_json: {s}\n", .{res_json});
 
-            var parsed_res = zigjr.parseRpcResponseOwned(alloc, res_json, .{});
+            var parsed_res = try zigjr.parseRpcResponseOwned(alloc, res_json, .{});
             defer parsed_res.deinit();
             const res = try parsed_res.response();
 
@@ -667,7 +642,7 @@ test "Handle batch requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
 
     {
-        var impl = CounterDispatcher{ .alloc = alloc };
+        var impl = CounterDispatcher{};
         var logger = zigjr.DbgLogger{};
         // var logger = try zigjr.FileLogger.init(alloc, "log.txt");
         // defer logger.deinit();
@@ -696,10 +671,8 @@ test "Handle batch requests with the CounterDispatcher" {
         try testing.expect((try batch_req_result.batch())[0].id.num == 1);
         try testing.expect((try batch_req_result.batch())[1].id.num == 2);
 
-        var response_buf = std.Io.Writer.Allocating.init(alloc);
-        defer response_buf.deinit();
-        _ = try pipeline.runRequest(batch_req_json, &response_buf.writer, .{});
-        const batch_res_json = response_buf.written();
+        _ = try pipeline.runRequest(batch_req_json);
+        const batch_res_json = pipeline.responseJson();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
@@ -740,7 +713,7 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
     const alloc = gpa.allocator();
 
     {
-        var impl = CounterDispatcher{ .alloc = alloc };
+        var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -760,8 +733,8 @@ test "runRequestToJson on batch JSON requests with the CounterDispatcher" {
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        const batch_res_json = try pipeline.runRequestToJson(alloc, batch_req_json) orelse "";
-        defer alloc.free(batch_res_json);
+        _ = try pipeline.runRequest(batch_req_json);
+        const batch_res_json = pipeline.responseJson();
 
         var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
         defer batch_parsed_res.deinit();
@@ -802,7 +775,7 @@ test "Handle empty batch response" {
     const alloc = gpa.allocator();
 
     {
-        var impl = CounterDispatcher{ .alloc = alloc };
+        var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -816,10 +789,8 @@ test "Handle empty batch response" {
         try testing.expect(batch_req_result.isBatch());
         try testing.expect((try batch_req_result.batch()).len == 0);
 
-        var batch_res_buf = std.Io.Writer.Allocating.init(alloc);
-        defer batch_res_buf.deinit();
-        _ = try pipeline.runRequest(batch_req_json, &batch_res_buf.writer, .{});
-        const batch_res_json = batch_res_buf.written();
+        _ = try pipeline.runRequest(batch_req_json);
+        const batch_res_json = pipeline.responseJson();
         // std.debug.print("batch response json {s}\n", .{batch_res_json});
 
         var batch_parsed_res = zigjr.parseRpcResponse(alloc, batch_res_json);
@@ -838,16 +809,14 @@ test "Dispatch on the response to a request of float add" {
     const alloc = gpa.allocator();
 
     {
-        var impl = FloatCalcDispatcher{ .alloc = alloc };
+        var impl = FloatCalcDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        var response_buf = std.Io.Writer.Allocating.init(alloc);
-        defer response_buf.deinit();
         _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "add", "params": [1.0, 2.0], "id": 1}
-            , &response_buf.writer, .{});
-        const res_json = response_buf.written();
+        );
+        const res_json = pipeline.responseJson();
         // std.debug.print("res_json: {s}\n", .{res_json});
 
         var my_dispatcher = struct {
@@ -874,7 +843,7 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
     const alloc = gpa.allocator();
 
     {
-        var impl = CounterDispatcher{ .alloc = alloc };
+        var impl = CounterDispatcher{};
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
@@ -894,8 +863,8 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
         defer alloc.free(batch_req_json);
         // std.debug.print("batch request json {s}\n", .{batch_req_json});
 
-        const batch_res_json = try pipeline.runRequestToJson(alloc, batch_req_json) orelse "";
-        defer alloc.free(batch_res_json);
+        _ = try pipeline.runRequest(batch_req_json);
+        const batch_res_json = pipeline.responseJson();
 
         const non_exist_id = "xyz";
 

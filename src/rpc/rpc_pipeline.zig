@@ -22,7 +22,6 @@ const RpcRequestResult = zigjr.RpcRequestResult;
 const FrameData = zigjr.frame.FrameData;
 
 const parseRpcResponse = zigjr.parseRpcResponse;
-const parseRpcResponseOwned = zigjr.parseRpcResponseOwned;
 const RpcResponse = zigjr.RpcResponse;
 const RpcResponseResult = zigjr.RpcResponseResult;
 const RpcResponseMessage = zigjr.RpcResponseMessage;
@@ -135,7 +134,7 @@ pub const RequestPipeline = struct {
     pub fn runRequestToResponse(self: *RequestPipeline, alloc: Allocator,
                                 request_json: []const u8) !RpcResponseResult {
         if ((try self.runRequest(request_json)).hasReply()) {
-            return parseRpcResponseOwned(alloc, self.responseJson(), .{});
+            return zigjr.parseRpcResponseOwned(alloc, self.responseJson(), .{});
         } else {
             return .{};
         }
