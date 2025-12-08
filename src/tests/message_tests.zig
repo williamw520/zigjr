@@ -102,8 +102,8 @@ test "Parsing valid request, single string param, string id" {
 
 
 const HelloDispatcher = struct {
-    pub fn dispatch(_: *@This(), _: Allocator, req: RpcRequest) !DispatchResult {
-        if (std.mem.eql(u8, req.method, "hello")) {
+    pub fn dispatch(_: *@This(), dc: *zigjr.DispatchCtxImpl) !DispatchResult {
+        if (std.mem.eql(u8, dc.request.method, "hello")) {
             return .{
                 .result = "\"hello back\"",
             };
@@ -117,14 +117,7 @@ const HelloDispatcher = struct {
         }
     }
 
-    pub fn dispatchEnd(_: *@This(), _: Allocator, _: RpcRequest, dresult: DispatchResult) void {
-        // All result data are constant strings.  Nothing to free.
-        switch (dresult) {
-            .none => {},
-            .result => {},
-            .err => {},
-            .end_stream => {},
-        }
+    pub fn dispatchEnd(_: *@This(), _: *zigjr.DispatchCtxImpl) void {
     }
 };
 
@@ -139,12 +132,10 @@ test "Parse response to a request of hello method via " {
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        const res_json = try pipeline.runRequestToJson(alloc, 
+        _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
         );
-        defer if (res_json)|json| alloc.free(json);
-        
-        var msg_result = zigjr.parseRpcMessage(alloc, res_json.?);
+        var msg_result = zigjr.parseRpcMessage(alloc, pipeline.responseJson());
         defer msg_result.deinit();
         var parsed_res = msg_result.response_result;
         const res = try parsed_res.response();
@@ -167,12 +158,11 @@ test "Parse error from a request of unknown method, expect error" {
         var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
-        const res_json = try pipeline.runRequestToJson(alloc, 
+        _ = try pipeline.runRequest(
             \\{"jsonrpc": "2.0", "method": "non-hello", "params": [42], "id": 1}
         );
-        defer if (res_json)|json| alloc.free(json);
 
-        var msg_result = zigjr.parseRpcMessage(alloc, res_json.?);
+        var msg_result = zigjr.parseRpcMessage(alloc, pipeline.responseJson());
         defer msg_result.deinit();
         var parsed_res = msg_result.response_result;
         const res = try parsed_res.response();
@@ -211,7 +201,7 @@ test "Dispatch on the request and response" {
         defer response_buf.deinit();
         const req_run_status = try pipeline.runMessage(alloc,
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-            , &response_buf.writer, .{});
+            , &response_buf.writer);
         try testing.expect(req_run_status.kind == .request);
         // std.debug.print("run_result: {}\n", .{run_result});
         // std.debug.print("response_buf: {s}\n", .{response_buf.items});
@@ -219,8 +209,7 @@ test "Dispatch on the request and response" {
         // Feed the response from request back into the message pipeline.
         var response_buf2 = std.Io.Writer.Allocating.init(alloc);
         defer response_buf2.deinit();
-        const res_run_status = try pipeline.runMessage(alloc, response_buf.written(),
-                                                       &response_buf2.writer, .{});
+        const res_run_status = try pipeline.runMessage(alloc, response_buf.written(), &response_buf2.writer);
         try testing.expect(res_run_status.kind == .response);
 
     }
