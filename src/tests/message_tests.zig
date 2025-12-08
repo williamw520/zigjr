@@ -197,19 +197,15 @@ test "Dispatch on the request and response" {
                                                            null);
         defer pipeline.deinit();
 
-        var response_buf = std.Io.Writer.Allocating.init(alloc);
-        defer response_buf.deinit();
-        const req_run_status = try pipeline.runMessage(alloc,
+        const req_run_status = try pipeline.runMessage(
             \\{"jsonrpc": "2.0", "method": "hello", "params": [42], "id": 1}
-            , &response_buf.writer);
+        );
         try testing.expect(req_run_status.kind == .request);
         // std.debug.print("run_result: {}\n", .{run_result});
-        // std.debug.print("response_buf: {s}\n", .{response_buf.items});
+        // std.debug.print("response_buf: {s}\n", .{pipeline.responseJson()});
 
         // Feed the response from request back into the message pipeline.
-        var response_buf2 = std.Io.Writer.Allocating.init(alloc);
-        defer response_buf2.deinit();
-        const res_run_status = try pipeline.runMessage(alloc, response_buf.written(), &response_buf2.writer);
+        const res_run_status = try pipeline.runMessage(pipeline.reqResponseJson());
         try testing.expect(res_run_status.kind == .response);
 
     }

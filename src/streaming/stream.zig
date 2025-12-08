@@ -79,7 +79,8 @@ pub fn responsesByDelimiter(alloc: Allocator, reader: *std.Io.Reader,
     var frame_buf = std.Io.Writer.Allocating.init(alloc);
     defer frame_buf.deinit();
 
-    const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    var pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    defer pipeline.deinit();
 
     options.logger.start("[stream.responsesByDelimiter] Logging starts");
     defer { options.logger.stop("[stream.responsesByDelimiter] Logging stops"); }
@@ -181,7 +182,8 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
                                 dispatcher: ResponseDispatcher, options: ContentLengthOptions) !void {
     var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
-    const pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    var pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    defer pipeline.deinit();
 
     options.logger.start("[stream.responsesByContentLength] Logging starts");
     defer { options.logger.stop("[stream.responsesByContentLength] Logging stops"); }
@@ -219,8 +221,6 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
                                options: ContentLengthOptions) !void {
     var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
-    var req_response_buf = std.Io.Writer.Allocating.init(alloc);
-    defer req_response_buf.deinit();
     const req_output_writer = req_writer;
     var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
     defer pipeline.deinit();
@@ -236,14 +236,13 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
         const message_json = std.mem.trim(u8, frame_buf.getContent(), " \t");
         if (options.skip_blank_message and message_json.len == 0) continue;
 
-        req_response_buf.clearRetainingCapacity();  // reset the output buffer for every request.
-        const run_status = try pipeline.runMessage(alloc, message_json, &req_response_buf.writer, .{});
+        const run_status = try pipeline.runMessage(message_json);
         switch (run_status.kind) {
             .request => {
                 if (run_status.hasReply())  {
-                    try frame.writeContentLengthFrame(req_output_writer, req_response_buf.written());
+                    try frame.writeContentLengthFrame(req_output_writer, pipeline.reqResponseJson());
                     try req_output_writer.flush();
-                    options.logger.log("stream.messagesByContentLength", "request_has_response", req_response_buf.written());
+                    options.logger.log("stream.messagesByContentLength", "request_has_response", pipeline.reqResponseJson());
                 } else {
                     options.logger.log("stream.messagesByContentLength", "request_no_response", "");
                 }

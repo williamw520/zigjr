@@ -830,7 +830,8 @@ test "Dispatch on the response to a request of float add" {
             }
         } {};
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
-        const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
+        var res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
+        defer res_pipeline.deinit();
 
         _ = try res_pipeline.runResponse(res_json, null);
     }
@@ -884,7 +885,8 @@ test "Dispatch batch responses on batch JSON requests with the CounterDispatcher
             }
         } {};
         const dispatcher = ResponseDispatcher.implBy(&my_dispatcher);
-        const res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
+        var res_pipeline = zigjr.pipeline.ResponsePipeline.init(alloc, dispatcher);
+        defer res_pipeline.deinit();
 
         _ = try res_pipeline.runResponse(batch_res_json, null);
     }
