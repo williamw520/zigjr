@@ -57,11 +57,11 @@ pub const RequestPipeline = struct {
     response_buf:   std.Io.Writer.Allocating,
     dc:             DispatchCtxImpl,
 
-    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) RequestPipeline {
+    pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, logger: ?zigjr.Logger) error{OutOfMemory}!RequestPipeline {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[RequestPipeline.init] Logging starts");
 
-        const arena_ptr = alloc.create(ArenaAllocator) catch unreachable;   // TODO: return error
+        const arena_ptr = try alloc.create(ArenaAllocator);
         arena_ptr.* = ArenaAllocator.init(alloc);
         const arena_alloc = arena_ptr.allocator();
         return .{
@@ -101,7 +101,7 @@ pub const RequestPipeline = struct {
         defer parsed_request.deinit();
         const run_status = switch (parsed_request.request_msg) {
             .batch   => |reqs| try self.processRpcBatch(reqs),
-            .request => |*req| try self.processRpcRequest(req, ""),
+            .request => |*req| try self.processRpcRequest(req, "", true),
         };
         if (run_status.hasReply()) {
             self.logger.log("RequestPipeline.runRequest", "response", self.responseJson());
@@ -145,12 +145,15 @@ pub const RequestPipeline = struct {
     }
 
     fn processRpcBatch(self: *RequestPipeline, reqs: []RpcRequest) std.Io.Writer.Error!RunStatus {
+        defer {
+            _ = self.arena_ptr.reset(.{ .retain_with_limit = 4096 });   // TODO: configurable limit
+        }
         var has_replied: bool = false;
         var end_stream: bool = false;
         try self.responseWriter().writeAll("[");
         for (reqs) |*req| {
             const delimiter = if (has_replied) ", " else "";
-            const r_status  = try self.processRpcRequest(req, delimiter);
+            const r_status  = try self.processRpcRequest(req, delimiter, false);
             has_replied     = has_replied or r_status.hasReply();
             end_stream      = end_stream  or r_status.end_stream;
         }
@@ -160,8 +163,12 @@ pub const RequestPipeline = struct {
 
     /// Handle request's error, dispatch the request, and write the response.
     /// Returns true if a response message is written, false for not as notification has no response.
-    fn processRpcRequest(self: *RequestPipeline, req: *const RpcRequest,
-                         delimiter: []const u8) std.Io.Writer.Error!RunStatus {
+    fn processRpcRequest(self: *RequestPipeline, req: *const RpcRequest, delimiter: []const u8,
+                         resetArena: bool) std.Io.Writer.Error!RunStatus {
+        defer {
+            if (resetArena)
+                _ = self.arena_ptr.reset(.{ .retain_with_limit = 4096 });   // TODO: configurable limit
+        }
         if (try self.fmtRequestError(req)) return RunStatus.asRequestReplied();
 
         const defaultResult = DispatchResult.asNone();
@@ -206,7 +213,6 @@ pub const RequestPipeline = struct {
                 }
                 try self.responseWriter().writeAll(delimiter);
                 try composer.writeResponseJson(req.id, json, self.responseWriter());
-                // TODO: reset arena_ptr after written to response_buf
                 return RunStatus.asRequestReplied();    // has response data written
             },
             .err => |err| {
@@ -216,7 +222,6 @@ pub const RequestPipeline = struct {
                 } else {
                     try composer.writeErrorResponseJson(req.id, err.code, err.msg, self.responseWriter());
                 }
-                // TODO: reset arena_ptr after written to response_buf
                 return RunStatus.asRequestReplied();    // has response data written
             },
             .end_stream =>
@@ -225,80 +230,6 @@ pub const RequestPipeline = struct {
     }
     
 };
-
-// fn processRpcBatch(reqs: []RpcRequest, req_arena: Allocator, dispatcher: RequestDispatcher,
-//                    writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
-//     var has_replied: bool = false;
-//     var end_stream: bool = false;
-//     try writer.writeAll("[");
-//     for (reqs) |req| {
-//         const delimiter = if (has_replied) ", " else "";
-//         const r_status  = try processRpcRequest(req, req_arena, dispatcher, delimiter, writer);
-//         has_replied     = has_replied or r_status.hasReply();
-//         end_stream      = end_stream  or r_status.end_stream;
-//     }
-//     try writer.writeAll("]");
-//     return RunStatus.asRequest(true, end_stream);   // batch always has some output like "[]"
-// }
-
-// /// Handle request's error, dispatch the request, and write the response.
-// /// Returns true if a response message is written, false for not as notification has no response.
-// fn processRpcRequest(req: RpcRequest, req_arena: Allocator, req_dispatcher: RequestDispatcher,
-//                      delimiter: []const u8, writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
-//     if (try writeRequestError(req, writer)) return RunStatus.asRequestReplied();
-//     errdefer {
-//         req_dispatcher.dispatchEnd(req_arena, req, DispatchResult.asNone());   // for std.Io.Writer.Error
-//     }
-
-//     const d_result = try dispatchRequest(req, req_arena, req_dispatcher);
-//     const r_status = try writeResponse(d_result, req, delimiter, writer);
-//     req_dispatcher.dispatchEnd(req_arena, req, d_result);
-//     return r_status;
-// }
-
-// fn writeRequestError(req: RpcRequest, writer: *std.Io.Writer) std.Io.Writer.Error!bool {
-//     if (req.hasError()) {   // request has parsing or validation error.
-//         try composer.writeErrorResponseJson(req.id, req.err().code, req.err().err_msg, writer);
-//         return true;
-//     }
-//     return false;
-// }
-
-// fn dispatchRequest(req: RpcRequest, req_arena: Allocator, req_dispatcher: RequestDispatcher) std.Io.Writer.Error!DispatchResult {
-//     return req_dispatcher.dispatch(req_arena, req) catch |err| {
-//         // Turn dispatching error into DispatchResult.err.
-//         // Handle errors here so dispatchers don't have to worry about error handling.
-//         return DispatchResult.withAnyErr(err);
-//     };
-// }
-
-// fn writeResponse(dresult: DispatchResult, req: RpcRequest, delimiter: []const u8,
-//                  writer: *std.Io.Writer) std.Io.Writer.Error!RunStatus {
-//     switch (dresult) {
-//         .none => {
-//             return RunStatus.asRequestNone();       // notification request has no response written.
-//         },
-//         .result => |json| {
-//             if (req.id.isNotification()) {
-//                 return RunStatus.asRequestNone();   // notification request has no response written.
-//             }
-//             try writer.writeAll(delimiter);
-//             try composer.writeResponseJson(req.id, json, writer);
-//             return RunStatus.asRequestReplied();    // has response data written
-//         },
-//         .err => |err| {
-//             try writer.writeAll(delimiter);
-//             if (err.data)|data_json| {
-//                 try composer.writeErrorDataResponseJson(req.id, err.code, err.msg, data_json, writer);
-//             } else {
-//                 try composer.writeErrorResponseJson(req.id, err.code, err.msg, writer);
-//             }
-//             return RunStatus.asRequestReplied();    // has response data written
-//         },
-//         .end_stream =>
-//             return RunStatus.asRequestEndStream(),
-//     }
-// }
 
 pub const RunStatus = struct {
     kind: union(enum) {         // status for processing request or response.
@@ -357,15 +288,17 @@ pub const RunStatus = struct {
 
 
 pub const ResponsePipeline = struct {
+    alloc:          Allocator,
     arena_ptr:      *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
     arena_alloc:    Allocator,
     res_dispatcher: ResponseDispatcher,
 
-    pub fn init(alloc: Allocator, res_dispatcher: ResponseDispatcher) ResponsePipeline {
-        const arena_ptr = alloc.create(ArenaAllocator) catch unreachable;   // TODO: return error
+    pub fn init(alloc: Allocator, res_dispatcher: ResponseDispatcher) error{OutOfMemory}!ResponsePipeline {
+        const arena_ptr = alloc.create(ArenaAllocator) catch unreachable;
         arena_ptr.* = ArenaAllocator.init(alloc);
         const arena_alloc = arena_ptr.allocator();
         return .{
+            .alloc = alloc,
             .arena_ptr = arena_ptr,
             .arena_alloc = arena_alloc,
             .res_dispatcher = res_dispatcher,
@@ -388,12 +321,16 @@ pub const ResponsePipeline = struct {
                        headers: ?std.StringHashMap([]const u8)) !RunStatus {
         _=headers;  // frame-level headers. May have character encoding. See FrameData.headers in frame.zig.
 
-        var response_result: RpcResponseResult = parseRpcResponse(self.arena_alloc, response_json);
+        var response_result: RpcResponseResult = parseRpcResponse(self.alloc, response_json);
         defer response_result.deinit();
         return try self.processResponseResult(response_result);
     }
 
     fn processResponseResult(self: *const ResponsePipeline, response_result: RpcResponseResult) anyerror!RunStatus {
+        defer {
+            _ = self.arena_ptr.reset(.{ .retain_with_limit = 4096 });   // TODO: configurable limit
+        }
+
         // Any errors (parsing or others) are forwarded to the handlers via the dispatcher.
         const run_status = switch (response_result.response_msg) {
             .response   => |rpc_response| {
@@ -416,7 +353,6 @@ pub const ResponsePipeline = struct {
             .none       =>
                 return RunStatus.asResponse(),
         };
-        // TODO: reset arena.
         return run_status;
     }
 };
@@ -429,15 +365,15 @@ pub const MessagePipeline = struct {
     logger:         zigjr.Logger,
 
     pub fn init(alloc: Allocator, req_dispatcher: RequestDispatcher, res_dispatcher: ResponseDispatcher,
-                logger: ?zigjr.Logger) MessagePipeline {
+                logger: ?zigjr.Logger) error{OutOfMemory}!MessagePipeline {
         const l = logger orelse zigjr.Logger.implBy(&nopLogger);
         l.start("[MessagePipeline] Logging starts");
         
         return .{
             .alloc = alloc,
             .logger = l,
-            .req_pipeline = RequestPipeline.init(alloc, req_dispatcher, logger),
-            .res_pipeline = ResponsePipeline.init(alloc, res_dispatcher),
+            .req_pipeline = try RequestPipeline.init(alloc, req_dispatcher, logger),
+            .res_pipeline = try ResponsePipeline.init(alloc, res_dispatcher),
         };
     }
 
@@ -457,7 +393,7 @@ pub const MessagePipeline = struct {
             .request_result  => |request_result| {
                 const run_status = switch (request_result.request_msg) {
                     .batch   => |reqs| try self.req_pipeline.processRpcBatch(reqs),
-                    .request => |req|  try self.req_pipeline.processRpcRequest(&req, ""),
+                    .request => |req|  try self.req_pipeline.processRpcRequest(&req, "", true),
                 };
                 if (run_status.hasReply()) {
                     self.logger.log("runMessage", "request message processed; response_json", self.req_pipeline.responseJson());

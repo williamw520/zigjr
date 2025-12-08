@@ -444,7 +444,7 @@ test "rpc_dispatcher - pipeline - fn0" {
     var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer dispatcher.deinit();
     {
-        var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
 
         try dispatcher.add("fn0", fn0);
@@ -468,7 +468,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn0", fn0);
@@ -541,7 +541,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn1", fn1);
@@ -610,7 +610,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn2", fn2);
@@ -694,7 +694,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn0", Group.fn0);
@@ -727,7 +727,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         var ctx = Ctx { .count = 0 };
@@ -801,7 +801,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat", null, fn_cat);
@@ -838,7 +838,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat", null, fn_cat);
@@ -877,7 +877,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat_value", null, fn_cat_value);
@@ -916,7 +916,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
@@ -954,7 +954,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         var ctx = Ctx { .count = 0 };
@@ -995,7 +995,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_json_value1", null, fn_json_value1);
@@ -1041,7 +1041,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_json_value2", null, fn_json_value2);
@@ -1072,7 +1072,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_json_value_int", null, fn_json_value_int);
@@ -1103,7 +1103,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_json_value_int_value", null, fn_json_value_int_value);
@@ -1134,7 +1134,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat_struct", null, fn_cat_struct);
@@ -1173,7 +1173,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.addWithCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
@@ -1212,7 +1212,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         var ctx = Ctx { .count = 0 };
@@ -1253,7 +1253,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         var ctx = Ctx { .count = 0 };
@@ -1294,7 +1294,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         var s = Standalone{};
@@ -1370,7 +1370,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn_opt1_int", fn_opt1_int);
@@ -1456,7 +1456,7 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     {
 //         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn2", fn2);

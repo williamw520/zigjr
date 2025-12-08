@@ -33,7 +33,7 @@ pub fn main() !void {
     const dispatcher = zigjr.RequestDispatcher.implBy(&hello_dispatcher);
 
     // Construct a pipeline with the custom dispatcher.
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
     // Read request from stdin.

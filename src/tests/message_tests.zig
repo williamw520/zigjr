@@ -129,7 +129,7 @@ test "Parse response to a request of hello method via " {
 
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
+        var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         _ = try pipeline.runRequest(
@@ -155,7 +155,7 @@ test "Parse error from a request of unknown method, expect error" {
 
     {
         var impl = HelloDispatcher{};
-        var pipeline = zigjr.pipeline.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
+        var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&impl), null);
         defer pipeline.deinit();
 
         _ = try pipeline.runRequest(
@@ -192,7 +192,7 @@ test "Dispatch on the request and response" {
             }
         } {};
 
-        var pipeline = zigjr.pipeline.MessagePipeline.init(alloc, RequestDispatcher.implBy(&req_dispatcher),
+        var pipeline = try zigjr.pipeline.MessagePipeline.init(alloc, RequestDispatcher.implBy(&req_dispatcher),
                                                            ResponseDispatcher.implBy(&res_dispatcher),
                                                            null);
         defer pipeline.deinit();

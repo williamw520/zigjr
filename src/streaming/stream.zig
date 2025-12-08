@@ -40,7 +40,7 @@ pub fn requestsByDelimiter(alloc: Allocator, reader: *std.Io.Reader, writer: *st
     var frame_buf = std.Io.Writer.Allocating.init(alloc);
     defer frame_buf.deinit();
 
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
     options.logger.start("[stream.requestsByDelimiter] Logging starts");
@@ -79,7 +79,7 @@ pub fn responsesByDelimiter(alloc: Allocator, reader: *std.Io.Reader,
     var frame_buf = std.Io.Writer.Allocating.init(alloc);
     defer frame_buf.deinit();
 
-    var pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    var pipeline = try zigjr.ResponsePipeline.init(alloc, dispatcher);
     defer pipeline.deinit();
 
     options.logger.start("[stream.responsesByDelimiter] Logging starts");
@@ -139,7 +139,7 @@ pub fn requestsByContentLength(alloc: Allocator, reader: *std.Io.Reader, writer:
     defer frame_data.deinit();
     // var response_buf = std.Io.Writer.Allocating.init(alloc);
     // defer response_buf.deinit();
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, options.logger);
     defer pipeline.deinit();
 
     while (true) {
@@ -182,7 +182,7 @@ pub fn responsesByContentLength(alloc: Allocator, reader: anytype,
                                 dispatcher: ResponseDispatcher, options: ContentLengthOptions) !void {
     var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
-    var pipeline = zigjr.ResponsePipeline.init(alloc, dispatcher);
+    var pipeline = try zigjr.ResponsePipeline.init(alloc, dispatcher);
     defer pipeline.deinit();
 
     options.logger.start("[stream.responsesByContentLength] Logging starts");

@@ -29,7 +29,7 @@ pub fn main() !void {
 
     // RequestDispatcher interface implemented by the 'registry' registry.
     const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
     // Read a JSON-RPC request JSON from StdIn.

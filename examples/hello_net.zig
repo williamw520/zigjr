@@ -132,7 +132,7 @@ fn runHttpSession(alloc: Allocator, dispatcher: zigjr.RequestDispatcher,
     const reader        = s_reader.interface();
     const writer        = &s_writer.interface;
     var dbg_logger      = zigjr.DbgLogger{};
-    var pipeline        = zigjr.RequestPipeline.init(alloc, dispatcher, dbg_logger.asLogger());
+    var pipeline        = try zigjr.RequestPipeline.init(alloc, dispatcher, dbg_logger.asLogger());
     var frame           = zigjr.frame.FrameData.init(alloc);
 
     defer pipeline.deinit();

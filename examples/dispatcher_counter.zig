@@ -34,7 +34,7 @@ pub fn main() !void {
     // try zigjr.stream.requestsByDelimiter(alloc, stdin, stdout, dispatcher, .{});
 
     // Construct a pipeline with the custom dispatcher.
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
     var read_buf = std.Io.Writer.Allocating.init(alloc);

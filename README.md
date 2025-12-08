@@ -206,7 +206,7 @@ dispatching, and response composition.
     const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
 
     // Set up the request pipeline with the dispatcher.
-    var pipeline = zigjr.RequestPipeline.init(alloc, dispatcher, null);
+    var pipeline = try zigjr.RequestPipeline.init(alloc, dispatcher, null);
     defer pipeline.deinit();
 
     // Run the individual requests to the pipeline.
