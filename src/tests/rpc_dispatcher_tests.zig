@@ -22,6 +22,9 @@ const DispatchResult = dispatcher_z.DispatchResult;
 const DispatchErrors = dispatcher_z.DispatchErrors;
 const DispatchCtxImpl = dispatcher_z.DispatchCtxImpl;
 
+const pipeline_z = @import("../rpc/rpc_pipeline.zig");
+const RequestPipeline = pipeline_z.RequestPipeline;
+
 
 // Test handler registration.
 
@@ -285,11 +288,8 @@ fn fn_opt1_int(a: ?isize) void {
     fn_opt1_int_a = a;
 }
 
-var fn_opt1_str_a: ?[]const u8 = null;
-
 fn fn_opt1_str(alloc: Allocator, a: ?[]const u8) ![]const u8 {
     // std.debug.print("fn_opt1_str called, a:{any}\n", .{a});
-    fn_opt1_str_a = a;
     if (a)|str| {
         return str;
     } else {
@@ -444,7 +444,7 @@ test "rpc_dispatcher - pipeline - fn0" {
     var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
     defer dispatcher.deinit();
     {
-        var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
 
         try dispatcher.add("fn0", fn0);
@@ -460,993 +460,942 @@ test "rpc_dispatcher - pipeline - fn0" {
 
 }
 
-// test "rpc_dispatcher fn0 variants" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
+test "rpc_dispatcher fn0 variants" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
 
-//         try dispatcher.add("fn0", fn0);
-//         try dispatcher.add("fn0_with_err", fn0_with_err);
-//         try dispatcher.add("fn0_return_value", fn0_return_value);
-//         try dispatcher.add("fn0_return_value_with_err", fn0_return_value_with_err);
-//         try dispatcher.add("fn0_alloc", fn0_alloc);
+        try dispatcher.add("fn0", fn0);
+        try dispatcher.add("fn0_with_err", fn0_with_err);
+        try dispatcher.add("fn0_return_value", fn0_return_value);
+        try dispatcher.add("fn0_return_value_with_err", fn0_return_value_with_err);
+        try dispatcher.add("fn0_alloc", fn0_alloc);
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn0_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
+            );
+            // const res_json = pipeline.responseJson();
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn0_called);
+        }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn0_with_err_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0_with_err", "id": 1}
+            );
+            // const res_json = pipeline.responseJson();
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn0_with_err_called);
+        }
         
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0_return_value", "id": 1}
+            );
+            const res_json = pipeline.responseJson();
+            // std.debug.print("response: {s}\n", .{res_json});
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//         }
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
         
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0_return_value_with_err", "id": 1}
+            );
+            const res_json = pipeline.responseJson();
+            // std.debug.print("response: {s}\n", .{res_json});
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//         }
+            var res_result = zigjr.parseRpcResponse(alloc, res_json);
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn0_alloc_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0_alloc", "id": 1}
+            );
+            // const res_json = pipeline.responseJson();
+            // std.debug.print("response: {s}\n", .{res_json});
+            try testing.expect(fn0_alloc_called);
+        }
 
-//     }
+    }
 
-// }
+}
 
 
-// test "rpc_dispatcher fn1" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
+test "rpc_dispatcher fn1" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
 
-//         try dispatcher.add("fn1", fn1);
-//         try dispatcher.add("fn1_with_err", fn1_with_err);
-//         try dispatcher.add("fn1_return_value", fn1_return_value);
-//         try dispatcher.add("fn1_return_value_with_err", fn1_return_value_with_err);
-//         try dispatcher.add("fn1_alloc_with_err", fn1_alloc_with_err);
+        try dispatcher.add("fn1", fn1);
+        try dispatcher.add("fn1_with_err", fn1_with_err);
+        try dispatcher.add("fn1_return_value", fn1_return_value);
+        try dispatcher.add("fn1_return_value_with_err", fn1_return_value_with_err);
+        try dispatcher.add("fn1_alloc_with_err", fn1_alloc_with_err);
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(fn1_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
+            );
+            try testing.expect(fn1_called);
+        }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(fn1_with_err_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1_with_err", "params": [2], "id": 1}
+            );
+            try testing.expect(fn1_with_err_called);
+        }
         
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1_return_value", "params": [3], "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
         
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1_return_value_with_err", "params": [4], "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("Hello"));
+        }
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("Hello"));
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
+            );
+            try testing.expect(pipeline.responseJson().len == 0);
+        }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1_alloc_with_err", "params": [1], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
+    }
 
-//             try testing.expect(res_json.len == 0);
-//         }
-
-//     }
-
-// }
+}
 
 
-// test "rpc_dispatcher fn2" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
+test "rpc_dispatcher fn2" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
 
-//         try dispatcher.add("fn2", fn2);
-//         try dispatcher.add("fn2_with_err", fn2_with_err);
-//         try dispatcher.add("fn2_return_value", fn2_return_value);
-//         try dispatcher.add("fn2_return_value_with_err", fn2_return_value_with_err);
-//         try dispatcher.add("fn2_alloc_with_err", fn2_alloc_with_err);
+        try dispatcher.add("fn2", fn2);
+        try dispatcher.add("fn2_with_err", fn2_with_err);
+        try dispatcher.add("fn2_return_value", fn2_return_value);
+        try dispatcher.add("fn2_return_value_with_err", fn2_return_value_with_err);
+        try dispatcher.add("fn2_alloc_with_err", fn2_alloc_with_err);
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(fn2_called);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
+            );
+            try testing.expect(fn2_called);
+        }
 
-//         fn2_with_err_called = false;
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(fn2_with_err_called);
-//         }
+        fn2_with_err_called = false;
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 1}
+            );
+            try testing.expect(fn2_with_err_called);
+        }
 
-//         fn2_with_err_called = false;
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, true], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect(fn2_with_err_called);
-//             try testing.expect((try res_result.response()).hasErr());
-//             try testing.expect((try res_result.response()).err().code == @intFromEnum(ErrorCode.ServerError));
-//             try testing.expectEqualStrings((try res_result.response()).err().message, "Fn2WithErr");
-//         }
+        fn2_with_err_called = false;
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, true], "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect(fn2_with_err_called);
+            try testing.expect((try res_result.response()).hasErr());
+            try testing.expect((try res_result.response()).err().code == @intFromEnum(ErrorCode.ServerError));
+            try testing.expectEqualStrings((try res_result.response()).err().message, "Fn2WithErr");
+        }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
+        }
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(3));
-//         }
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(8));
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(8));
+        }
         
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(fn2_alloc_with_err_called);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher with struct scope functions" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.add("fn0", Group.fn0);
-//         try dispatcher.add("fn1", Group.fn1);
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(Group.group_fn0_called);
-//         }
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(Group.group_fn1_called);
-//         }
-//     }
-
-// }
-
-
-// test "rpc_dispatcher with context" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         var ctx = Ctx { .count = 0 };
-
-//         try dispatcher.addWithCtx("ctx.get", &ctx, Ctx.get);
-//         try dispatcher.addWithCtx("ctx.fn0", &ctx, Ctx.fn0);
-//         try dispatcher.addWithCtx("ctx.fn1", &ctx, Ctx.fn1);
-//         try dispatcher.addWithCtx("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(0));
-//         }
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             try testing.expect(Ctx.ctx_fn0_called);
-//         }
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-
-//             try testing.expect(res_json.len == 0);
-//         }
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
-//             ) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             try testing.expect(res_json.len == 0);
-//         }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 1}
+            );
+            try testing.expect(fn2_alloc_with_err_called);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher with struct scope functions" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.add("fn0", Group.fn0);
+        try dispatcher.add("fn1", Group.fn1);
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn0", "id": 1}
+            );
+            try testing.expect(Group.group_fn0_called);
+        }
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn1", "params": [1], "id": 1}
+            );
+            try testing.expect(Group.group_fn1_called);
+        }
+    }
+
+}
+
+
+test "rpc_dispatcher with context" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        var ctx = Ctx { .count = 0 };
+
+        try dispatcher.addWithCtx("ctx.get", &ctx, Ctx.get);
+        try dispatcher.addWithCtx("ctx.fn0", &ctx, Ctx.fn0);
+        try dispatcher.addWithCtx("ctx.fn1", &ctx, Ctx.fn1);
+        try dispatcher.addWithCtx("ctx.fn1_alloc", &ctx, Ctx.fn1_alloc);
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
+            );
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(0));
+        }
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "ctx.fn0", "id": 1}
+            );
+            try testing.expect(Ctx.ctx_fn0_called);
+        }
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "ctx.fn1", "params": [2], "id": 1}
+            );
+            try testing.expect(pipeline.responseJson().len == 0);
+        }
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "ctx.fn1_alloc", "params": [2], "id": 1}
+            );
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            try testing.expect(pipeline.responseJson().len == 0);
+        }
+
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
+            );
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(4));
+        }
+
+    }
 
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "ctx.get", "id": 1}
-//             ) orelse "";
+}
+
+
+test "rpc_dispatcher fn with array params returning struct value" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat", null, fn_cat);
 
-//             defer alloc.free(res_json);
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
+            );
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 9);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher fn with built array params returning struct value" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat", null, fn_cat);
+
+        {
+            const params = .{"cat1", 9, "blue"};
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 9);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in an Value as a parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat_value", null, fn_cat_value);
+
+        {
+            const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "black");
+            try testing.expectEqual(parsed_cat.value.weight, 5.0);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in an Value as a parameter, with an Allocator as the first parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
+        {
+            const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "black");
+            try testing.expectEqual(parsed_cat.value.weight, 5.0);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a Value(.object) as a parameter, with a context, parsing the Value to a struct" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        var ctx = Ctx { .count = 0 };
+
+        try dispatcher.addWithCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
+
+        {
+            const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
+            try testing.expectEqual(parsed_cat.value.weight, 5);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a single JSON Value as parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(4));
-//         }
-
-//     }
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_json_value1", null, fn_json_value1);
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(1));
+        }
+
+        try dispatcher.addWithCtx("fn_json_value1", null, fn_json_value1);
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
+        }
+
+    }
 
-// }
-
+}
+
+
+test "rpc_dispatcher passing in two JSON Values as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
 
-// test "rpc_dispatcher fn with array params returning struct value" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat", null, fn_cat);
-
-//         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
-//                 \\{"jsonrpc": "2.0", "method": "fn_cat", "params": ["cat1", 9, "blue"], "id": 1}
-//             ) orelse "";
-
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_json_value2", null, fn_json_value2);
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
+        }
+
+    }
+
+}
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 9);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher fn with built array params returning struct value" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat", null, fn_cat);
-
-//         {
-//             const params = .{"cat1", 9, "blue"};
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat", params, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat1");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 9);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in an Value as a parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat_value", null, fn_cat_value);
-
-//         {
-//             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value", cat3, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "black");
-//             try testing.expectEqual(parsed_cat.value.weight, 5.0);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in an Value as a parameter, with an Allocator as the first parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat_value_alloc", null, fn_cat_value_alloc);
-//         {
-//             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "black" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_value_alloc", cat3, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "black");
-//             try testing.expectEqual(parsed_cat.value.weight, 5.0);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a Value(.object) as a parameter, with a context, parsing the Value to a struct" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         var ctx = Ctx { .count = 0 };
-
-//         try dispatcher.addWithCtx("ctx.fn_cat_value_ctx", &ctx, Ctx.fn_cat_value_ctx);
-
-//         {
-//             const cat3 = CatInfo { .cat_name = "cat3", .weight = 5.0, .eye_color = "brown" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "ctx.fn_cat_value_ctx", cat3, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat3");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "brown");
-//             try testing.expectEqual(parsed_cat.value.weight, 5);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a single JSON Value as parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_json_value1", null, fn_json_value1);
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1}, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(1));
-//         }
-
-//         try dispatcher.addWithCtx("fn_json_value1", null, fn_json_value1);
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value1", .{1, 2, 3}, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(3));
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in two JSON Values as parameters" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_json_value2", null, fn_json_value2);
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value2", .{1, 2}, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(3));
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in one JSON Value and one primitive as parameters" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_json_value_int", null, fn_json_value_int);
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(3));
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in one JSON Value, one primitive, and one Value as parameters" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_json_value_int_value", null, fn_json_value_int_value);
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(6));
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a struct object as a parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat_struct", null, fn_cat_struct);
-
-//         {
-//             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 6);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a struct object as a parameter, with Allocator parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.addWithCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
-
-//         {
-//             const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat5's cousin");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 6);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a struct object as a parameter, on a ctx" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         var ctx = Ctx { .count = 0 };
-
-//         try dispatcher.addWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
-
-//         {
-//             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 6);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher passing in a struct object as a parameter, on a ctx, with Allocator parameter" {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         var ctx = Ctx { .count = 0 };
-
-//         try dispatcher.addWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
-
-//         {
-//             const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
-//             defer alloc.free(req_json);
-//             // std.debug.print("request: {s}\n", .{req_json});
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
-//             const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
-//             defer parsed_cat.deinit();
-//             // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
-//             try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4's cousin");
-//             try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
-//             try testing.expectEqual(parsed_cat.value.weight, 6);
-//         }
-
-//     }
-
-// }
-
-
-// test "rpc_dispatcher register standalone functions on standalone object." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         var s = Standalone{};
-
-//         try dispatcher.addWithCtx("fn_standalone_on", &s, fn_standalone_on);
-//         try dispatcher.addWithCtx("fn_standalone_off", &s, fn_standalone_off);
-//         try dispatcher.addWithCtx("fn_standalone_get", &s, fn_standalone_get);
-//         try dispatcher.addWithCtx("fn_standalone_msg", &s, fn_standalone_msg);
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_on", null, .none);
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(true));
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_off", null, .none);
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql(false));
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc, req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
-//             defer res_result.deinit();
-//             try testing.expect((try res_result.response()).resultEql("flag value is: false"));
-//         }
-//     }
-
-// }
-
-// test "rpc_dispatcher register functions with an optional parameter." {
-//     var gpa = std.heap.DebugAllocator(.{}){};
-//     defer _ = gpa.deinit();
-//     const alloc = gpa.allocator();
-
-//     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
-//         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
-//         defer pipeline.deinit();
-
-//         try dispatcher.add("fn_opt1_int", fn_opt1_int);
-//         try dispatcher.add("fn_opt1_str", fn_opt1_str);
-//         try dispatcher.add("fn_opt1_cat", fn_opt1_cat);
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", null, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn_opt1_int_a == null);
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", .{123}, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn_opt1_int_a == 123);
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", null, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn_opt1_str_a == null);
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", .{"abc"}, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expectEqualStrings(fn_opt1_str_a.?, "abc");
-//         }
-
-//         {
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", null, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expect(fn_opt1_cat_a == null);
-//         }
-
-//         {
-//             const cat1 = CatInfo { .cat_name = "cat1", .weight = 5.0, .eye_color = "blue" };
-//             const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", cat1, .{ .num = 1});
-//             // std.debug.print("request: {s}\n", .{req_json});
-//             defer alloc.free(req_json);
-
-//             const res_json = try pipeline.runRequestToJson(alloc,  req_json) orelse "";
-//             defer alloc.free(res_json);
-//             // std.debug.print("response: {s}\n", .{res_json});
-//             try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
-//         }
-
-//     }
-
-// }
+
+test "rpc_dispatcher passing in one JSON Value and one primitive as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_json_value_int", null, fn_json_value_int);
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int", .{1, 2}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(3));
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in one JSON Value, one primitive, and one Value as parameters" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_json_value_int_value", null, fn_json_value_int_value);
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_json_value_int_value", .{1, 2, 3}, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(6));
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a struct object as a parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat_struct", null, fn_cat_struct);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a struct object as a parameter, with Allocator parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.addWithCtx("fn_cat_struct_alloc", null, fn_cat_struct_alloc);
+
+        {
+            const cat5 = CatInfo { .cat_name = "cat5", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_alloc", cat5, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat5's cousin");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a struct object as a parameter, on a ctx" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        var ctx = Ctx { .count = 0 };
+
+        try dispatcher.addWithCtx("fn_cat_struct_ctx", &ctx, Ctx.fn_cat_struct_ctx);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher passing in a struct object as a parameter, on a ctx, with Allocator parameter" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        var ctx = Ctx { .count = 0 };
+
+        try dispatcher.addWithCtx("fn_cat_struct_ctx_alloc", &ctx, Ctx.fn_cat_struct_ctx_alloc);
+
+        {
+            const cat4 = CatInfo { .cat_name = "cat4", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_cat_struct_ctx_alloc", cat4, .{ .num = 1 });
+            defer alloc.free(req_json);
+            // std.debug.print("request: {s}\n", .{req_json});
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            // std.debug.print("result: {any}\n", .{(try res_result.response()).result});
+            const parsed_cat = try std.json.parseFromValue(CatInfo, alloc, (try res_result.response()).result, .{});
+            defer parsed_cat.deinit();
+            // std.debug.print("cat1: {any}\n", .{parsed_cat.value});
+            try testing.expectEqualSlices(u8, parsed_cat.value.cat_name, "cat4's cousin");
+            try testing.expectEqualSlices(u8, parsed_cat.value.eye_color, "double blue");
+            try testing.expectEqual(parsed_cat.value.weight, 6);
+        }
+
+    }
+
+}
+
+
+test "rpc_dispatcher register standalone functions on standalone object." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        var s = Standalone{};
+
+        try dispatcher.addWithCtx("fn_standalone_on", &s, fn_standalone_on);
+        try dispatcher.addWithCtx("fn_standalone_off", &s, fn_standalone_off);
+        try dispatcher.addWithCtx("fn_standalone_get", &s, fn_standalone_get);
+        try dispatcher.addWithCtx("fn_standalone_msg", &s, fn_standalone_msg);
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_on", null, .none);
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(true));
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_off", null, .none);
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_get", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql(false));
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_standalone_msg", null, .{ .num = 1 });
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+
+            var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+            defer res_result.deinit();
+            try testing.expect((try res_result.response()).resultEql("flag value is: false"));
+        }
+    }
+
+}
+
+test "rpc_dispatcher register functions with an optional parameter." {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.add("fn_opt1_int", fn_opt1_int);
+        try dispatcher.add("fn_opt1_str", fn_opt1_str);
+        try dispatcher.add("fn_opt1_cat", fn_opt1_cat);
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            try testing.expect(fn_opt1_int_a == null);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_int", .{123}, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            try testing.expect(fn_opt1_int_a == 123);
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const result = try pipeline.runRequestToResult(alloc, req_json, []const u8);
+            defer result.?.deinit();
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            try testing.expectEqualStrings(result.?.value, "a is null");
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_str", .{"abc"}, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            const result = try pipeline.runRequestToResult(alloc, req_json, []const u8);
+            defer result.?.deinit();
+            // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            // std.debug.print("result:   {any}\n", .{result.?});
+            try testing.expectEqualStrings(result.?.value, "abc");
+        }
+
+        {
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", null, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            try testing.expect(fn_opt1_cat_a == null);
+        }
+
+        {
+            const cat1 = CatInfo { .cat_name = "cat1", .weight = 5.0, .eye_color = "blue" };
+            const req_json = try zigjr.composer.makeRequestJson(alloc, "fn_opt1_cat", cat1, .{ .num = 1});
+            // std.debug.print("request: {s}\n", .{req_json});
+            defer alloc.free(req_json);
+
+            _ = try pipeline.runRequest(req_json);
+//             // std.debug.print("response: {s}\n", .{pipeline.responseJson()});
+            try testing.expectEqualStrings(fn_opt1_cat_a.?.cat_name, "cat1");
+        }
+
+    }
+
+}
 
 // test "rpc_dispatcher extended handlers" {
 //     var gpa = std.heap.DebugAllocator(.{}){};
@@ -1454,9 +1403,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
 //         defer dispatcher.deinit();
-//         var pipeline = try zigjr.RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+//         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();
 
 //         try dispatcher.add("fn2", fn2);
@@ -1511,10 +1460,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(1));
@@ -1528,10 +1476,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 2}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(2));
@@ -1545,12 +1492,11 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, true], "id": 2}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
-//             var res_result = zigjr.parseRpcResponse(alloc, res_json);
+//             var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
 //             defer res_result.deinit();
 //             try testing.expect(fn2_with_err_called);
 //             try testing.expect((try res_result.response()).hasErr());
@@ -1571,10 +1517,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 3}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(3));
@@ -1588,10 +1533,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 4}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(4));
@@ -1605,10 +1549,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_after_called = false;
 //         ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 5}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(5));
@@ -1624,10 +1567,9 @@ test "rpc_dispatcher - pipeline - fn0" {
 //         ExtHandlers.on_fallback_called = false;
 //         ExtHandlers.on_fallback_id = zigjr.RpcId.ofNone();
 //         {
-//             const res_json = try pipeline.runRequestToJson(alloc, 
+//             _ = try pipeline.runRequest(
 //                 \\{"jsonrpc": "2.0", "method": "foobar", "params": [1, true], "id": 6}
 //             ) orelse "";
-//             defer alloc.free(res_json);
 
 //             try testing.expect(ExtHandlers.on_before_called);
 //             try testing.expect(ExtHandlers.on_before_id.eql(6));
