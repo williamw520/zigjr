@@ -62,32 +62,29 @@ pub const DispatchCtx = struct {
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 /// RpcHandler and its invoke() calls are thread-safe in general; 
 /// the only caveat is the user context and the user defined handler need to be thread-safe.
-pub fn RpcHandler(_: type) type {
-//pub fn RpcHandler(PROPS: type) type {
-    return struct {
-        const Self = @This();
+pub const RpcHandler = struct {
+    const Self = @This();
 
-        context: ?*anyopaque,
-        call: *const fn(context: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
+    context: ?*anyopaque,
+    call: *const fn(context: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
 
-        /// Call the handler call fn with the JSON Value parameters.
-        pub fn invoke(self: *const Self, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
-            return self.call(self.context, cc, params_value);
+    /// Call the handler call fn with the JSON Value parameters.
+    pub fn invoke(self: *const Self, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+        return self.call(self.context, cc, params_value);
+    }
+
+    /// Call the handler call fn with the JSON string parameters, convenient method for testing.
+    pub fn invokeJson(self: *const Self, cc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
+        const trimmed = std.mem.trim(u8, params_json, " ");
+        if (trimmed.len == 0) {
+            return self.call(self.context, cc, .{ .null = {} });
+        } else {
+            const parsed = try std.json.parseFromSlice(Value, cc.arena(), trimmed, .{});
+            defer parsed.deinit();
+            return self.call(self.context, cc, parsed.value);
         }
-
-        /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-        pub fn invokeJson(self: *const Self, cc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
-            const trimmed = std.mem.trim(u8, params_json, " ");
-            if (trimmed.len == 0) {
-                return self.call(self.context, cc, .{ .null = {} });
-            } else {
-                const parsed = try std.json.parseFromSlice(Value, cc.arena(), trimmed, .{});
-                defer parsed.deinit();
-                return self.call(self.context, cc, parsed.value);
-            }
-        }
-    };
-}
+    }
+};
 
 /// Package a user context, a DispatchCtx type, a handler function along with its parameters,
 /// its return type, and its return error type into a RpcHandler object.
@@ -135,8 +132,8 @@ pub fn RpcHandler(_: type) type {
 /// stringified to JSON.  If the function has already built its own JSON string, it can
 /// return it in a JsonStr struct, which prevents it from being stringified again.
 ///
-pub fn makeRpcHandler(context: anytype, comptime P: type, comptime F: anytype) RpcHandler(P) {
-    const hinfo = getHandlerInfo(context, P, F);
+pub fn makeRpcHandler(context: anytype, comptime F: anytype) RpcHandler {
+    const hinfo = getHandlerInfo(context, F);
 
     const wrapper = struct {
         fn call(ctx: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
@@ -181,8 +178,6 @@ pub const JsonStr = struct {
 
 // This is a comptime struct capturing the needed comptime info to do the call on the handler.
 const HandlerInfo = struct {
-    // TODO: remove DCP. No need.
-    DCP:            type,                   // The type of the user_props in a DispatchCtx.
     CTX:            type,                   // The type of the context object (the self pointer type).
     fn_info:        Type.Fn,                // Info on the handler function.
     params:         []const Type.Fn.Param,  // The parameter array of the handler function.
@@ -208,7 +203,7 @@ const HandlerInfo = struct {
 
 // Note: the following functions must be inline to force evaluation in comptime for makeRpcHandler.
 
-inline fn getHandlerInfo(context: anytype, comptime P: type, comptime handler_fn: anytype) HandlerInfo {
+inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) HandlerInfo {
     const fn_info       = getFnInfo(handler_fn);
     const params        = fn_info.params;
     const CTX           = @TypeOf(context);
@@ -223,7 +218,6 @@ inline fn getHandlerInfo(context: anytype, comptime P: type, comptime handler_fn
     const obj1_type     = if (is_obj1) params[user_idx].type.? else void;
 
     return .{
-        .DCP            = P,
         .CTX            = CTX,
         .fn_info        = fn_info,
         .params         = params,

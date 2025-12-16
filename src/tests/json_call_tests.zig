@@ -214,7 +214,7 @@ test "Test rpc call on fn0." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn0);
+        var h = json_call.makeRpcHandler(&ctx, fn0);
         fn0_called = false;
         _ = try h.invoke(&dc, .{ .null = {} });
         try testing.expect(fn0_called);
@@ -234,7 +234,7 @@ test "Test rpc call on fn0." {
     }
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn0_with_err);
+        var h = json_call.makeRpcHandler(&ctx, fn0_with_err);
         fn0_with_err_called = false;
 
         _ = try h.invoke(&dc, .{ .null = {} });
@@ -256,7 +256,7 @@ test "Test rpc call on fn0." {
     }
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn0_return_json_str);
+        var h = json_call.makeRpcHandler(&ctx, fn0_return_json_str);
         _ = try h.invoke(&dc, .{ .null = {} });
         _ = try h.invoke(&dc, .{ .null = {} });
         _ = try h.invokeJson(&dc, "");
@@ -266,7 +266,7 @@ test "Test rpc call on fn0." {
     }
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn0_return_json_str_err);
+        var h = json_call.makeRpcHandler(&ctx, fn0_return_json_str_err);
         _ = try h.invoke(&dc, .{ .null = {} });
         _ = try h.invoke(&dc, .{ .null = {} });
         _ = try h.invokeJson(&dc, "");
@@ -276,7 +276,7 @@ test "Test rpc call on fn0." {
     }
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn0_alloc);
+        var h = json_call.makeRpcHandler(&ctx, fn0_alloc);
         fn0_alloc_called = false;
 
         _ = try h.invoke(&dc, .{ .null = {} });
@@ -310,7 +310,7 @@ test "Test rpc call on fn1." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_integer);
+        var h = json_call.makeRpcHandler(&ctx, fn1_integer);
         fn1_integer_called = false;
 
         _ = try h.invoke(&dc, .{ .integer = 123 });
@@ -333,7 +333,7 @@ test "Test rpc call on fn1." {
         fn1_integer_called = false;
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_alloc_with_err);
+        var h = json_call.makeRpcHandler(&ctx, fn1_alloc_with_err);
         _ = try h.invoke(&dc, .{ .integer = 123 });
         try testing.expect(fn1_alloc_with_err_called);
         fn1_alloc_with_err_called = false;
@@ -343,12 +343,12 @@ test "Test rpc call on fn1." {
     }
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_float);
+        var h = json_call.makeRpcHandler(&ctx, fn1_float);
         _ = try h.invoke(&dc, .{ .float = 1.23 });
         _ = try h.invokeJson(&dc, "1.23");
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_float);
+        var h = json_call.makeRpcHandler(&ctx, fn1_float);
         var array = std.json.Array.init(alloc);
         try array.append(.{ .float = 4.56 });
         defer array.deinit();
@@ -364,7 +364,7 @@ test "Test rpc call on fn1." {
     }
     
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_bool);
+        var h = json_call.makeRpcHandler(&ctx, fn1_bool);
         fn1_bool_called = false;
 
         _ = try h.invoke(&dc, .{ .bool = true });
@@ -376,7 +376,7 @@ test "Test rpc call on fn1." {
         fn1_bool_called = false;
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_bool);
+        var h = json_call.makeRpcHandler(&ctx, fn1_bool);
         var array = std.json.Array.init(alloc);
         try array.append(.{ .bool = false });
         defer array.deinit();
@@ -393,7 +393,7 @@ test "Test rpc call on fn1." {
     }
     
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_string);
+        var h = json_call.makeRpcHandler(&ctx, fn1_string);
         fn1_string_called = false;
 
         _ = try h.invoke(&dc, .{ .string = "Hello123" });
@@ -405,7 +405,7 @@ test "Test rpc call on fn1." {
         fn1_string_called = false;
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_string);
+        var h = json_call.makeRpcHandler(&ctx, fn1_string);
         var array = std.json.Array.init(alloc);
         try array.append(.{ .string = "Hello456" });
         defer array.deinit();
@@ -438,23 +438,23 @@ test "Test rpc call on fn1 with DispatchResult." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_with_dresult_none);
+        var h = json_call.makeRpcHandler(&ctx, fn1_with_dresult_none);
         const dres = try h.invoke(&dc, .{ .integer = 123 });
         // std.debug.print("fn1_with_dresult_none: {any}\n", .{dres});
         try testing.expectEqual(dres, DispatchResult.none);
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_with_dresult_integer);
+        var h = json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer);
         const dres = try h.invoke(&dc, .{ .integer = 123 });
         try testing.expectEqualStrings(dres.result, "123");
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_with_dresult_integer_err);
+        var h = json_call.makeRpcHandler(&ctx, fn1_with_dresult_integer_err);
         const dres = try h.invoke(&dc, .{ .integer = 123 });
         try testing.expectEqualStrings(dres.result, "123");
     }
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn1_with_dresult_str_err);
+        var h = json_call.makeRpcHandler(&ctx, fn1_with_dresult_str_err);
         const dres = try h.invoke(&dc, .{ .integer = 123 });
         try testing.expectEqualStrings(dres.result, "\"abc\"");
     }
@@ -476,7 +476,7 @@ test "Test rpc call on fn4." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn4);
+        var h = json_call.makeRpcHandler(&ctx, fn4);
         _ = try h.invokeJson(&dc, "[123, 4.56, true, \"abc\"]");
         try testing.expect(fn4_called);
     }
@@ -498,7 +498,7 @@ test "Test rpc call on fn_cat." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn_cat);
+        var h = json_call.makeRpcHandler(&ctx, fn_cat);
         fn_cat_called = false;
         _ = try h.invokeJson(&dc, 
                 \\{
@@ -527,7 +527,7 @@ test "Test rpc call on fn_cat_value on std.json.Value parameter." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn_cat_value);
+        var h = json_call.makeRpcHandler(&ctx, fn_cat_value);
         fn_cat_called = false;
         _ = try h.invokeJson(&dc, 
                 \\{
@@ -556,7 +556,7 @@ test "Test rpc call on fn_opt1_int with optional argument." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn_opt1_int);
+        var h = json_call.makeRpcHandler(&ctx, fn_opt1_int);
 
         _ = try h.invoke(&dc, .{ .null = {} });
         try testing.expect(fn_opt1_int_a == null);
@@ -605,7 +605,7 @@ test "Test rpc call on fn_opt1_str with optional argument and alloc." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn_opt1_str);
+        var h = json_call.makeRpcHandler(&ctx, fn_opt1_str);
         var res: DispatchResult = undefined;
         
         res = try h.invoke(&dc, .{ .null = {} });
@@ -663,7 +663,7 @@ test "Test rpc call on fn_opt1_cat with optional object argument." {
     var ctx = {};
 
     {
-        var h = json_call.makeRpcHandler(&ctx, void, fn_opt1_cat);
+        var h = json_call.makeRpcHandler(&ctx, fn_opt1_cat);
 
         _ = try h.invokeJson(&dc, 
                 \\{
@@ -730,19 +730,19 @@ test "Test rpc call with DispatchCtx." {
     dc.setProps(&userProps);
 
     {
-        const h1 = json_call.makeRpcHandler(&ctx, UserProps, fn_dc_integer1);
+        const h1 = json_call.makeRpcHandler(&ctx, fn_dc_integer1);
         const dr1 = try h1.invokeJson(&dc, "[123]");
         _=dr1;
         // std.debug.print("dr1.result: {s}\n", .{dr1.result});
         _ = try h1.invoke(&dc, .{ .integer = 123 });
         try testing.expect(userProps.x == 123);
 
-        var h2 = json_call.makeRpcHandler(&ctx, UserProps, fn_alloc_integer1);
+        var h2 = json_call.makeRpcHandler(&ctx, fn_alloc_integer1);
         const dr2 = try h2.invokeJson(&dc, "[123]");
         // std.debug.print("dr2.result: {s}\n", .{dr2.result});
         try testing.expectEqualStrings("\"a is 123\"", dr2.result);
 
-        var h3 = json_call.makeRpcHandler(&ctx, UserProps, fn_ctx_dc_integer1);
+        var h3 = json_call.makeRpcHandler(&ctx, fn_ctx_dc_integer1);
         ctx.called = false;
         _ = try h3.invokeJson(&dc, "[123]");
         // std.debug.print("dr3.result: {s}\n", .{dr3.result});
@@ -752,7 +752,7 @@ test "Test rpc call with DispatchCtx." {
 
 test "Test rpc call with missing DispatchCtx in handler when registering the handler." {
     var ctx = CalledCtx {};
-    _ = json_call.makeRpcHandler(&ctx, UserProps, fn_alloc_integer1);
+    _ = json_call.makeRpcHandler(&ctx, fn_alloc_integer1);
 }
 
 

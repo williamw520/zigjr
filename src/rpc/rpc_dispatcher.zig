@@ -38,8 +38,8 @@ pub const H_ON_ERROR    = "rpc.on-error";       // called when handler returns a
 /// The dispatcher is thread-safe in general once it's set up, as long as
 /// the addXX and setXX() methods are not called afterward.
 /// P is the type of data struct for the per-request user props.
-pub fn RpcDispatcher(P: type) type {
-    const RpcHandlerP = json_call.RpcHandler(P);
+pub fn RpcDispatcher(_: type) type {
+    const RpcHandlerP = json_call.RpcHandler;
     const DispatchCtxP = DispatchCtx;
 
     return struct {
@@ -75,7 +75,7 @@ pub fn RpcDispatcher(P: type) type {
 
             var dummy_null_ctx = {};
             const ctx = if (@typeInfo(@TypeOf(context)) == .null) &dummy_null_ctx else context;
-            const h = json_call.makeRpcHandler(ctx, P, handler_fn);
+            const h = json_call.makeRpcHandler(ctx, handler_fn);
             try self.handlers.put(method, h);
         }
 
