@@ -25,18 +25,8 @@ const dispatcher = @import("dispatcher.zig");
 const DispatchCtxImpl = dispatcher.DispatchCtxImpl;
 
 
-
-pub inline fn asPtr(T: type, opaque_ptr: *anyopaque) *T {
-    return @as(*T, @ptrCast(@alignCast(opaque_ptr)));
-}
-
-pub inline fn asTPtr(T: type, opaque_ptr: *anyopaque) T {
-    return @as(T, @ptrCast(@alignCast(opaque_ptr)));
-}
-
-
 /// P as the type of the user_props.
-pub fn DispatchCtx(P: type) type {
+pub fn DispatchCtx(_: type) type {
     return struct {
         const Self = @This();
 
@@ -60,10 +50,10 @@ pub fn DispatchCtx(P: type) type {
         pub fn setResult(self: *Self, res: zigjr.DispatchResult) void {
             self.dc_impl.result = res;
         }
-        pub fn props(self: *Self) *P {
-            return asPtr(P, self.dc_impl.user_props);
+        pub fn props(self: *Self, comptime T: type) *T {
+            return @as(*T, @ptrCast(@alignCast(self.dc_impl.user_props)));
         }
-        pub fn setProps(self: *Self, p: *P) void {
+        pub fn setProps(self: *Self, p: anytype) void {
             self.dc_impl.user_props = p;
         }
     };
@@ -74,20 +64,20 @@ pub fn DispatchCtx(P: type) type {
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 /// RpcHandler and its invoke() calls are thread-safe in general; 
 /// the only caveat is the user context and the user defined handler need to be thread-safe.
-pub fn RpcHandler(P: type) type {
+pub fn RpcHandler(PROPS: type) type {
     return struct {
         const Self = @This();
 
         context: ?*anyopaque,
-        call: *const fn(context: ?*anyopaque, cc: *DispatchCtx(P), params_value: Value) anyerror!DispatchResult,
+        call: *const fn(context: ?*anyopaque, cc: *DispatchCtx(PROPS), params_value: Value) anyerror!DispatchResult,
 
         /// Call the handler call fn with the JSON Value parameters.
-        pub fn invoke(self: *const Self, cc: *DispatchCtx(P), params_value: Value) anyerror!DispatchResult {
+        pub fn invoke(self: *const Self, cc: *DispatchCtx(PROPS), params_value: Value) anyerror!DispatchResult {
             return self.call(self.context, cc, params_value);
         }
 
         /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-        pub fn invokeJson(self: *const Self, cc: *DispatchCtx(P), params_json: []const u8) anyerror!DispatchResult {
+        pub fn invokeJson(self: *const Self, cc: *DispatchCtx(PROPS), params_json: []const u8) anyerror!DispatchResult {
             const trimmed = std.mem.trim(u8, params_json, " ");
             if (trimmed.len == 0) {
                 return self.call(self.context, cc, .{ .null = {} });

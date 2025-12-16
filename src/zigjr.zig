@@ -42,8 +42,6 @@ pub const DispatchResult = dispatcher.DispatchResult;
 pub const DispatchErrors = dispatcher.DispatchErrors;
 pub const DispatchCtxImpl = dispatcher.DispatchCtxImpl;
 pub const DispatchCtx = json_call.DispatchCtx;
-pub const asPtr = json_call.asPtr;
-pub const asTPtr = json_call.asTPtr;
 
 pub const RequestPipeline = pipeline.RequestPipeline;
 pub const ResponsePipeline = pipeline.ResponsePipeline;

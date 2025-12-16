@@ -697,12 +697,12 @@ const UserProps = struct {
 };
 
 fn fn_dc_integer1(dc: *DispatchCtx(UserProps), a: i64) ![]const u8 {
-    dc.props().x = a;
+    dc.props(UserProps).x = a;
     return try allocPrint(dc.arena(), "a is {}", .{a});
 }
 
 fn fn_ctx_dc_integer1(ctx: *CalledCtx, dc: *DispatchCtx(UserProps), a: i64) ![]const u8 {
-    dc.props().x = a;
+    dc.props(UserProps).x = a;
     ctx.called = true;
     return try allocPrint(dc.arena(), "a is {}", .{a});
 }
