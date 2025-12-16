@@ -208,6 +208,8 @@ inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) Handler
     const params        = fn_info.params;
     const CTX           = @TypeOf(context);
     const ctx_idx       = typeInParams(params, CTX);
+    // TODO: check for non-const *DispatchCtx
+    // TODO: check for DispatchCtx
     const cc_idx        = typeInParams(params, *DispatchCtx);
     const alloc_idx     = typeInParams(params, std.mem.Allocator);
     const user_idx      = findUserIdx(ctx_idx, cc_idx, alloc_idx);

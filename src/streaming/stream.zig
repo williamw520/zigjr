@@ -222,7 +222,7 @@ pub fn messagesByContentLength(alloc: Allocator, reader: anytype, req_writer: an
     var frame_buf = frame.FrameData.init(alloc);
     defer frame_buf.deinit();
     const req_output_writer = req_writer;
-    var pipeline = zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
+    var pipeline = try zigjr.MessagePipeline.init(alloc, req_dispatcher, res_dispatcher, options.logger);
     defer pipeline.deinit();
 
     options.logger.start("[stream.messagesByContentLength] Logging starts");

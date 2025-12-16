@@ -240,13 +240,13 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
         var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer rpc_dispatcher.deinit();
 
-        rpc_dispatcher.setOnBefore(null, onBefore);
+        try rpc_dispatcher.add(zigjr.H_PRE_REQUEST, onBefore);
 
         var fallbackCtx: FallbackCtx = .{
             .log_json = (args.json or args.pp_json),
             .json_opt = if (args.pp_json) .{ .whitespace = .indent_2 } else .{},
         };
-        rpc_dispatcher.setOnFallback(&fallbackCtx, onFallback);
+        try rpc_dispatcher.addWithCtx(zigjr.H_FALLBACK, &fallbackCtx, onFallback);
 
         // Comment out this to see the fallback_handler being called.
         try rpc_dispatcher.add("window/logMessage", window_logMessage);
@@ -270,11 +270,11 @@ fn response_worker(child_stdout: std.fs.File, args: CmdArgs) !void {
     std.debug.print("[---- response_worker ---] exits\n", .{});
 }
 
-fn onBefore(_: *anyopaque, _: Allocator, req: RpcRequest) void {
+fn onBefore(dc: *zigjr.DispatchCtx) void {
     // req.result has the result JSON object from server.
     // req.id is the request id; dispatch based on the id recorded in request_worker().
     std.debug.print("\n[---- response_worker ---] Server sent request, method: {s}, id: {any}\n",
-                    .{req.method, req.id});
+                    .{dc.request().method, dc.request().id});
 }
 
 const FallbackCtx = struct {
@@ -282,11 +282,11 @@ const FallbackCtx = struct {
     json_opt:   StringifyOptions,
 };
 
-fn onFallback(ctx_ptr: *anyopaque, alloc: Allocator, req: RpcRequest) anyerror!DispatchResult {
-    const ctx =  @as(*FallbackCtx, @ptrCast(@alignCast(ctx_ptr)));
+
+fn onFallback(ctx: *FallbackCtx, dc: *zigjr.DispatchCtx) anyerror!DispatchResult {
+    // const ctx =  @as(*FallbackCtx, @ptrCast(@alignCast(ctx_ptr)));
     if (ctx.log_json) {
-        const params_json = try std.json.Stringify.valueAlloc(alloc, req.params, ctx.json_opt);
-        defer alloc.free(params_json);
+        const params_json = try std.json.Stringify.valueAlloc(dc.arena(), dc.request().params, ctx.json_opt);
         std.debug.print("{s}\n", .{params_json});
     }
     return DispatchResult.asNone();
