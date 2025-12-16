@@ -57,8 +57,12 @@ pub const FileLogger = logger.FileLogger;
 
 pub const RpcDispatcher = rpc_dispatcher.RpcDispatcher;
 pub const RegistrationErrors = rpc_dispatcher.RegistrationErrors;
-pub const JsonStr = @import("rpc/json_call.zig").JsonStr;
+pub const H_PRE_REQUEST = rpc_dispatcher.H_PRE_REQUEST;
+pub const H_FALLBACK    = rpc_dispatcher.H_FALLBACK;
+pub const H_END_REQUEST = rpc_dispatcher.H_END_REQUEST;
+pub const H_ON_ERROR    = rpc_dispatcher.H_ON_ERROR;
 
+pub const JsonStr = @import("rpc/json_call.zig").JsonStr;
 pub const ErrorCode = errors.ErrorCode;
 pub const JrErrors = errors.JrErrors;
 

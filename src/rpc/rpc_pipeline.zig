@@ -171,11 +171,10 @@ pub const RequestPipeline = struct {
         }
         if (try self.fmtRequestError(req)) return RunStatus.asRequestReplied();
 
-        const defaultResult = DispatchResult.asNone();
         self.dc.request = req;
         errdefer {
             // In case of std.Io.Writer.Error.
-            self.dc.result = &defaultResult;
+            self.dc.result = DispatchResult.asNone();
             self.req_dispatcher.dispatchEnd(&self.dc);
             self.dc.reset();
         }
@@ -183,7 +182,7 @@ pub const RequestPipeline = struct {
             break :blk DispatchResult.withAnyErr(err);  // Turn dispatch error into DispatchResult.err.
         };
         const r_status = try self.fmtResponse(&d_result, req, delimiter);
-        self.dc.result = &d_result;
+        self.dc.result = d_result;
         self.req_dispatcher.dispatchEnd(&self.dc);
         self.dc.reset();
         return r_status;

@@ -25,7 +25,8 @@ pub const DispatchCtxImpl = struct {
     logger:         zigjr.Logger,
     // per-request request and result
     request:        *const zigjr.RpcRequest = &nop_request,
-    result:         ?*const zigjr.DispatchResult = null,    // TODO: set to nop_result
+    result:         zigjr.DispatchResult = .asNone(),
+    err:            ?anyerror = null,
     // per-request user data; set up by the pre-request and cleaned up by the end-request hook.
     user_props:     *anyopaque = undefined,
 
@@ -36,7 +37,8 @@ pub const DispatchCtxImpl = struct {
 
     pub fn reset(self: *DispatchCtxImpl) void {
         self.request = &nop_request;
-        self.result = null;
+        self.result = .asNone();
+        self.err = null;
         // TODO: clean up self.user_props?
     }
 };

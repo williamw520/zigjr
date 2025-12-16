@@ -163,8 +163,8 @@ test "Write dup with .write() and enableWriter2" {
         dup_writer.enableWriter2(true);
         _ = try writer.write("c");
         try writer.flush();
-        std.debug.print("w1: |{s}|\n", .{writer1.written()});
-        std.debug.print("w2: |{s}|\n", .{writer2.written()});
+        // std.debug.print("w1: |{s}|\n", .{writer1.written()});
+        // std.debug.print("w2: |{s}|\n", .{writer2.written()});
         try std.testing.expect(writer1.written().len == 3);
         try std.testing.expect(writer2.written().len == 2);
         try std.testing.expectEqualSlices(u8, writer1.written(), "abc");

@@ -54,7 +54,10 @@ pub fn DispatchCtx(P: type) type {
         pub fn result(self: *const Self) ?*const zigjr.DispatchResult {
             return self.dc_impl.result;
         }
-        pub fn setResult(self: *Self, res: *const zigjr.DispatchResult) void {
+        pub fn err(self: *const Self) ?anyerror {
+            return self.dc_impl.err;
+        }
+        pub fn setResult(self: *Self, res: zigjr.DispatchResult) void {
             self.dc_impl.result = res;
         }
         pub fn props(self: *Self) *P {

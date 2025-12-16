@@ -1397,6 +1397,190 @@ test "rpc_dispatcher register functions with an optional parameter." {
 
 }
 
+test "rpc_dispatcher extended handlers" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const alloc = gpa.allocator();
+
+    {
+        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        defer dispatcher.deinit();
+        var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
+        defer pipeline.deinit();
+
+        try dispatcher.add("fn2", fn2);
+        try dispatcher.add("fn2_with_err", fn2_with_err);
+        try dispatcher.add("fn2_return_value", fn2_return_value);
+        try dispatcher.add("fn2_return_value_with_err", fn2_return_value_with_err);
+        try dispatcher.add("fn2_alloc_with_err", fn2_alloc_with_err);
+
+        const ExtHandlers = struct {
+            var on_before_called = false;
+            var on_before_id = zigjr.RpcId.ofNone();
+            var on_after_called = false;
+            var on_after_id = zigjr.RpcId.ofNone();
+            var on_error_called = false;
+            var on_error_id = zigjr.RpcId.ofNone();
+            var on_error_err: anyerror = undefined;
+            var on_fallback_called = false;
+            var on_fallback_id = zigjr.RpcId.ofNone();
+
+            fn onBefore(dc: *zigjr.DispatchCtx(void)) void {
+                on_before_called = true;
+                on_before_id = dc.request().id;
+            }
+
+            fn onAfter(dc: *zigjr.DispatchCtx(void)) void {
+                on_after_called = true;
+                on_after_id = dc.request().id;
+            }
+
+            fn onError(dc: *zigjr.DispatchCtx(void)) void {
+                on_error_err = dc.err().?;
+                on_error_called = true;
+                on_error_id = dc.request().id;
+            }
+
+            fn onFallback(dc: *zigjr.DispatchCtx(void)) anyerror!DispatchResult {
+                on_fallback_called = true;
+                on_fallback_id = dc.request().id;
+                return DispatchResult.asNone();
+            }
+            
+        };
+
+        try dispatcher.add(zigjr.H_PRE_REQUEST, ExtHandlers.onBefore);
+        try dispatcher.add(zigjr.H_END_REQUEST, ExtHandlers.onAfter);
+        try dispatcher.add(zigjr.H_ON_ERROR, ExtHandlers.onError);
+        try dispatcher.add(zigjr.H_FALLBACK, ExtHandlers.onFallback);
+
+        ExtHandlers.on_before_called = false;
+        ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        ExtHandlers.on_after_called = false;
+        ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        {
+            _ = try pipeline.runRequest(
+                \\{"jsonrpc": "2.0", "method": "fn2", "params": [1, true], "id": 1}
+            );
+            try testing.expect(ExtHandlers.on_before_called);
+            try testing.expect(ExtHandlers.on_before_id.eql(1));
+            try testing.expect(ExtHandlers.on_after_called);
+            try testing.expect(ExtHandlers.on_after_id.eql(1));
+            try testing.expect(!ExtHandlers.on_fallback_called);
+        }
+
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, false], "id": 2}
+        //     ) orelse "";
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(2));
+        //     try testing.expect(ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_after_id.eql(2));
+        //     try testing.expect(!ExtHandlers.on_fallback_called);
+        // }
+
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "fn2_with_err", "params": [2, true], "id": 2}
+        //     ) orelse "";
+
+        //     var res_result = zigjr.parseRpcResponse(alloc, pipeline.responseJson());
+        //     defer res_result.deinit();
+        //     try testing.expect(fn2_with_err_called);
+        //     try testing.expect((try res_result.response()).hasErr());
+        //     try testing.expect((try res_result.response()).err().code == @intFromEnum(ErrorCode.ServerError));
+        //     try testing.expectEqualStrings((try res_result.response()).err().message, "Fn2WithErr");
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(2));
+        //     try testing.expect(!ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_error_called);
+        //     try testing.expect(ExtHandlers.on_error_id.eql(2));
+        //     try testing.expect(ExtHandlers.on_error_err == error{Fn2WithErr}.Fn2WithErr);
+        //     try testing.expect(!ExtHandlers.on_fallback_called);
+        // }
+        
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "fn2_return_value", "params": [3, true], "id": 3}
+        //     ) orelse "";
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(3));
+        //     try testing.expect(ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_after_id.eql(3));
+        //     try testing.expect(!ExtHandlers.on_fallback_called);
+        // }
+        
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "fn2_return_value_with_err", "params": [4, false], "id": 4}
+        //     ) orelse "";
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(4));
+        //     try testing.expect(ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_after_id.eql(4));
+        //     try testing.expect(!ExtHandlers.on_fallback_called);
+        // }
+        
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "fn2_alloc_with_err", "params": [1, true], "id": 5}
+        //     ) orelse "";
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(5));
+        //     try testing.expect(ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_after_id.eql(5));
+        //     try testing.expect(!ExtHandlers.on_fallback_called);
+        // }
+
+        // ExtHandlers.on_before_called = false;
+        // ExtHandlers.on_before_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_after_called = false;
+        // ExtHandlers.on_after_id = zigjr.RpcId.ofNone();
+        // ExtHandlers.on_fallback_called = false;
+        // ExtHandlers.on_fallback_id = zigjr.RpcId.ofNone();
+        // {
+        //     _ = try pipeline.runRequest(
+        //         \\{"jsonrpc": "2.0", "method": "foobar", "params": [1, true], "id": 6}
+        //     ) orelse "";
+
+        //     try testing.expect(ExtHandlers.on_before_called);
+        //     try testing.expect(ExtHandlers.on_before_id.eql(6));
+        //     try testing.expect(ExtHandlers.on_after_called);
+        //     try testing.expect(ExtHandlers.on_after_id.eql(6));
+        //     try testing.expect(ExtHandlers.on_fallback_called);
+        //     try testing.expect(ExtHandlers.on_fallback_id.eql(6));
+        // }
+
+    }
+
+}
+
 // test "rpc_dispatcher extended handlers" {
 //     var gpa = std.heap.DebugAllocator(.{}){};
 //     defer _ = gpa.deinit();
