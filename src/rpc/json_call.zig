@@ -26,58 +26,57 @@ const DispatchCtxImpl = dispatcher.DispatchCtxImpl;
 
 
 /// P as the type of the user_props.
-pub fn DispatchCtx(_: type) type {
-    return struct {
-        const Self = @This();
+pub const DispatchCtx = struct {
+    const Self = @This();
 
-        dc_impl:    *DispatchCtxImpl,
+    dc_impl:    *DispatchCtxImpl,
 
-        pub fn arena(self: *const Self) Allocator {
-            return self.dc_impl.arena;
-        }
-        pub fn logger(self: *const Self) zigjr.Logger {
-            return self.dc_impl.logger;
-        }
-        pub fn request(self: *const Self) *const zigjr.RpcRequest {
-            return self.dc_impl.request;
-        }
-        pub fn result(self: *const Self) ?*const zigjr.DispatchResult {
-            return self.dc_impl.result;
-        }
-        pub fn err(self: *const Self) ?anyerror {
-            return self.dc_impl.err;
-        }
-        pub fn setResult(self: *Self, res: zigjr.DispatchResult) void {
-            self.dc_impl.result = res;
-        }
-        pub fn props(self: *Self, comptime T: type) *T {
-            return @as(*T, @ptrCast(@alignCast(self.dc_impl.user_props)));
-        }
-        pub fn setProps(self: *Self, p: anytype) void {
-            self.dc_impl.user_props = p;
-        }
-    };
-}
+    pub fn arena(self: *const Self) Allocator {
+        return self.dc_impl.arena;
+    }
+    pub fn logger(self: *const Self) zigjr.Logger {
+        return self.dc_impl.logger;
+    }
+    pub fn request(self: *const Self) *const zigjr.RpcRequest {
+        return self.dc_impl.request;
+    }
+    pub fn result(self: *const Self) ?*const zigjr.DispatchResult {
+        return self.dc_impl.result;
+    }
+    pub fn err(self: *const Self) ?anyerror {
+        return self.dc_impl.err;
+    }
+    pub fn setResult(self: *Self, res: zigjr.DispatchResult) void {
+        self.dc_impl.result = res;
+    }
+    pub fn props(self: *Self, comptime T: type) *T {
+        return @as(*T, @ptrCast(@alignCast(self.dc_impl.user_props)));
+    }
+    pub fn setProps(self: *Self, p: anytype) void {
+        self.dc_impl.user_props = p;
+    }
+};
 
 
 /// Uniform call object that can be stored in a hash map.
 /// makeRpcHandler will deal with the parameter unpacking of specific function at comptime.
 /// RpcHandler and its invoke() calls are thread-safe in general; 
 /// the only caveat is the user context and the user defined handler need to be thread-safe.
-pub fn RpcHandler(PROPS: type) type {
+pub fn RpcHandler(_: type) type {
+//pub fn RpcHandler(PROPS: type) type {
     return struct {
         const Self = @This();
 
         context: ?*anyopaque,
-        call: *const fn(context: ?*anyopaque, cc: *DispatchCtx(PROPS), params_value: Value) anyerror!DispatchResult,
+        call: *const fn(context: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
 
         /// Call the handler call fn with the JSON Value parameters.
-        pub fn invoke(self: *const Self, cc: *DispatchCtx(PROPS), params_value: Value) anyerror!DispatchResult {
+        pub fn invoke(self: *const Self, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
             return self.call(self.context, cc, params_value);
         }
 
         /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-        pub fn invokeJson(self: *const Self, cc: *DispatchCtx(PROPS), params_json: []const u8) anyerror!DispatchResult {
+        pub fn invokeJson(self: *const Self, cc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
             const trimmed = std.mem.trim(u8, params_json, " ");
             if (trimmed.len == 0) {
                 return self.call(self.context, cc, .{ .null = {} });
@@ -109,15 +108,15 @@ pub fn RpcHandler(PROPS: type) type {
 /// The lifetime of the context object is the same as the registered handler itself, i.e.
 /// it lasts for the duration of the running program. The lifetime exceeds beyond each request and each session.
 ///
-/// If the handler function has a DispatchCtx(P) parameter as its first, second, or third parameter,
+/// If the handler function has a DispatchCtx parameter as its first, second, or third parameter,
 /// the dispatch context is passed in during invocation. The handler can use its functionality during the call.
-/// Use DispatchCtx(P).arena allocator for any memory allocation during the request handling.
+/// Use DispatchCtx.arena allocator for any memory allocation during the request handling.
 /// The arena memory will be reset at the end of the request by a higher level caller.
-/// Use DispatchCtx(P).logger for logging, set up by a higher level caller.
-/// DispatchCtx(P).user_data contains a user data object of type U. The user data object has a lifetime
+/// Use DispatchCtx.logger for logging, set up by a higher level caller.
+/// DispatchCtx.user_data contains a user data object of type U. The user data object has a lifetime
 /// of the request. It's set up by a pre-request hook and cleaned upu by a post-request hook.
 ///
-/// (Deprecated: Use DispatchCtx(P).arena instead.) 
+/// (Deprecated: Use DispatchCtx.arena instead.) 
 /// If the handler function has an Allocator parameter as its first, second, or third parameter,
 /// an arena allocator is passed in during invocation. The handler can use it for memory allocation.
 /// The arena memory will be reset at the end of the request by a higher level caller.
@@ -140,7 +139,7 @@ pub fn makeRpcHandler(context: anytype, comptime P: type, comptime F: anytype) R
     const hinfo = getHandlerInfo(context, P, F);
 
     const wrapper = struct {
-        fn call(ctx: ?*anyopaque, cc: *DispatchCtx(P), params_value: Value) anyerror!DispatchResult {
+        fn call(ctx: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
             // Function expects a single Value or a single struct object.
             if (hinfo.is_value1) {
                 return callOnValue(F, hinfo, ctx, cc, params_value);
@@ -182,7 +181,8 @@ pub const JsonStr = struct {
 
 // This is a comptime struct capturing the needed comptime info to do the call on the handler.
 const HandlerInfo = struct {
-    DCP:            type,                   // The type of the user_props in a DispatchCtx(P).
+    // TODO: remove DCP. No need.
+    DCP:            type,                   // The type of the user_props in a DispatchCtx.
     CTX:            type,                   // The type of the context object (the self pointer type).
     fn_info:        Type.Fn,                // Info on the handler function.
     params:         []const Type.Fn.Param,  // The parameter array of the handler function.
@@ -213,7 +213,7 @@ inline fn getHandlerInfo(context: anytype, comptime P: type, comptime handler_fn
     const params        = fn_info.params;
     const CTX           = @TypeOf(context);
     const ctx_idx       = typeInParams(params, CTX);
-    const cc_idx        = typeInParams(params, *DispatchCtx(P));
+    const cc_idx        = typeInParams(params, *DispatchCtx);
     const alloc_idx     = typeInParams(params, std.mem.Allocator);
     const user_idx      = findUserIdx(ctx_idx, cc_idx, alloc_idx);
     const is_value1     = params.len == user_idx + 1 and isValue(params[user_idx].type);
@@ -382,7 +382,7 @@ inline fn hasField(comptime T: type, f_name: []const u8) bool {
 }
 
 fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                   cc: *DispatchCtx(hinfo.DCP), json_primitive: Value) anyerror!DispatchResult {
+                   cc: *DispatchCtx, json_primitive: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -393,7 +393,7 @@ fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyo
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-               cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
+               cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
@@ -405,7 +405,7 @@ fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
 }
 
 fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, 
-                cc: *DispatchCtx(hinfo.DCP), params_value: Value) anyerror!DispatchResult {
+                cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
@@ -431,7 +431,7 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
 }
 
 fn callOnNull(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-              cc: *DispatchCtx(hinfo.DCP)) anyerror!DispatchResult {
+              cc: *DispatchCtx) anyerror!DispatchResult {
     var nullArray = Array.init(cc.arena());
     try nullArray.append( .{ .null = {} } );
     const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, cc, nullArray);
@@ -439,7 +439,7 @@ fn callOnNull(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque
 }
 
 fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-               cc: *DispatchCtx(hinfo.DCP), array: Array) anyerror!DispatchResult {
+               cc: *DispatchCtx, array: Array) anyerror!DispatchResult {
     if (hinfo.is_optional1 and array.items.len == 0) {
         var nullArray = Array.init(cc.arena());
         try nullArray.append( .{ .null = {} } );
@@ -494,7 +494,7 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
     }
 }
 
-fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP)) hinfo.tuple_type {
+fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     // Assign the context and alloc to the appropriate function argument slots in the tuple.
@@ -521,7 +521,7 @@ inline fn idxStr(comptime idx: usize) []const u8 {
     unreachable;
 }
 
-fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
+fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
                     value: Value) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -530,7 +530,7 @@ fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
     return tuple;
 }
 
-fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
+fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
                     primitive_value: Value) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -540,7 +540,7 @@ fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
     return tuple;
 }
 
-fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
+fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
                 values: Array) !hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
@@ -566,7 +566,7 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(
 }
 
 // For optional paramenter, hinfo.obj1_type already has the optional type.
-fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx(hinfo.DCP),
+fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
                  object: hinfo.obj1_type) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";

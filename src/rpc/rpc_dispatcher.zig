@@ -40,7 +40,7 @@ pub const H_ON_ERROR    = "rpc.on-error";       // called when handler returns a
 /// P is the type of data struct for the per-request user props.
 pub fn RpcDispatcher(P: type) type {
     const RpcHandlerP = json_call.RpcHandler(P);
-    const DispatchCtxP = DispatchCtx(P);
+    const DispatchCtxP = DispatchCtx;
 
     return struct {
         const Self = @This();

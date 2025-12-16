@@ -210,7 +210,7 @@ test "Test rpc call on fn0." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -306,7 +306,7 @@ test "Test rpc call on fn1." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -434,7 +434,7 @@ test "Test rpc call on fn1 with DispatchResult." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -472,7 +472,7 @@ test "Test rpc call on fn4." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -494,7 +494,7 @@ test "Test rpc call on fn_cat." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -523,7 +523,7 @@ test "Test rpc call on fn_cat_value on std.json.Value parameter." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -552,7 +552,7 @@ test "Test rpc call on fn_opt1_int with optional argument." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -601,7 +601,7 @@ test "Test rpc call on fn_opt1_str with optional argument and alloc." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -659,7 +659,7 @@ test "Test rpc call on fn_opt1_cat with optional object argument." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(void) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = {};
 
     {
@@ -696,12 +696,12 @@ const UserProps = struct {
     x: i64 = 10,
 };
 
-fn fn_dc_integer1(dc: *DispatchCtx(UserProps), a: i64) ![]const u8 {
+fn fn_dc_integer1(dc: *DispatchCtx, a: i64) ![]const u8 {
     dc.props(UserProps).x = a;
     return try allocPrint(dc.arena(), "a is {}", .{a});
 }
 
-fn fn_ctx_dc_integer1(ctx: *CalledCtx, dc: *DispatchCtx(UserProps), a: i64) ![]const u8 {
+fn fn_ctx_dc_integer1(ctx: *CalledCtx, dc: *DispatchCtx, a: i64) ![]const u8 {
     dc.props(UserProps).x = a;
     ctx.called = true;
     return try allocPrint(dc.arena(), "a is {}", .{a});
@@ -724,7 +724,7 @@ test "Test rpc call with DispatchCtx." {
         .arena = arena_alloc,
         .logger = nop_logger.asLogger(),
     };
-    var dc: DispatchCtx(UserProps) = .{ .dc_impl = &dc_impl };
+    var dc: DispatchCtx = .{ .dc_impl = &dc_impl };
     var ctx = CalledCtx {};
     var userProps = UserProps{};
     dc.setProps(&userProps);

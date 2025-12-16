@@ -1425,23 +1425,23 @@ test "rpc_dispatcher extended handlers" {
             var on_fallback_called = false;
             var on_fallback_id = zigjr.RpcId.ofNone();
 
-            fn onBefore(dc: *zigjr.DispatchCtx(void)) void {
+            fn onBefore(dc: *zigjr.DispatchCtx) void {
                 on_before_called = true;
                 on_before_id = dc.request().id;
             }
 
-            fn onAfter(dc: *zigjr.DispatchCtx(void)) void {
+            fn onAfter(dc: *zigjr.DispatchCtx) void {
                 on_after_called = true;
                 on_after_id = dc.request().id;
             }
 
-            fn onError(dc: *zigjr.DispatchCtx(void)) void {
+            fn onError(dc: *zigjr.DispatchCtx) void {
                 on_error_err = dc.err().?;
                 on_error_called = true;
                 on_error_id = dc.request().id;
             }
 
-            fn onFallback(dc: *zigjr.DispatchCtx(void)) anyerror!DispatchResult {
+            fn onFallback(dc: *zigjr.DispatchCtx) anyerror!DispatchResult {
                 on_fallback_called = true;
                 on_fallback_id = dc.request().id;
                 return DispatchResult.asNone();
