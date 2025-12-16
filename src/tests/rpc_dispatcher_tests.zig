@@ -354,7 +354,7 @@ test "rpc_dispatcher fn0 and variants with DispatchCtx" {
         .logger = nop_logger.asLogger(),
     };
 
-    var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer dispatcher.deinit();
     const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
     try dispatcher.add("fn0", fn0);
@@ -404,7 +404,7 @@ test "rpc_dispatcher fn1 and variants with DispatchCtx" {
         .logger = nop_logger.asLogger(),
     };
 
-    var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer dispatcher.deinit();
     const req_dispatcher = RequestDispatcher.implBy(&dispatcher);
     try dispatcher.add("fn1", fn1);
@@ -441,7 +441,7 @@ test "rpc_dispatcher - pipeline - fn0" {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer dispatcher.deinit();
     {
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
@@ -466,7 +466,7 @@ test "rpc_dispatcher fn0 variants" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -539,7 +539,7 @@ test "rpc_dispatcher fn1" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -600,7 +600,7 @@ test "rpc_dispatcher fn2" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -675,7 +675,7 @@ test "rpc_dispatcher with struct scope functions" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -706,7 +706,7 @@ test "rpc_dispatcher with context" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -771,7 +771,7 @@ test "rpc_dispatcher fn with array params returning struct value" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -806,7 +806,7 @@ test "rpc_dispatcher fn with built array params returning struct value" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -844,7 +844,7 @@ test "rpc_dispatcher passing in an Value as a parameter" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -882,7 +882,7 @@ test "rpc_dispatcher passing in an Value as a parameter, with an Allocator as th
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -919,7 +919,7 @@ test "rpc_dispatcher passing in a Value(.object) as a parameter, with a context,
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -959,7 +959,7 @@ test "rpc_dispatcher passing in a single JSON Value as parameter" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1003,7 +1003,7 @@ test "rpc_dispatcher passing in two JSON Values as parameters" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1033,7 +1033,7 @@ test "rpc_dispatcher passing in one JSON Value and one primitive as parameters" 
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1063,7 +1063,7 @@ test "rpc_dispatcher passing in one JSON Value, one primitive, and one Value as 
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1093,7 +1093,7 @@ test "rpc_dispatcher passing in a struct object as a parameter" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1131,7 +1131,7 @@ test "rpc_dispatcher passing in a struct object as a parameter, with Allocator p
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1169,7 +1169,7 @@ test "rpc_dispatcher passing in a struct object as a parameter, on a ctx" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1209,7 +1209,7 @@ test "rpc_dispatcher passing in a struct object as a parameter, on a ctx, with A
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1249,7 +1249,7 @@ test "rpc_dispatcher register standalone functions on standalone object." {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1320,7 +1320,7 @@ test "rpc_dispatcher register functions with an optional parameter." {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1403,7 +1403,7 @@ test "rpc_dispatcher extended handlers" {
     const alloc = gpa.allocator();
 
     {
-        var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+        var dispatcher = try zigjr.RpcDispatcher.init(alloc);
         defer dispatcher.deinit();
         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
         defer pipeline.deinit();
@@ -1587,7 +1587,7 @@ test "rpc_dispatcher extended handlers" {
 //     const alloc = gpa.allocator();
 
 //     {
-//         var dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+//         var dispatcher = try zigjr.RpcDispatcher.init(alloc);
 //         defer dispatcher.deinit();
 //         var pipeline = try RequestPipeline.init(alloc, RequestDispatcher.implBy(&dispatcher), null);
 //         defer pipeline.deinit();

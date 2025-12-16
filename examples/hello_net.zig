@@ -57,9 +57,9 @@ const ServerCtx = struct {
     end_server: std.atomic.Value(bool),
 };
 
-fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher(void) {
-    var rpc_dispatcher = try alloc.create(zigjr.RpcDispatcher(void));
-    rpc_dispatcher.* = try zigjr.RpcDispatcher(void).init(alloc);
+fn createDispatcher(alloc: Allocator, ctx: *ServerCtx) !*zigjr.RpcDispatcher {
+    var rpc_dispatcher = try alloc.create(zigjr.RpcDispatcher);
+    rpc_dispatcher.* = try zigjr.RpcDispatcher.init(alloc);
     
     try rpc_dispatcher.add("hello", hello);
     try rpc_dispatcher.add("hello-name", helloName);

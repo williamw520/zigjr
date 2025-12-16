@@ -21,7 +21,7 @@ pub fn main() !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
 
     try rpc_dispatcher.add("add", Basic.add);                   // register functions in a struct scope.

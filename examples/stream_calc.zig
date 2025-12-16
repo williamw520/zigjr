@@ -28,7 +28,7 @@ fn runExample(alloc: Allocator, args: CmdArgs) !void {
     var stash = Stash.init(alloc);
     defer stash.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
     const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
 

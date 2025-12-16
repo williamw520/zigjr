@@ -43,7 +43,7 @@ pub fn main() !void {
     var f_logger = try zigjr.FileLogger.init(alloc, "log.txt");
     defer f_logger.deinit();
 
-    var rpc_dispatcher = try zigjr.RpcDispatcher(void).init(alloc);
+    var rpc_dispatcher = try zigjr.RpcDispatcher.init(alloc);
     defer rpc_dispatcher.deinit();
 
     // Register the MCP RPC methods.
