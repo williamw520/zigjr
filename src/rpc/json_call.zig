@@ -210,7 +210,7 @@ inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) Handler
     const CTX           = @TypeOf(context);
     const ctx_idx       = getCtxParamIdx(params, CTX);
     const dc_idx        = getDispatchCtxParamIdx(params);
-    const alloc_idx     = typeInParams(params, std.mem.Allocator);
+    const alloc_idx     = getAllocatorParamIdx(params);
     const user_idx      = findUserIdx(ctx_idx, dc_idx, alloc_idx);
     const is_value1     = params.len == user_idx + 1 and isValue(params[user_idx].type);
     const is_struct     = params.len == user_idx + 1 and isStruct(params[user_idx].type);
@@ -274,13 +274,6 @@ inline fn getFnInfo(comptime handler_fn: anytype) Type.Fn {
     };
 }
 
-inline fn typeInParams(comptime params: []const Type.Fn.Param, of_type: type) ?usize {
-    if (params.len > 0 and params[0].type.? == of_type) return 0;
-    if (params.len > 1 and params[1].type.? == of_type) return 1;
-    if (params.len > 2 and params[2].type.? == of_type) return 2;
-    return null;
-}
-
 inline fn getCtxParamIdx(comptime params: []const Type.Fn.Param, CTX: type) ?usize {
     const c_info = @typeInfo(CTX);
     if (c_info != .pointer) {
@@ -294,7 +287,7 @@ inline fn getCtxParamIdx(comptime params: []const Type.Fn.Param, CTX: type) ?usi
         const p_info = @typeInfo(p.type.?);
         if (p_info == .pointer) return idx;
         comptime var buf: [256]u8 = undefined;
-        @compileError(try bufPrint(&buf, "Handler's context parameter {} should be *{s}, not {s}.", .{idx, C_Name, C_Name}));
+        @compileError(try bufPrint(&buf, "Context parameter {} for the handler should be *{s}, not {s}.", .{idx, C_Name, C_Name}));
     }
     return null;
 }
@@ -306,12 +299,25 @@ inline fn getDispatchCtxParamIdx(comptime params: []const Type.Fn.Param) ?usize 
         if (p_info == .pointer) {
             if (p_info.pointer.is_const) {
                 comptime var buf: [256]u8 = undefined;
-                @compileError(try bufPrint(&buf, "Handler parameter {} should be *DispatchCtx, not *const DispatchCtx.", .{idx}));
+                @compileError(try bufPrint(&buf, "Parameter {} for the handler should be *DispatchCtx, not *const DispatchCtx.", .{idx}));
             }
             return idx;
         }
         comptime var buf: [256]u8 = undefined;
-        @compileError(try bufPrint(&buf, "Handler parameter {} should be *DispatchCtx, not DispatchCtx.", .{idx}));
+        @compileError(try bufPrint(&buf, "Parameter {} for the handler should be *DispatchCtx, not DispatchCtx.", .{idx}));
+    }
+    return null;
+}
+
+inline fn getAllocatorParamIdx(comptime params: []const Type.Fn.Param) ?usize {
+    inline for (params, 0..) |p, idx| {
+        if (!hasType(p.type, std.mem.Allocator)) continue;
+        const p_info = @typeInfo(p.type.?);
+        if (p_info == .pointer) {
+            comptime var buf: [256]u8 = undefined;
+            @compileError(try bufPrint(&buf, "Parameter {} of the handler should be Allocator, not *Allocator.", .{idx}));
+        }
+        return idx;
     }
     return null;
 }
@@ -322,6 +328,8 @@ inline fn findUserIdx(ctx_idx: ?usize, dc_idx: ?usize, alc_idx: ?usize) usize {
     if (ctx_idx)|i| { user_idx = @max(user_idx, i + 1); }
     if (dc_idx)|i|  { user_idx = @max(user_idx, i + 1); }
     if (alc_idx)|i| { user_idx = @max(user_idx, i + 1); }
+    if (user_idx > 3)   // Some unknown parameters are placed in front of the Context/DispatchCtx/Allocator.
+        @compileError("The 'context', DispatchCtx, and Allocator parameters must be one of the first three parameters of the handler.");
     return user_idx;
 }
 
