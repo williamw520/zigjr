@@ -66,9 +66,9 @@ pub fn main() !void {
 // ZigJR automatically does the mapping between the structs and the JSON objects.
 
 // First message from a MCP client to do the initial handshake.
-fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
+fn mcp_initialize(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
                   params: InitializeRequest_params) !InitializeResult {
-    const msg = try allocPrint(alloc, "client name: {s}, version: {s}", .{params.clientInfo.name, params.clientInfo.version});
+    const msg = try allocPrint(dc.arena(), "client name: {s}, version: {s}", .{params.clientInfo.name, params.clientInfo.version});
     logger.log("mcp_initialize", "initialize", msg);
 
     return .{
@@ -84,46 +84,46 @@ fn mcp_initialize(logger: *zigjr.FileLogger, alloc: Allocator,
     };
 }
 
-fn mcp_notifications_initialized(logger: *zigjr.FileLogger, alloc: Allocator,
+fn mcp_notifications_initialized(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
                                  params: InitializedNotification_params) !void {
-    const msg = try allocPrint(alloc, "params: {any}", .{params});
+    const msg = try allocPrint(dc.arena(), "params: {any}", .{params});
     logger.log("mcp_notifications_initialized", "notifications/initialized", msg);
 }
 
-fn mcp_tools_list(logger: *zigjr.FileLogger, alloc: Allocator,
+fn mcp_tools_list(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
                   params: ListToolsRequest_params) !ListToolsResult {
-    const msg = try allocPrint(alloc, "params: {any}", .{params});
+    const msg = try allocPrint(dc.arena(), "params: {any}", .{params});
     logger.log("mcp_tools_list", "tools/list", msg);
     var tools: std.ArrayList(Tool) = .empty;
 
-    const helloTool = Tool.init(alloc, "hello", "Replying a 'Hello World' when called.");
-    try tools.append(alloc, helloTool);
+    const helloTool = Tool.init(dc.arena(), "hello", "Replying a 'Hello World' when called.");
+    try tools.append(dc.arena(), helloTool);
 
-    var helloNameTool = Tool.init(alloc, "hello-name", "Replying a 'Hello NAME' when called with a NAME.");
+    var helloNameTool = Tool.init(dc.arena(), "hello-name", "Replying a 'Hello NAME' when called with a NAME.");
     try helloNameTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloNameTool.inputSchema.addRequired("name");
-    try tools.append(alloc, helloNameTool);
+    try tools.append(dc.arena(), helloNameTool);
 
-    var helloXTimesTool = Tool.init(alloc, "hello-xtimes", "Replying a 'Hello NAME NUMBER' repeated X times when called with a NAME and a number.");
+    var helloXTimesTool = Tool.init(dc.arena(), "hello-xtimes", "Replying a 'Hello NAME NUMBER' repeated X times when called with a NAME and a number.");
     try helloXTimesTool.inputSchema.addProperty("name", "string", "The name to say hello to");
     try helloXTimesTool.inputSchema.addRequired("name");
     try helloXTimesTool.inputSchema.addProperty("times", "integer", "The number of times to repeat");
     try helloXTimesTool.inputSchema.addRequired("times");
-    try tools.append(alloc, helloXTimesTool);
+    try tools.append(dc.arena(), helloXTimesTool);
 
     return .{
         .tools = tools,
     };
 }
 
-fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !CallToolResult {
+fn mcp_tools_call(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx, params: Value) !CallToolResult {
     const tool = params.object.get("name").?.string;
-    const msg = try allocPrint(alloc, "tool name: {s}", .{tool});
+    const msg = try allocPrint(dc.arena(), "tool name: {s}", .{tool});
     logger.log("mcp_tools_call", "tools/call", msg);
 
     // We'll just do a poorman's dispatching on the MCP tool name.
     if (std.mem.eql(u8, tool, "hello")) {
-        var ctr = CallToolResult.init(alloc);
+        var ctr = CallToolResult.init(dc.arena());
         try ctr.addTextContent("Hello World!");
         return ctr;
     } else if (std.mem.eql(u8, tool, "hello-name")) {
@@ -131,23 +131,23 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, alloc: Allocator, params: Value) !C
         const name = arguments.get("name") orelse Value{ .string = "not set" };
         logger.log("mcp_tools_call", "arguments", name.string);
 
-        var ctr = CallToolResult.init(alloc);
-        try ctr.addTextContent(try allocPrint(alloc, "Hello '{s}'!", .{name.string}));
+        var ctr = CallToolResult.init(dc.arena());
+        try ctr.addTextContent(try allocPrint(dc.arena(), "Hello '{s}'!", .{name.string}));
         return ctr;
     } else if (std.mem.eql(u8, tool, "hello-xtimes")) {
         const arguments = params.object.get("arguments").?.object;
         const name = arguments.get("name") orelse Value{ .string = "not set" };
         const times = arguments.get("times") orelse Value{ .integer = 1 };
         const repeat: usize = if (0 < times.integer and times.integer < 100) @intCast(times.integer) else 1;
-        var buf = std.Io.Writer.Allocating.init(alloc);
+        var buf = std.Io.Writer.Allocating.init(dc.arena());
         var writer = &buf.writer;
         for (0..repeat) |_| try writer.print("Hello {s}! ", .{name.string});
-        var ctr = CallToolResult.init(alloc);
+        var ctr = CallToolResult.init(dc.arena());
         try ctr.addTextContent(buf.written());
         return ctr;
     } else {
-        var ctr = CallToolResult.init(alloc);
-        try ctr.addTextContent(try allocPrint(alloc, "Tool {s} not found", .{tool}));
+        var ctr = CallToolResult.init(dc.arena());
+        try ctr.addTextContent(try allocPrint(dc.arena(), "Tool {s} not found", .{tool}));
         ctr.isError = true;
         return ctr;
     }

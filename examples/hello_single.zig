@@ -64,13 +64,13 @@ fn hello() []const u8 {
     return "Hello world";
 }
 
-fn helloName(alloc: Allocator, name: [] const u8) ![]const u8 {
-    return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
+fn helloName(dc: *zigjr.DispatchCtx, name: [] const u8) ![]const u8 {
+    return try std.fmt.allocPrint(dc.arena(), "Hello {s}", .{name});
 }
 
-fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
+fn helloXTimes(dc: *zigjr.DispatchCtx, name: [] const u8, times: i64) ![]const u8 {
     const repeat: usize = if (0 < times and times < 100) @intCast(times) else 1;
-    var buf = std.Io.Writer.Allocating.init(alloc);
+    var buf = std.Io.Writer.Allocating.init(dc.arena());
     var writer = &buf.writer;
     for (0..repeat) |_| try writer.print("Hello {s}! ", .{name});
     return buf.written();

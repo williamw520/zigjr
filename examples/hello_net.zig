@@ -14,6 +14,15 @@ const StringHashMap = std.hash_map.StringHashMap;
 const zigjr = @import("zigjr");
 
 
+// For --http, test with
+//  curl localhost:35354 --request POST --json @data/hello.json
+//  curl localhost:35354 --request POST --json @data/hello_name.json
+
+// For --tcp, test with
+//  nc64 localhost 35354 < data\hello.json
+//  nc64 localhost 35354 < data\hello_name.json
+
+
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -188,14 +197,14 @@ fn hello() []const u8 {
 // A handler takes in a string parameter and returns a string with error.
 // It also asks the library for an allocator, which is passed in automatically.
 // Allocated memory is freed automatically, making memory usage simple.
-fn helloName(alloc: Allocator, name: [] const u8) Allocator.Error![]const u8 {
-    return try std.fmt.allocPrint(alloc, "Hello {s}", .{name});
+fn helloName(dc: *zigjr.DispatchCtx, name: [] const u8) Allocator.Error![]const u8 {
+    return try std.fmt.allocPrint(dc.arena(), "Hello {s}", .{name});
 }
 
 // This one takes one more parameter. Note that i64 is JSON's integer type.
-fn helloXTimes(alloc: Allocator, name: [] const u8, times: i64) ![]const u8 {
+fn helloXTimes(dc: *zigjr.DispatchCtx, name: [] const u8, times: i64) ![]const u8 {
     const repeat: usize = if (0 < times and times < 100) @intCast(times) else 1;
-    var buf = std.Io.Writer.Allocating.init(alloc);
+    var buf = std.Io.Writer.Allocating.init(dc.arena());
     for (0..repeat) |_| try buf.writer.print("Hello {s}! ", .{name});
     return buf.written();
 }

@@ -162,11 +162,11 @@ fn makeCat(name: []const u8, eye_color: []const u8) CatInfo {
     };
 }
 
-fn cloneCat(alloc: Allocator, cat: CatInfo) ![2]CatInfo {
+fn cloneCat(dc: *zigjr.DispatchCtx, cat: CatInfo) ![2]CatInfo {
     return .{
         cat,
         CatInfo {
-            .cat_name = try std.fmt.allocPrint(alloc, "Clone of {s}", .{cat.cat_name}),
+            .cat_name = try std.fmt.allocPrint(dc.arena(), "Clone of {s}", .{cat.cat_name}),
             .weight = cat.weight * 2,
             .eye_color = cat.eye_color,
         },
