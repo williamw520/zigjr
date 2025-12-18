@@ -208,7 +208,7 @@ inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) Handler
     const fn_info       = getFnInfo(handler_fn);
     const params        = fn_info.params;
     const CTX           = @TypeOf(context);
-    const ctx_idx       = typeInParams(params, CTX);
+    const ctx_idx       = getCtxParamIdx(params, CTX);
     const dc_idx        = getDispatchCtxParamIdx(params);
     const alloc_idx     = typeInParams(params, std.mem.Allocator);
     const user_idx      = findUserIdx(ctx_idx, dc_idx, alloc_idx);
@@ -281,22 +281,37 @@ inline fn typeInParams(comptime params: []const Type.Fn.Param, of_type: type) ?u
     return null;
 }
 
+inline fn getCtxParamIdx(comptime params: []const Type.Fn.Param, CTX: type) ?usize {
+    const c_info = @typeInfo(CTX);
+    if (c_info != .pointer) {
+        @compileError("The 'context' for the handler should have a pointer type, *" ++ @typeName(CTX));
+    }
+
+    const C = c_info.pointer.child;         // base type of CTX.
+    const C_Name = @typeName(C);
+    inline for (params, 0..) |p, idx| {
+        if (!hasType(p.type, C)) continue;
+        const p_info = @typeInfo(p.type.?);
+        if (p_info == .pointer) return idx;
+        comptime var buf: [256]u8 = undefined;
+        @compileError(try bufPrint(&buf, "Handler's context parameter {} should be *{s}, not {s}.", .{idx, C_Name, C_Name}));
+    }
+    return null;
+}
+
 inline fn getDispatchCtxParamIdx(comptime params: []const Type.Fn.Param) ?usize {
     inline for (params, 0..) |p, idx| {
-        if (!hasType(p.type, DispatchCtx))
-            continue;
-        const t_info = @typeInfo(p.type.?);
-        if (t_info == .pointer) {
-            if (t_info.pointer.is_const) {
+        if (!hasType(p.type, DispatchCtx)) continue;
+        const p_info = @typeInfo(p.type.?);
+        if (p_info == .pointer) {
+            if (p_info.pointer.is_const) {
                 comptime var buf: [256]u8 = undefined;
-                @compileError(try bufPrint(&buf, "Parameter {} should be *DispatchCtx, not *const DispatchCtx.", .{idx}));
-            } else {
-                return idx;
+                @compileError(try bufPrint(&buf, "Handler parameter {} should be *DispatchCtx, not *const DispatchCtx.", .{idx}));
             }
-        } else {
-            comptime var buf: [256]u8 = undefined;
-            @compileError(try bufPrint(&buf, "Parameter {} should be *DispatchCtx, not DispatchCtx.", .{idx}));
+            return idx;
         }
+        comptime var buf: [256]u8 = undefined;
+        @compileError(try bufPrint(&buf, "Handler parameter {} should be *DispatchCtx, not DispatchCtx.", .{idx}));
     }
     return null;
 }
