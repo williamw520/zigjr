@@ -12,6 +12,7 @@ const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const allocPrint = std.fmt.allocPrint;
+const bufPrint = std.fmt.bufPrint;
 const Value = std.json.Value;
 const Array = std.json.Array;
 
@@ -66,22 +67,22 @@ pub const RpcHandler = struct {
     const Self = @This();
 
     context: ?*anyopaque,
-    call: *const fn(context: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
+    call: *const fn(context: ?*anyopaque, dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult,
 
     /// Call the handler call fn with the JSON Value parameters.
-    pub fn invoke(self: *const Self, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
-        return self.call(self.context, cc, params_value);
+    pub fn invoke(self: *const Self, dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+        return self.call(self.context, dc, params_value);
     }
 
     /// Call the handler call fn with the JSON string parameters, convenient method for testing.
-    pub fn invokeJson(self: *const Self, cc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
+    pub fn invokeJson(self: *const Self, dc: *DispatchCtx, params_json: []const u8) anyerror!DispatchResult {
         const trimmed = std.mem.trim(u8, params_json, " ");
         if (trimmed.len == 0) {
-            return self.call(self.context, cc, .{ .null = {} });
+            return self.call(self.context, dc, .{ .null = {} });
         } else {
-            const parsed = try std.json.parseFromSlice(Value, cc.arena(), trimmed, .{});
+            const parsed = try std.json.parseFromSlice(Value, dc.arena(), trimmed, .{});
             defer parsed.deinit();
-            return self.call(self.context, cc, parsed.value);
+            return self.call(self.context, dc, parsed.value);
         }
     }
 };
@@ -136,25 +137,25 @@ pub fn makeRpcHandler(context: anytype, comptime F: anytype) RpcHandler {
     const hinfo = getHandlerInfo(context, F);
 
     const wrapper = struct {
-        fn call(ctx: ?*anyopaque, cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+        fn call(ctx: ?*anyopaque, dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
             // Function expects a single Value or a single struct object.
             if (hinfo.is_value1) {
-                return callOnValue(F, hinfo, ctx, cc, params_value);
+                return callOnValue(F, hinfo, ctx, dc, params_value);
             } else if (hinfo.is_obj1) {
-                return callOnObject(F, hinfo, ctx, cc, params_value);
+                return callOnObject(F, hinfo, ctx, dc, params_value);
             }
             // Function expects no parameter or an array of parameters.
             switch (params_value) {
                 .null   => {
-                    return callOnNull(F, hinfo, ctx, cc);
+                    return callOnNull(F, hinfo, ctx, dc);
                 },
                 .array  => {
-                    return callOnArray(F, hinfo, ctx, cc, params_value.array);
+                    return callOnArray(F, hinfo, ctx, dc, params_value.array);
                 },
                 .bool, .integer, .float, .string => {
                     // JSON-RPC spec doesn't support primitive JSON types for the "params" property.
                     // Add them here for completeness.
-                    return callOnPrimitive(F, hinfo, ctx, cc, params_value);
+                    return callOnPrimitive(F, hinfo, ctx, dc, params_value);
                 },
                 else    => {
                     std.debug.print("Unexpected JSON params: {any}\n", .{params_value});
@@ -183,7 +184,7 @@ const HandlerInfo = struct {
     params:         []const Type.Fn.Param,  // The parameter array of the handler function.
     tuple_type:     type,                   // The type of parameter tuple for calling the handler function.
     ctx_idx:        ?usize,
-    cc_idx:         ?usize,
+    dc_idx:         ?usize,
     alloc_idx:      ?usize,
     user_idx:       usize,                  // The index of the first user parameter of the handler.
     is_value1:      bool,                   // The only user parameter is a std.json.Value.
@@ -197,7 +198,7 @@ const HandlerInfo = struct {
 
     // Whether the handler function has the following argument types.
     inline fn has_ctx(self: HandlerInfo) bool      { return self.ctx_idx != null; }
-    inline fn has_cc(self: HandlerInfo) bool       { return self.cc_idx != null; }
+    inline fn has_dc(self: HandlerInfo) bool       { return self.dc_idx != null; }
     inline fn has_alloc(self: HandlerInfo) bool    { return self.alloc_idx != null; }
 };
 
@@ -208,11 +209,9 @@ inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) Handler
     const params        = fn_info.params;
     const CTX           = @TypeOf(context);
     const ctx_idx       = typeInParams(params, CTX);
-    // TODO: check for non-const *DispatchCtx
-    // TODO: check for DispatchCtx
-    const cc_idx        = typeInParams(params, *DispatchCtx);
+    const dc_idx        = getDispatchCtxParamIdx(params);
     const alloc_idx     = typeInParams(params, std.mem.Allocator);
-    const user_idx      = findUserIdx(ctx_idx, cc_idx, alloc_idx);
+    const user_idx      = findUserIdx(ctx_idx, dc_idx, alloc_idx);
     const is_value1     = params.len == user_idx + 1 and isValue(params[user_idx].type);
     const is_struct     = params.len == user_idx + 1 and isStruct(params[user_idx].type);
     const is_optional1  = params.len == user_idx + 1 and isOptional(params[user_idx].type);
@@ -225,7 +224,7 @@ inline fn getHandlerInfo(context: anytype, comptime handler_fn: anytype) Handler
         .params         = params,
         .tuple_type     = ArgsTupleType(params),
         .ctx_idx        = ctx_idx,
-        .cc_idx         = cc_idx,
+        .dc_idx         = dc_idx,
         .alloc_idx      = alloc_idx,
         .user_idx       = user_idx,
         .is_value1      = is_value1,
@@ -282,13 +281,42 @@ inline fn typeInParams(comptime params: []const Type.Fn.Param, of_type: type) ?u
     return null;
 }
 
-inline fn findUserIdx(ctx_idx: ?usize, cc_idx: ?usize, alc_idx: ?usize) usize {
+inline fn getDispatchCtxParamIdx(comptime params: []const Type.Fn.Param) ?usize {
+    inline for (params, 0..) |p, idx| {
+        if (!hasType(p.type, DispatchCtx))
+            continue;
+        const t_info = @typeInfo(p.type.?);
+        if (t_info == .pointer) {
+            if (t_info.pointer.is_const) {
+                comptime var buf: [256]u8 = undefined;
+                @compileError(try bufPrint(&buf, "Parameter {} should be *DispatchCtx, not *const DispatchCtx.", .{idx}));
+            } else {
+                return idx;
+            }
+        } else {
+            comptime var buf: [256]u8 = undefined;
+            @compileError(try bufPrint(&buf, "Parameter {} should be *DispatchCtx, not DispatchCtx.", .{idx}));
+        }
+    }
+    return null;
+}
+
+inline fn findUserIdx(ctx_idx: ?usize, dc_idx: ?usize, alc_idx: ?usize) usize {
     // The user params start after the max index of any of the three arguments.
     comptime var user_idx = 0;
     if (ctx_idx)|i| { user_idx = @max(user_idx, i + 1); }
-    if (cc_idx)|i|  { user_idx = @max(user_idx, i + 1); }
+    if (dc_idx)|i|  { user_idx = @max(user_idx, i + 1); }
     if (alc_idx)|i| { user_idx = @max(user_idx, i + 1); }
     return user_idx;
+}
+
+inline fn getParamType(comptime params: []const Type.Fn.Param, idx: ?usize) ?type {
+    if (idx) |i| {
+        if (i < params.len) {
+            return params[i].type;
+        }
+    }
+    return null;
 }
 
 inline fn getReturnType(comptime T: ?type) ?type {
@@ -332,26 +360,20 @@ inline fn unwrapOptionalType(comptime T: ?type) ?type {
     if (T) |t| {
         const t_info: Type = @typeInfo(t);
         return if (t_info == .optional) t_info.optional.child else t;
-    } else {
-        return null;
     }
+    return null;
 }
 
-inline fn isPointer(comptime T: ?type) bool {
-    if (T) |t| {
-        const t_info: Type = @typeInfo(t);
-        return t_info == .pointer;
-    } else {
-        return false;
-    }
-}
-
-inline fn unwrapPtrType(comptime T: ?type) type {
-    if (T) |t| {
+inline fn unwrapPointerType(comptime T: ?type) ?type {
+    if (unwrapOptionalType(T)) |t| {
         const t_info: Type = @typeInfo(t);
         return if (t_info == .pointer) t_info.pointer.child else t;
     }
-    return T;
+    return null;
+}
+
+inline fn hasType(comptime T: ?type, of_type: type) bool {
+    return unwrapPointerType(T) == of_type;
 }
 
 inline fn isValue(comptime T: ?type) bool {
@@ -378,37 +400,37 @@ inline fn hasField(comptime T: type, f_name: []const u8) bool {
 }
 
 fn callOnPrimitive(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-                   cc: *DispatchCtx, json_primitive: Value) anyerror!DispatchResult {
+                   dc: *DispatchCtx, json_primitive: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
 
     // Pack the JSON param into a tuple for F's params.
-    const args: hinfo.tuple_type = try primitiveToTuple(hinfo, ctx, cc, json_primitive);
-    return callF(F, hinfo, args, cc.arena());
+    const args: hinfo.tuple_type = try primitiveToTuple(hinfo, ctx, dc, json_primitive);
+    return callF(F, hinfo, args, dc.arena());
 }
 
 fn callOnValue(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-               cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+               dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
 
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
 
     // Pack the JSON params into a tuple for F's params.
-    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, cc, params_value);
-    return callF(F, hinfo, args, cc.arena());
+    const args: hinfo.tuple_type = jsonValueToTuple(hinfo, ctx, dc, params_value);
+    return callF(F, hinfo, args, dc.arena());
 }
 
 fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque, 
-                cc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
+                dc: *DispatchCtx, params_value: Value) anyerror!DispatchResult {
     if (hinfo.params.len != hinfo.user_idx + 1) {
         return DispatchErrors.MismatchedParamCounts;
     }
 
     if (hinfo.is_optional1 and (isNull(params_value) or isEmptyArray(params_value))) {
-        const args: hinfo.tuple_type = objectToTuple(hinfo, ctx, cc, null);
-        return callF(F, hinfo, args, cc.arena());
+        const args: hinfo.tuple_type = objectToTuple(hinfo, ctx, dc, null);
+        return callF(F, hinfo, args, dc.arena());
     }
     if (params_value != .object) {
         return DispatchErrors.InvalidParams;
@@ -416,31 +438,31 @@ fn callOnObject(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaq
 
     // Map the incoming Value (.object) into a struct object.
     // Alloc is an arena allocator; don't need to free the parsed result here.
-    const parsed = try std.json.parseFromValue(hinfo.obj1_type, cc.arena(), params_value, .{
+    const parsed = try std.json.parseFromValue(hinfo.obj1_type, dc.arena(), params_value, .{
         .ignore_unknown_fields = true,
     });
     const obj1: hinfo.obj1_type = parsed.value;
 
     // Pack JSON array params into a tuple for F's params.
-    const args: hinfo.tuple_type = objectToTuple(hinfo, ctx, cc, obj1);
-    return callF(F, hinfo, args, cc.arena());
+    const args: hinfo.tuple_type = objectToTuple(hinfo, ctx, dc, obj1);
+    return callF(F, hinfo, args, dc.arena());
 }
 
 fn callOnNull(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-              cc: *DispatchCtx) anyerror!DispatchResult {
-    var nullArray = Array.init(cc.arena());
+              dc: *DispatchCtx) anyerror!DispatchResult {
+    var nullArray = Array.init(dc.arena());
     try nullArray.append( .{ .null = {} } );
-    const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, cc, nullArray);
-    return callF(F, hinfo, args, cc.arena());
+    const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, dc, nullArray);
+    return callF(F, hinfo, args, dc.arena());
 }
 
 fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaque,
-               cc: *DispatchCtx, array: Array) anyerror!DispatchResult {
+               dc: *DispatchCtx, array: Array) anyerror!DispatchResult {
     if (hinfo.is_optional1 and array.items.len == 0) {
-        var nullArray = Array.init(cc.arena());
+        var nullArray = Array.init(dc.arena());
         try nullArray.append( .{ .null = {} } );
-        const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, cc, nullArray);
-        return callF(F, hinfo, args, cc.arena());
+        const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, dc, nullArray);
+        return callF(F, hinfo, args, dc.arena());
     }
 
     if (hinfo.params.len != hinfo.user_idx + array.items.len) {
@@ -448,8 +470,8 @@ fn callOnArray(comptime F: anytype, comptime hinfo: HandlerInfo, ctx: ?*anyopaqu
     }
 
     // Pack the JSON array params into a tuple for F's params.
-    const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, cc, array);
-    return callF(F, hinfo, args, cc.arena());
+    const args: hinfo.tuple_type = try arrayToTuple(hinfo, ctx, dc, array);
+    return callF(F, hinfo, args, dc.arena());
 }
 
 // Finally calling the function with the args. Pack its result into DispatchResult.
@@ -490,7 +512,7 @@ fn toDispatchResult(comptime hinfo: HandlerInfo, alloc: Allocator, result: anyty
     }
 }
 
-fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx) hinfo.tuple_type {
+fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx) hinfo.tuple_type {
     var tuple: hinfo.tuple_type = undefined;
 
     // Assign the context and alloc to the appropriate function argument slots in the tuple.
@@ -499,13 +521,13 @@ fn initArgsTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx
         const idx = idxStr(hinfo.ctx_idx.?);
         @field(tuple, idx) = ctx_ptr;
     }
-    if (hinfo.has_cc()) {
-        const idx = idxStr(hinfo.cc_idx.?);
-        @field(tuple, idx) = cc;
+    if (hinfo.has_dc()) {
+        const idx = idxStr(hinfo.dc_idx.?);
+        @field(tuple, idx) = dc;
     }
     if (hinfo.has_alloc()) {
         const idx = idxStr(hinfo.alloc_idx.?);
-        @field(tuple, idx) = cc.arena();
+        @field(tuple, idx) = dc.arena();
     }
     return tuple;
 }
@@ -517,18 +539,18 @@ inline fn idxStr(comptime idx: usize) []const u8 {
     unreachable;
 }
 
-fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
+fn jsonValueToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                     value: Value) hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     @field(tuple, t_field.name) = value;        // Value for the single argument.
     return tuple;
 }
 
-fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
+fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                     primitive_value: Value) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     const value = try valueAs(t_field.type).from(primitive_value);
@@ -536,9 +558,9 @@ fn primitiveToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *Dispatch
     return tuple;
 }
 
-fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
+fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                 values: Array) !hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const start_idx = hinfo.user_idx;
     // Fill in the rest of the user specific parameters.
@@ -548,7 +570,7 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
         if (isValue(t_field.type)) {
             @field(tuple, t_field.name) = j_value;
         } else if (isStruct(t_field.type)) {
-            const parsed = try std.json.parseFromValue(t_field.type, cc.arena(), j_value, .{
+            const parsed = try std.json.parseFromValue(t_field.type, dc.arena(), j_value, .{
                 .ignore_unknown_fields = true,
             });
             @field(tuple, t_field.name) = parsed.value;
@@ -562,9 +584,9 @@ fn arrayToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
 }
 
 // For optional paramenter, hinfo.obj1_type already has the optional type.
-fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx,
+fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, dc: *DispatchCtx,
                  object: hinfo.obj1_type) hinfo.tuple_type {
-    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, cc);
+    var tuple: hinfo.tuple_type = initArgsTuple(hinfo, ctx, dc);
     const tt_info = @typeInfo(hinfo.tuple_type).@"struct";
     const t_field = tt_info.fields[hinfo.user_idx];
     @field(tuple, t_field.name) = object;
@@ -576,10 +598,9 @@ fn objectToTuple(comptime hinfo: HandlerInfo, ctx: ?*anyopaque, cc: *DispatchCtx
 fn valueAs(comptime ParamType: type) type {
     const is_optional = @typeInfo(ParamType) == .optional;
     const OParamType = unwrapOptionalType(ParamType).?;
-    const pt_info = @typeInfo(OParamType);
 
     // Validate supported primitive types for parameter value.
-    validateSupportedPrimitiveTypes(pt_info);
+    validateSupportedPrimitiveTypes(OParamType);
 
     return struct {
         pub fn from(json_value: Value) !ParamType {
@@ -591,7 +612,7 @@ fn valueAs(comptime ParamType: type) type {
                 return null;
             }
 
-            switch (pt_info) {
+            switch (@typeInfo(OParamType)) {
                 .bool => switch (json_value) {
                     .bool       => |x| return x,
                     .integer    => |x| return x != 0,
@@ -634,25 +655,30 @@ fn valueAs(comptime ParamType: type) type {
 
 }
 
-fn validateSupportedPrimitiveTypes(comptime paramType: std.builtin.Type) void {
-    switch (paramType) {
+fn validateSupportedPrimitiveTypes(comptime ParamType: type) void {
+    switch (@typeInfo(ParamType)) {
         .bool => {},
-        .int => {
-            if (paramType.int.signedness == .unsigned)
-                @compileError("Required signed integer, at least i64.");
-            if (paramType.int.bits < 64)
-                @compileError("Required at least i64 for integer.");
+        .int => |int_info| {
+            if (int_info.signedness == .unsigned)
+                @compileError("Required signed integer, at least i64. Parameter type: " ++ @typeName(ParamType));
+            if (int_info.bits < 64)
+                @compileError("Required at least i64 for integer. ParamType type: " ++ @typeName(ParamType));
         },
-        .float => {
-            if (paramType.float.bits < 64)
-                @compileError("Required at least f64 for floating point number.");
+        .float => |float_info| {
+            if (float_info.bits < 64)
+                @compileError("Required at least f64 for floating point number. ParamType type: " ++ @typeName(ParamType));
         },
         .pointer => |ptr| {
-            if (ptr.child != u8)
-                @compileError("String slice requires the '[]const u8' type.");
+            if (ptr.child != u8) {
+                if (ptr.size == .one) {
+                    @compileError("Unsupported parameter pointer type: " ++ @typeName(ParamType));
+                } else {
+                    @compileError("Unsupported parameter slice type: " ++ @typeName(ParamType));
+                }
+            }
         },
         else => {
-            @compileError(std.fmt.comptimePrint("Unsupported primitive parameter type: {any}", .{paramType}));
+            @compileError("Unsupported primitive parameter type: " ++ @typeName(ParamType));
         }
     }
 }
