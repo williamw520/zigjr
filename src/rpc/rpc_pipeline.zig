@@ -53,7 +53,6 @@ pub const RequestPipeline = struct {
     arena_ptr:      *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
     arena_alloc:    Allocator,
     req_dispatcher: RequestDispatcher,
-    logger:         zigjr.Logger,   // TODO: remove, use the logger in dc.
     response_buf:   std.Io.Writer.Allocating,
     dc:             DispatchCtxImpl,
 
@@ -69,7 +68,6 @@ pub const RequestPipeline = struct {
             .arena_ptr = arena_ptr,
             .arena_alloc = arena_alloc,
             .req_dispatcher = req_dispatcher,
-            .logger = l,
             .response_buf = std.Io.Writer.Allocating.init(alloc),
             .dc = .{
                 .arena = arena_alloc,
@@ -79,7 +77,7 @@ pub const RequestPipeline = struct {
     }
 
     pub fn deinit(self: *RequestPipeline) void {
-        self.logger.stop("[RequestPipeline.deinit] Logging stops");
+        self.dc.logger.stop("[RequestPipeline.deinit] Logging stops");
         self.response_buf.deinit();
         self.arena_ptr.deinit();
         const backing_alloc = self.arena_ptr.child_allocator;
@@ -94,7 +92,7 @@ pub const RequestPipeline = struct {
     /// The function returns a RunStatus indicating whether any response has been written,
     /// as notification requests have no response.
     pub fn runRequest(self: *RequestPipeline, request_json: []const u8) std.Io.Writer.Error!RunStatus {
-        self.logger.log("RequestPipeline.runRequest", "request ", request_json);
+        self.dc.logger.log("RequestPipeline.runRequest", "request ", request_json);
         self.resetResponseBuffer();
 
         var parsed_request = parseRpcRequest(self.alloc, request_json);
@@ -104,7 +102,7 @@ pub const RequestPipeline = struct {
             .request => |*req| try self.processRpcRequest(req, "", true),
         };
         if (run_status.hasReply()) {
-            self.logger.log("RequestPipeline.runRequest", "response", self.responseJson());
+            self.dc.logger.log("RequestPipeline.runRequest", "response", self.responseJson());
         }
         return run_status;
     }
