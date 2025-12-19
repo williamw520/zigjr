@@ -47,11 +47,10 @@ pub fn main() !void {
     defer rpc_dispatcher.deinit();
 
     // Register the MCP RPC methods.
-    // Pass the logger in as the context so handlers can also log to the log file.
-    try rpc_dispatcher.addWithCtx("initialize", &f_logger, mcp_initialize);
-    try rpc_dispatcher.addWithCtx("notifications/initialized", &f_logger, mcp_notifications_initialized);
-    try rpc_dispatcher.addWithCtx("tools/list", &f_logger, mcp_tools_list);
-    try rpc_dispatcher.addWithCtx("tools/call", &f_logger, mcp_tools_call);
+    try rpc_dispatcher.add("initialize", mcp_initialize);
+    try rpc_dispatcher.add("notifications/initialized", mcp_notifications_initialized);
+    try rpc_dispatcher.add("tools/list", mcp_tools_list);
+    try rpc_dispatcher.add("tools/call", mcp_tools_call);
 
     // Starts the JSON streaming pipeline from stdin to stdout.
     const dispatcher = zigjr.RequestDispatcher.implBy(&rpc_dispatcher);
@@ -66,10 +65,9 @@ pub fn main() !void {
 // ZigJR automatically does the mapping between the structs and the JSON objects.
 
 // First message from a MCP client to do the initial handshake.
-fn mcp_initialize(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
-                  params: InitializeRequest_params) !InitializeResult {
+fn mcp_initialize(dc: *zigjr.DispatchCtx, params: InitializeRequest_params) !InitializeResult {
     const msg = try allocPrint(dc.arena(), "client name: {s}, version: {s}", .{params.clientInfo.name, params.clientInfo.version});
-    logger.log("mcp_initialize", "initialize", msg);
+    dc.logger().log("mcp_initialize", "initialize", msg);
 
     return .{
         .protocolVersion = "2025-03-26",    // https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/schema/2025-03-26
@@ -84,16 +82,14 @@ fn mcp_initialize(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
     };
 }
 
-fn mcp_notifications_initialized(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
-                                 params: InitializedNotification_params) !void {
+fn mcp_notifications_initialized(dc: *zigjr.DispatchCtx, params: InitializedNotification_params) !void {
     const msg = try allocPrint(dc.arena(), "params: {any}", .{params});
-    logger.log("mcp_notifications_initialized", "notifications/initialized", msg);
+    dc.logger().log("mcp_notifications_initialized", "notifications/initialized", msg);
 }
 
-fn mcp_tools_list(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
-                  params: ListToolsRequest_params) !ListToolsResult {
+fn mcp_tools_list(dc: *zigjr.DispatchCtx, params: ListToolsRequest_params) !ListToolsResult {
     const msg = try allocPrint(dc.arena(), "params: {any}", .{params});
-    logger.log("mcp_tools_list", "tools/list", msg);
+    dc.logger().log("mcp_tools_list", "tools/list", msg);
     var tools: std.ArrayList(Tool) = .empty;
 
     const helloTool = Tool.init(dc.arena(), "hello", "Replying a 'Hello World' when called.");
@@ -116,10 +112,10 @@ fn mcp_tools_list(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx,
     };
 }
 
-fn mcp_tools_call(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx, params: Value) !CallToolResult {
+fn mcp_tools_call(dc: *zigjr.DispatchCtx, params: Value) !CallToolResult {
     const tool = params.object.get("name").?.string;
     const msg = try allocPrint(dc.arena(), "tool name: {s}", .{tool});
-    logger.log("mcp_tools_call", "tools/call", msg);
+    dc.logger().log("mcp_tools_call", "tools/call", msg);
 
     // We'll just do a poorman's dispatching on the MCP tool name.
     if (std.mem.eql(u8, tool, "hello")) {
@@ -129,7 +125,7 @@ fn mcp_tools_call(logger: *zigjr.FileLogger, dc: *zigjr.DispatchCtx, params: Val
     } else if (std.mem.eql(u8, tool, "hello-name")) {
         const arguments = params.object.get("arguments").?.object;
         const name = arguments.get("name") orelse Value{ .string = "not set" };
-        logger.log("mcp_tools_call", "arguments", name.string);
+        dc.logger().log("mcp_tools_call", "arguments", name.string);
 
         var ctr = CallToolResult.init(dc.arena());
         try ctr.addTextContent(try allocPrint(dc.arena(), "Hello '{s}'!", .{name.string}));

@@ -22,7 +22,7 @@ pub const nop_request = RpcRequest{};
 
 pub const DispatchCtxImpl = struct {
     arena:          Allocator,      // per-request arena allocator
-    logger:         zigjr.Logger,
+    logger:         zigjr.Logger,   // logger is usually set to the passed in logger in RequestPipeline or in the stream API.
     // per-request request and result
     request:        *const zigjr.RpcRequest = &nop_request,
     result:         zigjr.DispatchResult = .asNone(),

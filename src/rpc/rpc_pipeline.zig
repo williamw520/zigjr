@@ -53,7 +53,7 @@ pub const RequestPipeline = struct {
     arena_ptr:      *ArenaAllocator, // arena needs to be a ptr to the struct to survive copying.
     arena_alloc:    Allocator,
     req_dispatcher: RequestDispatcher,
-    logger:         zigjr.Logger,
+    logger:         zigjr.Logger,   // TODO: remove, use the logger in dc.
     response_buf:   std.Io.Writer.Allocating,
     dc:             DispatchCtxImpl,
 
